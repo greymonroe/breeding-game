@@ -40,8 +40,8 @@ import { TECHS_BY_ID, canUnlock, type TechId } from '../src/game/progression';
 
 const FUNCTIONAL_LOCI = [
   'COLOR', 'SHAPE', 'DR',
-  'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6', 'Y7',
-  'F1', 'F2', 'F3',
+  'Y1', 'Y2', 'Y4', 'Y7', 'Y8', 'Y11', 'Y15', 'Y16', 'Y19', 'Y22',
+  'F1', 'F4', 'F7',
 ];
 
 export interface Variety {
@@ -204,7 +204,7 @@ export class HeadlessGame {
       const resReleasedDuring = this.releases.some(
         (r) => r.releasedAt >= this.diseaseStartedAt! && r.resistant
       );
-      if (resReleasedDuring || this.season - this.diseaseStartedAt >= 8) {
+      if (resReleasedDuring || this.season - this.diseaseStartedAt >= 5) {
         this.diseaseActive = false;
         this.diseaseStartedAt = null;
       }
@@ -268,10 +268,6 @@ export class HeadlessGame {
       group.sort((a, b) => b.traits.yield - a.traits.yield);
       winners.add(group[0].id);
     }
-    // Diversity multiplier: He > 0.15 → +10% bonus, He < 0.05 → -15% penalty (inbreeding depression)
-    const he = meanHe(this.main, this.map);
-    const diversityMultiplier = he > 0.15 ? 1.1 : he < 0.05 ? 0.85 : 1.0;
-
     let total = 0;
     for (const r of this.releases) {
       const base = varietyBaseRevenue({
@@ -284,7 +280,7 @@ export class HeadlessGame {
       const share = winners.has(r.id) ? 1 : COMPETITION_LOSER_SHARE;
       const seg = segmentKey(r.traits.color, r.resistant);
       const demand = this.market[seg];
-      const rev = Math.round(base * share * demand * this.trust * diversityMultiplier);
+      const rev = Math.round(base * share * demand * this.trust);
       r.lastSeasonRevenue = rev;
       r.totalEarned += rev;
       total += rev;
@@ -386,6 +382,11 @@ export class HeadlessGame {
     const wild = randomFounder(this.map, this.rng);
     wild.genotype.haplotypes[0].set('DR', 'R');
     wild.genotype.haplotypes[1].set('DR', 'R');
+    // Linkage drag: DR(25cM) and Y4(33cM) are 8cM apart on chr2.
+    // Wild carries DR=R with Y4=- (unfavorable). Introgressing DR=R
+    // drags Y4=- along — player must screen large F2 for rare recombinant.
+    wild.genotype.haplotypes[0].set('Y4', '-');
+    wild.genotype.haplotypes[1].set('Y4', '-');
     for (const t of this.traits) {
       if (FREE_PHENOTYPES.has(t.name)) {
         wild.phenotype.set(t.name, computePhenotype(wild, t, this.rng));

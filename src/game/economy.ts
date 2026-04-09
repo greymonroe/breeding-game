@@ -97,10 +97,10 @@ export function meanRevertMarket(
 }
 
 /** Market drift per season — the rest of the world is breeding too. */
-export const MARKET_DRIFT_PER_SEASON = 0.5;
+export const MARKET_DRIFT_PER_SEASON = 0.7;
 
 /** Probability per season of a disease outbreak triggering (after grace gens). */
-export const DISEASE_OUTBREAK_CHANCE = 0.24;
+export const DISEASE_OUTBREAK_CHANCE = 0.20;
 /** Number of generations of grace before disease outbreaks can occur. */
 export const DISEASE_GRACE_GENERATIONS = 4;
 

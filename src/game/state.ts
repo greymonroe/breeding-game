@@ -239,8 +239,8 @@ function findNurseryFor(nurseries: Nursery[], indId: string): Nursery | null {
  *  for traits the player cares about). Used to compute variety uniformity. */
 const FUNCTIONAL_LOCI = [
   'COLOR', 'SHAPE', 'DR',
-  'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6', 'Y7',
-  'F1', 'F2', 'F3',
+  'Y1', 'Y2', 'Y4', 'Y7', 'Y8', 'Y11', 'Y15', 'Y16', 'Y19', 'Y22',
+  'F1', 'F4', 'F7',
 ];
 
 function makeInitial(): Omit<GameState,
@@ -469,7 +469,7 @@ export const useGame = create<GameState>((set, get) => ({
       const releasedDuringOutbreak = s.releases.some(
         (r) => r.releasedAtSeason >= diseaseStartedAt! && r.resistant
       );
-      if (releasedDuringOutbreak || newSeason - diseaseStartedAt >= 8) {
+      if (releasedDuringOutbreak || newSeason - diseaseStartedAt >= 5) {
         diseaseActive = false;
         diseaseStartedAt = null;
         notices.push(notice('🌤 Disease pressure subsided. Markets recovering.'));
@@ -545,9 +545,6 @@ export const useGame = create<GameState>((set, get) => ({
     // Trust slowly recovers toward 1.0 each season
     const newTrust = Math.min(1, s.trust + 0.01);
 
-    // Diversity multiplier: He > 0.15 → +10% bonus, He < 0.05 → -15% penalty (inbreeding depression)
-    const diversityMultiplier = stat.he > 0.15 ? 1.1 : stat.he < 0.05 ? 0.85 : 1.0;
-
     let totalIncome = 0;
     const updatedReleases = s.releases.map((r) => {
       const base = varietyBaseRevenue({
@@ -560,7 +557,7 @@ export const useGame = create<GameState>((set, get) => ({
       const share = winners.has(r.id) ? 1 : COMPETITION_LOSER_SHARE;
       const seg = segmentKey(r.traits.color, r.resistant);
       const demand = market[seg];
-      const rev = Math.round(base * share * demand * newTrust * diversityMultiplier);
+      const rev = Math.round(base * share * demand * newTrust);
       totalIncome += rev;
       return { ...r, lastSeasonRevenue: rev, totalEarned: r.totalEarned + rev };
     });
@@ -910,6 +907,10 @@ export const useGame = create<GameState>((set, get) => ({
     const wild = randomFounder(s.map, s.rng);
     wild.genotype.haplotypes[0].set('DR', 'R');
     wild.genotype.haplotypes[1].set('DR', 'R');
+    // Linkage drag: Y4(33cM) is 8cM from DR(25cM) on chr2.
+    // Wild carries Y4=- linked to DR=R.
+    wild.genotype.haplotypes[0].set('Y4', '-');
+    wild.genotype.haplotypes[1].set('Y4', '-');
     phenotypeAll(wild, s.traits, s.rng);
     stripPaidPhenotypes(wild);
     set({

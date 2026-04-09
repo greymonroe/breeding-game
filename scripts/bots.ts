@@ -282,11 +282,12 @@ const smartBot: BotFn = (g) => {
 
   let bestRedYield = 0;
   let wildAcquired = false;
+  let resistantPool: Individual[] = [];
 
   for (let s = 0; s < MAX_SEASONS && g.cash > 50; s++) {
     // Adaptive sizing
     const popSize = g.cash > 800 ? 30 : g.cash > 400 ? 20 : 12;
-    const nP = Math.max(4, Math.min(10, Math.floor(popSize * 0.35)));
+    const nP = Math.max(8, Math.min(14, Math.floor(popSize * 0.45)));
 
     // Buy tech in order when affordable
     if (g.cash > 500 && !g.unlocked.has('controlled_cross')) g.buyTech('controlled_cross');
@@ -340,7 +341,7 @@ const smartBot: BotFn = (g) => {
     }
 
     // Disease response: acquire wild + introgress
-    if (!wildAcquired && g.unlocked.has('wild_germplasm') && (g.diseaseActive || g.season >= 8) && g.cash > 150) {
+    if (!wildAcquired && g.unlocked.has('wild_germplasm') && (g.diseaseActive || g.season >= 6) && g.cash > 150) {
       const wild = g.acquireWild();
       const bestElite = g.sortByYield(g.main)[0];
       if (bestElite && g.cash > 60) {
@@ -361,11 +362,37 @@ const smartBot: BotFn = (g) => {
           if (resYield.length > 0) {
             const line = inbreed(g, resYield[0], 3, 12);
             if (line) g.release(line);
+            resistantPool = resYield.slice(0, 5);
           }
           g.populations.delete('_intro');
         }
       }
       wildAcquired = true;
+    }
+
+    // Periodically improve resistant lines via backcross to elite
+    if (resistantPool.length > 0 && g.season % 6 === 0 && g.cash > 150) {
+      const bestElite = g.sortByYield(g.main)[0];
+      const bestRes = resistantPool[0];
+      if (bestElite && bestRes) {
+        const bc = g.crossTwo(bestElite, bestRes, 15);
+        g.cash -= 15;
+        g.populations.set('_bc', bc);
+        g.measureAllTraits('_bc');
+        const bcPop = g.populations.get('_bc') ?? [];
+        const resistant = bcPop.filter((p) => {
+          const a = p.genotype.haplotypes[0].get('DR');
+          const b = p.genotype.haplotypes[1].get('DR');
+          return a === 'R' || b === 'R';
+        });
+        const resYield = g.sortByYield(resistant);
+        if (resYield.length > 0) {
+          const line = inbreed(g, resYield[0], 3, 12);
+          if (line) g.release(line);
+          resistantPool = resYield.slice(0, 5);
+        }
+        g.populations.delete('_bc');
+      }
     }
 
     // Release red — only if significantly better than last
