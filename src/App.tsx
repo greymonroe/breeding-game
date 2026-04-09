@@ -9,6 +9,7 @@ import { MarketPanel } from './components/MarketPanel';
 import { Objectives } from './components/Objectives';
 import { ContextualHints } from './components/ContextualHints';
 import { ChallengeModal } from './challenges/components/ChallengeModal';
+import { MeiosisAnimation } from './challenges/visualizations/MeiosisAnimation';
 
 type Tab = 'field' | 'lab' | 'data' | 'tech';
 
@@ -18,6 +19,9 @@ export default function App() {
   const notices = useGame((s) => s.notices);
   const dismissNotice = useGame((s) => s.dismissNotice);
   const activeChallenge = useGame((s) => s.activeChallenge);
+  const meiosisTrace = useGame((s) => s.meiosisTrace);
+  const dismissMeiosis = useGame((s) => s.dismissMeiosis);
+  const chromosomes = useGame((s) => s.map.chromosomes.map((c) => ({ id: c.id, length: c.length })));
 
   return (
     <div className="min-h-screen bg-surface text-ink">
@@ -85,6 +89,14 @@ export default function App() {
       </main>
 
       {activeChallenge && <ChallengeModal />}
+      {meiosisTrace && (
+        <MeiosisAnimation
+          chromosomes={chromosomes}
+          maternalCrossovers={meiosisTrace.maternalCrossovers}
+          paternalCrossovers={meiosisTrace.paternalCrossovers}
+          onComplete={dismissMeiosis}
+        />
+      )}
     </div>
   );
 }

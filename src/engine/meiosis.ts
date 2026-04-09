@@ -12,6 +12,51 @@ import type { Genotype, GenomeMap, Haplotype, RNG } from './types';
  *   - linkage between nearby loci
  *   - r → 0.5 for unlinked loci on the same chromosome
  */
+/** A crossover event: which chromosome and at what position (cM) the haplotype switched. */
+export interface CrossoverEvent {
+  chromosomeId: number;
+  /** Position in cM where the crossover occurred (midpoint between flanking loci). */
+  position: number;
+  /** Which haplotype was active AFTER the crossover (0 or 1). */
+  newActive: 0 | 1;
+}
+
+/**
+ * Produce a gamete and record all crossover events for visualization.
+ * Returns both the gamete haplotype and the list of crossover positions.
+ */
+export function produceGameteWithTrace(
+  genotype: Genotype, map: GenomeMap, rng: RNG
+): { gamete: Haplotype; crossovers: CrossoverEvent[] } {
+  const out: Haplotype = new Map();
+  const crossovers: CrossoverEvent[] = [];
+  const [hA, hB] = genotype.haplotypes;
+
+  for (const chrom of map.chromosomes) {
+    const loci = [...chrom.loci].sort((a, b) => a.position - b.position);
+    if (loci.length === 0) continue;
+
+    let active: 0 | 1 = rng() < 0.5 ? 0 : 1;
+    const src = () => (active === 0 ? hA : hB);
+
+    out.set(loci[0].id, src().get(loci[0].id)!);
+    for (let i = 1; i < loci.length; i++) {
+      const d = loci[i].position - loci[i - 1].position;
+      const r = 0.5 * (1 - Math.exp((-2 * d) / 100));
+      if (rng() < r) {
+        active = active === 0 ? 1 : 0;
+        crossovers.push({
+          chromosomeId: chrom.id,
+          position: (loci[i - 1].position + loci[i].position) / 2,
+          newActive: active,
+        });
+      }
+      out.set(loci[i].id, src().get(loci[i].id)!);
+    }
+  }
+  return { gamete: out, crossovers };
+}
+
 export function produceGamete(genotype: Genotype, map: GenomeMap, rng: RNG): Haplotype {
   const out: Haplotype = new Map();
   const [hA, hB] = genotype.haplotypes;

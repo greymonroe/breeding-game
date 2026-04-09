@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   computePhenotype,
   crossIndividuals,
+  produceGameteWithTrace,
   discoverAssociations,
   geneEdit,
   genomicSelect,
@@ -164,6 +165,12 @@ interface GameState {
   challengeCompletion: Map<string, ChallengeCompletion>;
   activeChallenge: { definitionId: string; instance: ChallengeInstance } | null;
 
+  // ── Meiosis animation ──
+  meiosisTrace: {
+    maternalCrossovers: Array<{ chromosomeId: number; position: number; newActive: 0 | 1 }>;
+    paternalCrossovers: Array<{ chromosomeId: number; position: number; newActive: 0 | 1 }>;
+  } | null;
+
   // ── Selectors ──
   activeNursery: () => Nursery;
   population: () => Individual[]; // active nursery's plants
@@ -204,6 +211,7 @@ interface GameState {
   startChallenge: (definitionId: string) => void;
   submitChallenge: (playerAnswer: unknown) => ChallengeResult;
   dismissChallenge: () => void;
+  dismissMeiosis: () => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -264,7 +272,7 @@ function makeInitial(): Omit<GameState,
   | 'acquireWildAccession' | 'introducePlantFromBank' | 'mutagenizeField'
   | 'editIndividual' | 'trainPredictor' | 'dismissNotice' | 'reset'
   | 'measureTrait' | 'makeControlledCross'
-  | 'startChallenge' | 'submitChallenge' | 'dismissChallenge'> {
+  | 'startChallenge' | 'submitChallenge' | 'dismissChallenge' | 'dismissMeiosis'> {
   const seed = Math.floor(Math.random() * 1e9);
   const rng = makeRng(seed);
   const starter = makeStarterPopulation(seed);
@@ -308,6 +316,7 @@ function makeInitial(): Omit<GameState,
     predictor: null,
     challengeCompletion: new Map(),
     activeChallenge: null,
+    meiosisTrace: null,
   };
 }
 
@@ -910,6 +919,13 @@ export const useGame = create<GameState>((set, get) => ({
       return;
     }
     const offspring = crossIndividuals(parentA, parentB, s.map, s.traits, s.rng, count);
+    // Capture meiosis crossover events for animation (run extra trace on parents)
+    const matTrace = produceGameteWithTrace(parentA.genotype, s.map, s.rng);
+    const patTrace = produceGameteWithTrace(parentB.genotype, s.map, s.rng);
+    const meiosisTrace = {
+      maternalCrossovers: matTrace.crossovers,
+      paternalCrossovers: patTrace.crossovers,
+    };
     const familyId = isSelf
       ? `self_${parentAId}_s${s.season}`
       : `fam_${parentAId}_${parentBId}_${s.season}`;
@@ -940,6 +956,7 @@ export const useGame = create<GameState>((set, get) => ({
         ),
       ],
       selectedIds: [],
+      meiosisTrace,
     });
   },
 
@@ -1085,4 +1102,5 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   dismissChallenge: () => set({ activeChallenge: null }),
+  dismissMeiosis: () => set({ meiosisTrace: null }),
 }));
