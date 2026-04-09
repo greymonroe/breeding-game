@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Individual, Trait } from '../engine';
 import { MEASURE_COST } from '../game/economy';
+import { GenotypeBar } from '../challenges/visualizations/GenotypeBar';
 
 interface Props {
   ind: Individual;
@@ -92,6 +93,7 @@ export function PlantCard({ ind, selected, onClick }: Props) {
           {' / '}
           {flavor != null ? flavor.toFixed(0) : '?'}
         </div>
+        <GenotypeBar haplotypes={ind.genotype.haplotypes} />
       </button>
 
       {showTooltip && (

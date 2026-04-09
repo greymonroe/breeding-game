@@ -43,6 +43,9 @@ import {
   type SegmentId,
 } from './economy';
 import { canUnlock, TECHS_BY_ID, type TechId } from './progression';
+import type { ChallengeCompletion, ChallengeInstance, ChallengeResult } from '../challenges/types';
+import { ALL_CHALLENGES, TECH_CHALLENGES, BONUS_CHALLENGES } from '../challenges/registry';
+import { buildChallengeContext, generateChallenge, validateChallenge } from '../challenges/engine';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Types
@@ -157,6 +160,10 @@ interface GameState {
   germplasm: Individual[];
   predictor: GenomicPredictor | null;
 
+  // ── Challenges ──
+  challengeCompletion: Map<string, ChallengeCompletion>;
+  activeChallenge: { definitionId: string; instance: ChallengeInstance } | null;
+
   // ── Selectors ──
   activeNursery: () => Nursery;
   population: () => Individual[]; // active nursery's plants
@@ -192,6 +199,11 @@ interface GameState {
   trainPredictor: () => void;
   dismissNotice: (id: number) => void;
   reset: () => void;
+
+  // ── Challenge actions ──
+  startChallenge: (definitionId: string) => void;
+  submitChallenge: (playerAnswer: unknown) => ChallengeResult;
+  dismissChallenge: () => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -251,7 +263,8 @@ function makeInitial(): Omit<GameState,
   | 'advanceSeason' | 'release' | 'unlockTech' | 'genotypeAll' | 'runGwas'
   | 'acquireWildAccession' | 'introducePlantFromBank' | 'mutagenizeField'
   | 'editIndividual' | 'trainPredictor' | 'dismissNotice' | 'reset'
-  | 'measureTrait' | 'makeControlledCross'> {
+  | 'measureTrait' | 'makeControlledCross'
+  | 'startChallenge' | 'submitChallenge' | 'dismissChallenge'> {
   const seed = Math.floor(Math.random() * 1e9);
   const rng = makeRng(seed);
   const starter = makeStarterPopulation(seed);
@@ -293,6 +306,8 @@ function makeInitial(): Omit<GameState,
     markers: makeMarkerKnowledge(),
     germplasm: [],
     predictor: null,
+    challengeCompletion: new Map(),
+    activeChallenge: null,
   };
 }
 
@@ -583,6 +598,23 @@ export const useGame = create<GameState>((set, get) => ({
       notices.push(notice('⚠ Diversity (He) is low in your active nursery. Pull in fresh material.'));
     }
 
+    // Bonus challenge trigger: ~20% chance per season, min 4 seasons apart
+    const lastBonusSeason = s.history.findIndex((h) => h.season === newSeason) === -1 ? -10 : -10;
+    if (
+      BONUS_CHALLENGES.length > 0 &&
+      newSeason >= 3 &&
+      s.rng() < 0.20 &&
+      !s.activeChallenge
+    ) {
+      const uncompleted = BONUS_CHALLENGES.filter((b) => !s.challengeCompletion.has(b.id));
+      if (uncompleted.length > 0) {
+        const pick = uncompleted[Math.floor(s.rng() * uncompleted.length)];
+        newsItems.push(news(`🧪 A farmer has a genetics question for you! Check the notification bar.`, newSeason, 'system'));
+        notices.push(notice(`🧪 Bonus challenge available: "${pick.title}" — earn $${pick.reward}!`));
+      }
+    }
+    void lastBonusSeason;
+
     set({
       nurseries: newNurseries,
       archive,
@@ -740,6 +772,17 @@ export const useGame = create<GameState>((set, get) => ({
     const s = get();
     const tech = TECHS_BY_ID[id];
     if (!canUnlock(tech, s.unlocked, s.budget.cash)) return false;
+
+    // If this tech has a challenge that hasn't been completed, start it instead
+    const challenge = TECH_CHALLENGES[id];
+    if (challenge && !s.challengeCompletion.has(challenge.id)) {
+      const ctx = buildChallengeContext(s as unknown as Parameters<typeof buildChallengeContext>[0]);
+      const instance = generateChallenge(challenge, ctx);
+      set({ activeChallenge: { definitionId: challenge.id, instance } });
+      return false; // unlock happens after challenge completion
+    }
+
+    // No challenge or already completed — unlock directly
     const next = new Set(s.unlocked);
     next.add(id);
     set({
@@ -994,4 +1037,52 @@ export const useGame = create<GameState>((set, get) => ({
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
 
   reset: () => set(makeInitial()),
+
+  // ── Challenge actions ──
+
+  startChallenge: (definitionId) => {
+    const s = get();
+    const def = ALL_CHALLENGES[definitionId];
+    if (!def) return;
+    const ctx = buildChallengeContext(s as unknown as Parameters<typeof buildChallengeContext>[0]);
+    const instance = generateChallenge(def, ctx);
+    set({ activeChallenge: { definitionId, instance } });
+  },
+
+  submitChallenge: (playerAnswer) => {
+    const s = get();
+    if (!s.activeChallenge) return { correct: false, explanation: 'No active challenge.' };
+    const { definitionId, instance } = s.activeChallenge;
+    const result = validateChallenge(definitionId, instance, playerAnswer);
+
+    if (result.correct) {
+      const prev = s.challengeCompletion.get(definitionId);
+      const next = new Map(s.challengeCompletion);
+      next.set(definitionId, { completedAt: s.season, attempts: (prev?.attempts ?? 0) + 1 });
+
+      // If this is a tech unlock challenge, unlock the tech now
+      const def = ALL_CHALLENGES[definitionId];
+      const updates: Partial<GameState> = { challengeCompletion: next };
+      if (def?.techId) {
+        const tech = TECHS_BY_ID[def.techId];
+        if (tech && !s.unlocked.has(def.techId) && s.budget.cash >= tech.cost) {
+          const nextUnlocked = new Set(s.unlocked);
+          nextUnlocked.add(def.techId);
+          updates.unlocked = nextUnlocked;
+          updates.budget = spend(s.budget, tech.cost, `researched ${tech.name}`, s.season);
+          updates.notices = [...s.notices, notice(`🔓 Unlocked: ${tech.name} — ${tech.blurb}`)];
+        }
+      }
+      // Bonus challenge cash reward
+      if (def?.reward) {
+        const b = updates.budget ?? s.budget;
+        updates.budget = { cash: b.cash + def.reward, history: [...b.history, { generation: s.season, cash: b.cash + def.reward, reason: `+$${def.reward} challenge reward` }] };
+      }
+
+      set(updates as Partial<typeof s>);
+    }
+    return result;
+  },
+
+  dismissChallenge: () => set({ activeChallenge: null }),
 }));

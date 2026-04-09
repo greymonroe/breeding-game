@@ -8,6 +8,7 @@ import { TechTreeView } from './components/TechTreeView';
 import { MarketPanel } from './components/MarketPanel';
 import { Objectives } from './components/Objectives';
 import { ContextualHints } from './components/ContextualHints';
+import { ChallengeModal } from './challenges/components/ChallengeModal';
 
 type Tab = 'field' | 'lab' | 'data' | 'tech';
 
@@ -16,6 +17,7 @@ export default function App() {
   const reset = useGame((s) => s.reset);
   const notices = useGame((s) => s.notices);
   const dismissNotice = useGame((s) => s.dismissNotice);
+  const activeChallenge = useGame((s) => s.activeChallenge);
 
   return (
     <div className="min-h-screen bg-surface text-ink">
@@ -81,6 +83,8 @@ export default function App() {
           <MarketPanel />
         </div>
       </main>
+
+      {activeChallenge && <ChallengeModal />}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGame, type Nursery } from '../game/state';
 import type { Individual } from '../engine';
 import { PlantCard } from './PlantCard';
-import { Pedigree } from './Pedigree';
+import { PedigreeGraph } from '../challenges/visualizations/PedigreeGraph';
 import { Portfolio } from './Portfolio';
 import { Costs, MEASURE_COST } from '../game/economy';
 
@@ -218,7 +218,7 @@ function NurserySection({
               {unlocked.has('pedigree') && (
                 <details className="text-[11px]">
                   <summary className="cursor-pointer text-muted hover:text-soil">pedigree</summary>
-                  <Pedigree id={focused.id} depth={3} />
+                  <PedigreeGraph ind={focused} archive={archive} maxDepth={3} />
                 </details>
               )}
             </div>

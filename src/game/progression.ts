@@ -3,7 +3,6 @@
 export type TechId =
   | 'mass_selection'
   | 'controlled_cross'
-  | 'family_selection'
   | 'pedigree'
   | 'marker_discovery'
   | 'mas'
@@ -53,15 +52,6 @@ export const TECHS: Tech[] = [
     requires: ['controlled_cross'],
     description: 'Visualize ancestry of every line.',
     blurb: 'Pedigree records prevent unintentional inbreeding and reveal where alleles came from.',
-  },
-  {
-    id: 'family_selection',
-    name: 'Family selection',
-    tier: 2,
-    cost: 50,
-    requires: ['mass_selection'],
-    description: 'Evaluate family means; advance the best families.',
-    blurb: 'Family means average out environmental noise — better for low-h² traits.',
   },
   {
     id: 'diversity_dashboard',

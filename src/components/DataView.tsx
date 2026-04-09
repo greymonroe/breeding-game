@@ -1,5 +1,6 @@
 import { useGame } from '../game/state';
 import { alleleFreqs } from '../engine';
+import { ChromosomeView } from '../challenges/visualizations/ChromosomeView';
 
 export function DataView() {
   const { history, releases, budget, map, unlocked } = useGame();
@@ -11,6 +12,13 @@ export function DataView() {
 
   return (
     <div className="space-y-6">
+      <section className="rounded-lg border border-soil/20 bg-white p-4">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-leaf">
+          Genome Map
+        </h2>
+        <ChromosomeView />
+      </section>
+
       <section className="rounded-lg border border-soil/20 bg-white p-4">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-leaf">
           Selection response
