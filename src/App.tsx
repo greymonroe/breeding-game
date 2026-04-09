@@ -21,7 +21,8 @@ export default function App() {
   const activeChallenge = useGame((s) => s.activeChallenge);
   const meiosisTrace = useGame((s) => s.meiosisTrace);
   const dismissMeiosis = useGame((s) => s.dismissMeiosis);
-  const chromosomes = useGame((s) => s.map.chromosomes.map((c) => ({ id: c.id, length: c.length })));
+  const rawChromosomes = useGame((s) => s.map.chromosomes);
+  const chromosomes = rawChromosomes.map((c) => ({ id: c.id, length: c.length }));
 
   return (
     <div className="min-h-screen bg-surface text-ink">
