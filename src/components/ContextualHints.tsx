@@ -6,6 +6,8 @@ interface HintConfig {
   text: string;
   /** Return true to show this hint */
   condition: (state: ReturnType<typeof useGameSnapshot>) => boolean;
+  /** Higher priority hints show first (default 0). */
+  priority?: number;
 }
 
 function useGameSnapshot() {
@@ -15,39 +17,81 @@ function useGameSnapshot() {
   const trust = useGame((s) => s.trust);
   const nurseries = useGame((s) => s.nurseries);
   const unlocked = useGame((s) => s.unlocked);
-  return { season, selectedIds, releases, trust, nurseries, unlocked };
+  const discovery = useGame((s) => s.discovery);
+  const objectives = useGame((s) => s.objectives);
+  return { season, selectedIds, releases, trust, nurseries, unlocked, discovery, objectives };
 }
 
 const HINTS: HintConfig[] = [
+  // ── Season 0: Getting started ──
   {
-    id: 'first_season',
-    text: 'Click plants to select parents, then press Advance Season to create the next generation.',
+    id: 'welcome',
+    text: 'You have 10 founder plants with hidden genetics. Your goal: breed better varieties and release them to earn money. Start by clicking on 2\u20134 plants to select them as parents.',
     condition: (s) => s.season === 0 && s.selectedIds.length === 0,
+    priority: 10,
   },
   {
+    id: 'first_selection',
+    text: 'Good \u2014 parents selected! Now press "Advance Season" to cross them and grow the next generation.',
+    condition: (s) => s.season === 0 && s.selectedIds.length > 0,
+    priority: 10,
+  },
+  {
+    id: 'try_red_white',
+    text: 'Tip: notice some flowers are red and some white? Try selecting one of each as parents \u2014 the offspring might reveal something about how color is inherited.',
+    condition: (s) => {
+      if (s.season !== 0) return false;
+      if (s.selectedIds.length < 1) return false;
+      // Check if selected plants are all the same color
+      const plants = s.nurseries.flatMap(n => n.plants);
+      const selected = plants.filter(p => s.selectedIds.includes(p.id));
+      const colors = selected.map(p => (p.phenotype.get('color') ?? 0) >= 0.5);
+      return colors.length >= 2 && colors.every(c => c === colors[0]);
+    },
+  },
+
+  // ── Season 1+: Measure and observe ──
+  {
     id: 'measure_yield',
-    text: 'Use the "Measure Yield" button on a nursery to see which plants perform best. Yield drives variety income.',
+    text: 'Use the "Measure Yield" button to see which plants perform best. Yield determines variety income \u2014 you need to know it before releasing.',
     condition: (s) => {
       if (s.season < 1) return false;
       return s.nurseries.some(
         (n) => n.plants.length > 0 && n.plants.every((p) => !p.phenotype.has('yield'))
       );
     },
+    priority: 5,
   },
   {
-    id: 'parents_selected',
-    text: 'With one parent selected, you can self it to create a family. Select two parents + unlock Controlled Crosses to make an F1.',
-    condition: (s) => s.selectedIds.length >= 2 && s.season <= 3 && !s.unlocked.has('controlled_cross'),
+    id: 'look_at_families',
+    text: 'Your offspring are grouped by parent pair. Look at each family \u2014 do all siblings look the same, or are some red and some white? Scroll down to see interpretation panels on interesting families.',
+    condition: (s) => s.season === 1 && s.discovery.traitDiscoveries.color.level === 'unknown',
+    priority: 3,
   },
+
+  // ── Discovery nudges ──
+  {
+    id: 'color_not_discovered',
+    text: 'You\'ve bred several generations but haven\'t discovered how color is inherited yet. Make sure to cross a red plant with a white plant \u2014 look for the blue interpretation panel on those families.',
+    condition: (s) => s.season >= 3 && s.discovery.traitDiscoveries.color.level === 'unknown',
+  },
+  {
+    id: 'no_releases',
+    text: 'You haven\'t released any varieties yet! Select your best plant and click "Release ($20)" to start earning income. But watch out \u2014 releasing a plant that isn\'t true-breeding will hurt farmer trust.',
+    condition: (s) => s.season >= 4 && s.releases.length === 0,
+  },
+
+  // ── Economic hints ──
   {
     id: 'trust_drop',
-    text: 'Your variety may be segregating in farmers\u2019 fields, reducing trust. Inbreed (self a plant several times) before releasing to improve uniformity.',
+    text: 'Your variety is segregating in farmers\u2019 fields \u2014 trust is dropping. Self a plant several generations before releasing to improve uniformity.',
     condition: (s) => s.trust < 0.85 && s.releases.length > 0,
+    priority: 5,
   },
   {
-    id: 'first_selection',
-    text: 'Good \u2014 you have parents selected. Set population size and press Advance Season to breed the next generation.',
-    condition: (s) => s.season === 0 && s.selectedIds.length > 0,
+    id: 'market_rising',
+    text: 'The market baseline rises every season \u2014 competitors are improving too. Keep selecting for higher yield or your varieties will become obsolete.',
+    condition: (s) => s.season >= 6 && s.releases.length > 0 && s.releases.every(r => r.lastSeasonRevenue <= 0),
   },
 ];
 
@@ -73,7 +117,7 @@ export function ContextualHints() {
 
   const activeHints = HINTS.filter(
     (h) => !dismissed.has(h.id) && !fading.has(h.id) && h.condition(snapshot)
-  );
+  ).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   const fadingHints = HINTS.filter(
     (h) => fading.has(h.id) && h.condition(snapshot)
   );
