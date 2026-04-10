@@ -120,7 +120,7 @@ async function selectDiverse(page: Page, n: number) {
 }
 
 async function objectives(page: Page): Promise<string> {
-  const s = page.locator('h2:has-text("OBJECTIVES")').locator('..');
+  const s = page.locator('h2:has-text("QUEST BOARD"), h2:has-text("OBJECTIVES")').locator('..');
   if (await s.count() === 0) return '';
   return await s.first().innerText();
 }
@@ -263,13 +263,13 @@ test('Evaluate gameplay as a student', async ({ page }) => {
   log(`\nQuest status:\n${finalObj}`);
 
   // Count completed
-  const completed = (finalObj.match(/done s\d+/g) ?? []).length;
-  const total = (finalObj.match(/[⬜✅🔒]/g) ?? []).length;
+  const completed = (finalObj.match(/[✅]/g) ?? []).length;
+  const total = (finalObj.match(/[⭐✅🔒]/g) ?? []).length;
   log(`\nQuests completed: ${completed}/${total}`);
 
   // Check each tab
   await tab(page, 'Lab'); await shot(page, '09-final-lab');
-  const finalLab = await page.locator('section, .space-y-6').first().innerText();
+  const finalLab = await page.locator('.card-lab, .space-y-4, section').first().innerText();
   log(`\nLab notebook content:\n  ${finalLab.slice(0, 300).replace(/\n/g, '\n  ')}`);
 
   await tab(page, 'Data'); await shot(page, '10-final-data');
