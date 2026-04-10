@@ -1139,9 +1139,21 @@ export const useGame = create<GameState>((set, get) => ({
     });
     const archive = new Map(s.archive);
     for (const p of updatedPlants) archive.set(p.id, p);
+    // Update the history stat if we just measured yield on the active nursery
+    const updatedHistory = traitName === 'yield' && nurseryId === s.activeNurseryId
+      ? (() => {
+          const newMean = meanPhenotype(updatedPlants, 'yield');
+          const newBest = Math.max(...updatedPlants.map(p => p.phenotype.get('yield') ?? 0), 0);
+          const h = [...s.history];
+          h[h.length - 1] = { ...h[h.length - 1], meanYield: newMean, bestYield: newBest };
+          return h;
+        })()
+      : s.history;
+
     set({
       nurseries: s.nurseries.map((n) => (n.id === nurseryId ? { ...n, plants: updatedPlants } : n)),
       archive,
+      history: updatedHistory,
       budget: spend(
         s.budget,
         cost,
