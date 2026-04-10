@@ -188,6 +188,31 @@ function makeObjectives(): Objective[] {
       completed: false,
     },
     {
+      id: 'unlock_controlled_cross',
+      title: 'Precision breeding',
+      description: 'Unlock "Controlled crosses" in the Tech tab to make targeted crosses between specific parents. This is essential for systematic test crosses.',
+      reward: 50,
+      availableAt: 2,
+      completed: false,
+    },
+    {
+      id: 'unlock_diversity_dashboard',
+      title: 'Know your population',
+      description: 'Unlock the "Diversity dashboard" in the Tech tab, then check the Data tab to see how diverse your breeding population is. Are you losing alleles?',
+      reward: 80,
+      availableAt: 4,
+      completed: false,
+    },
+    {
+      id: 'run_gwas',
+      title: 'Map the genome',
+      description: 'Unlock "Marker discovery" in the Tech tab, genotype your plants, and run a GWAS to find which chromosome regions affect yield. Check the Data tab genome map to see the hits.',
+      reward: 200,
+      availableAt: 6,
+      requires: ['unlock_controlled_cross'],
+      completed: false,
+    },
+    {
       id: 'release_hybrid',
       title: 'Release an F1 hybrid',
       description: 'Develop two inbred parent lines and release a high-performing F1 hybrid.',
@@ -1056,10 +1081,38 @@ export const useGame = create<GameState>((set, get) => ({
     // No challenge or already completed — unlock directly
     const next = new Set(s.unlocked);
     next.add(id);
+
+    // Check tech-unlock quests
+    const techQuestMap: Record<string, string> = {
+      controlled_cross: 'unlock_controlled_cross',
+      diversity_dashboard: 'unlock_diversity_dashboard',
+    };
+    const questId = techQuestMap[id];
+    const updatedObjectives = s.objectives.map(o => {
+      if (o.completed) return o;
+      if (!prereqsMet(o, s.objectives)) return o;
+      if (questId && o.id === questId) return { ...o, completed: true, completedAt: s.season };
+      return o;
+    });
+    let objBonus = 0;
+    const objNotices: Notice[] = [];
+    for (let i = 0; i < updatedObjectives.length; i++) {
+      if (updatedObjectives[i].completed && !s.objectives[i].completed) {
+        objBonus += updatedObjectives[i].reward;
+        objNotices.push(notice(`🏆 Quest complete: "${updatedObjectives[i].title}" — earned $${updatedObjectives[i].reward}!`));
+      }
+    }
+
     set({
       unlocked: next,
-      budget: spend(s.budget, tech.cost, `researched ${tech.name}`, s.season),
-      notices: [...s.notices, notice(`🔓 Unlocked: ${tech.name} — ${tech.blurb}`)],
+      objectives: updatedObjectives,
+      budget: spend(
+        { cash: s.budget.cash + objBonus, history: objBonus > 0 ? [...s.budget.history, { generation: s.season, cash: s.budget.cash + objBonus, reason: `+$${objBonus} quest bonus` }] : s.budget.history },
+        tech.cost,
+        `researched ${tech.name}`,
+        s.season
+      ),
+      notices: [...s.notices, notice(`🔓 Unlocked: ${tech.name} — ${tech.blurb}`), ...objNotices],
     });
     return true;
   },
@@ -1103,8 +1156,29 @@ export const useGame = create<GameState>((set, get) => ({
     }
     const allLoci = s.map.chromosomes.flatMap((c) => c.loci);
     const { knowledge, found } = discoverAssociations(s.markers, phenotyped, allLoci, traitName, 0.3);
+
+    // Check GWAS quest
+    const updatedObjectives = s.objectives.map(o => {
+      if (o.completed) return o;
+      if (!prereqsMet(o, s.objectives)) return o;
+      if (o.id === 'run_gwas' && found.length > 0) return { ...o, completed: true, completedAt: s.season };
+      return o;
+    });
+    let objBonus = 0;
+    const objNotices: Notice[] = [];
+    for (let i = 0; i < updatedObjectives.length; i++) {
+      if (updatedObjectives[i].completed && !s.objectives[i].completed) {
+        objBonus += updatedObjectives[i].reward;
+        objNotices.push(notice(`🏆 Quest complete: "${updatedObjectives[i].title}" — earned $${updatedObjectives[i].reward}!`));
+      }
+    }
+
     set({
       markers: knowledge,
+      objectives: updatedObjectives,
+      budget: objBonus > 0
+        ? { cash: s.budget.cash + objBonus, history: [...s.budget.history, { generation: s.season, cash: s.budget.cash + objBonus, reason: `+$${objBonus} quest bonus` }] }
+        : s.budget,
       notices: [
         ...s.notices,
         notice(
@@ -1112,6 +1186,7 @@ export const useGame = create<GameState>((set, get) => ({
             ? `GWAS scan on ${traitName}: no significant associations in ${target.name}.`
             : `GWAS scan on ${traitName}: found ${found.length} marker–trait association${found.length === 1 ? '' : 's'} in ${target.name}.`
         ),
+        ...objNotices,
       ],
     });
   },

@@ -93,6 +93,21 @@ const HINTS: HintConfig[] = [
     text: 'The market baseline rises every season \u2014 competitors are improving too. Keep selecting for higher yield or your varieties will become obsolete.',
     condition: (s) => s.season >= 6 && s.releases.length > 0 && s.releases.every(r => r.lastSeasonRevenue <= 0),
   },
+  {
+    id: 'test_cross_hint',
+    text: 'To identify true-breeding (RR) plants, you need a test cross with enough offspring to read the ratio. Try selecting just 2 parents \u2014 one red, one white \u2014 so the family is large enough to interpret.',
+    condition: (s) => {
+      const quest = s.objectives.find(o => o.id === 'identify_homozygous_red');
+      return !!quest && !quest.completed && s.discovery.traitDiscoveries.color.level !== 'unknown' && s.season >= 2;
+    },
+    priority: 4,
+  },
+  {
+    id: 'tech_tree_hint',
+    text: 'Check the Tech tab \u2014 unlocking "Controlled crosses" lets you pair specific parents into labeled families. This makes test crosses much easier.',
+    condition: (s) => s.season >= 3 && !s.unlocked.has('controlled_cross') && s.discovery.traitDiscoveries.color.level !== 'unknown',
+    priority: 2,
+  },
 ];
 
 export function ContextualHints() {
