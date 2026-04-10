@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Individual, Trait } from '../engine';
 import { MEASURE_COST } from '../game/economy';
 import { GenotypeBar } from '../challenges/visualizations/GenotypeBar';
+import { useGame } from '../game/state';
 
 interface Props {
   ind: Individual;
@@ -36,6 +37,8 @@ function formatTraitValue(key: string, value: number): string {
 }
 
 export function PlantCard({ ind, selected, onClick }: Props) {
+  // Grab the stable discovery reference — it only changes when a discovery is made
+  const discovery = useGame((s) => s.discovery);
   const color = ind.phenotype.get('color') ?? 0;
   const shape = ind.phenotype.get('shape') ?? 0;
   const yieldV = ind.phenotype.get('yield');
@@ -93,7 +96,7 @@ export function PlantCard({ ind, selected, onClick }: Props) {
           {' / '}
           {flavor != null ? flavor.toFixed(0) : '?'}
         </div>
-        <GenotypeBar haplotypes={ind.genotype.haplotypes} />
+        <GenotypeBar ind={ind} discovery={discovery} />
       </button>
 
       {showTooltip && (

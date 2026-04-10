@@ -1,16 +1,24 @@
 /**
- * Small inline genotype display for the COLOR locus.
- * Shows two cells representing each haplotype's allele.
- * Visible from season 1 — no tech required.
+ * Small inline genotype display for qualitative loci.
+ * Shows two cells representing each haplotype's allele,
+ * respecting the player's discovery state.
  */
-export function GenotypeBar({ haplotypes }: {
-  haplotypes: [Map<string, string>, Map<string, string>];
+import type { Individual } from '../../engine';
+import { getAlleleDisplay, type DiscoveryState } from '../../game/discovery';
+
+export function GenotypeBar({ ind, discovery }: {
+  ind: Individual;
+  discovery: DiscoveryState;
 }) {
-  const a0 = haplotypes[0].get('COLOR') ?? '?';
-  const a1 = haplotypes[1].get('COLOR') ?? '?';
+  const [a0, a1] = getAlleleDisplay(ind, 'color', discovery);
 
   const bg = (allele: string) =>
-    allele === 'R' ? 'bg-danger/70 text-white' : allele === 'r' ? 'bg-wheat text-soil' : 'bg-soil/10 text-muted';
+    allele === 'R' ? 'bg-danger/70 text-white'
+    : allele === 'r' ? 'bg-wheat text-soil'
+    : 'bg-soil/10 text-muted';
+
+  // If both are '?', don't show the bar at all
+  if (a0 === '?' && a1 === '?') return null;
 
   return (
     <div className="mt-0.5 flex justify-center gap-px" title={`Genotype: ${a0}${a1}`}>
