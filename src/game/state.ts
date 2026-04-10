@@ -49,7 +49,7 @@ import { canUnlock, TECHS_BY_ID, type TechId } from './progression';
 import type { ChallengeCompletion, ChallengeInstance, ChallengeResult } from '../challenges/types';
 import { ALL_CHALLENGES, TECH_CHALLENGES, BONUS_CHALLENGES } from '../challenges/registry';
 import { buildChallengeContext, generateChallenge, validateChallenge } from '../challenges/engine';
-import { makeInitialDiscovery, type DiscoveryState, type TraitDiscovery } from './discovery';
+import { makeInitialDiscovery, type DiscoveryState, type LinkageDiscovery, type TraitDiscovery } from './discovery';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Types
@@ -146,6 +146,38 @@ function makeObjectives(): Objective[] {
       description: 'Release a white-flowered variety with competitive yield.',
       reward: 500,
       availableAt: 5,
+      completed: false,
+    },
+    {
+      id: 'discover_shape_dominance',
+      title: 'How do leaves get their shape?',
+      description: 'Cross a round-leaved plant with an elongated-leaved plant and observe the offspring. What type of inheritance is this?',
+      reward: 120,
+      availableAt: 2,
+      completed: false,
+    },
+    {
+      id: 'discover_linkage',
+      title: 'A curious pattern',
+      description: 'You\'ve noticed white plants always yield less than red ones. Grow a large segregating population (cross Rr × Rr) and examine whether color and yield are truly independent.',
+      reward: 200,
+      availableAt: 4,
+      completed: false,
+    },
+    {
+      id: 'break_color_yield_linkage',
+      title: 'Break the chain',
+      description: 'Find a rare recombinant: release a white variety with yield above the market baseline. You\'ll need a large segregating population to find one.',
+      reward: 400,
+      availableAt: 6,
+      completed: false,
+    },
+    {
+      id: 'introgress_dr',
+      title: 'Taming the wild',
+      description: 'Disease outbreaks destroy susceptible varieties. Introgress disease resistance from wild germplasm and release a resistant variety with competitive yield — but watch out for linkage drag.',
+      reward: 500,
+      availableAt: 10,
       completed: false,
     },
     {
@@ -248,6 +280,8 @@ interface GameState {
   interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
   /** Interpret a cross family as a test cross. One parent must have the dominant phenotype, the other recessive. */
   interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
+  /** Interpret a segregating F2 population to discover linkage between color and yield. */
+  interpretLinkage: (answer: 'linkage' | 'pleiotropy' | 'coincidence') => boolean;
 
   // ── Challenge actions ──
   startChallenge: (definitionId: string) => void;
@@ -775,6 +809,14 @@ export const useGame = create<GameState>((set, get) => ({
       if (o.id === 'release_white' && isWhite && objectiveOk) {
         return { ...o, completed: true, completedAt: s.season };
       }
+      // Break linkage: release a white variety with yield above market baseline
+      if (o.id === 'break_color_yield_linkage' && isWhite && objectiveOk && release.traits.yield >= s.marketBaseline) {
+        return { ...o, completed: true, completedAt: s.season };
+      }
+      // Introgress DR: release a resistant variety with competitive yield
+      if (o.id === 'introgress_dr' && release.resistant && objectiveOk && release.traits.yield >= s.marketBaseline) {
+        return { ...o, completed: true, completedAt: s.season };
+      }
       return o;
     });
 
@@ -931,6 +973,8 @@ export const useGame = create<GameState>((set, get) => ({
       if (o.id === 'release_red' && isRed && objectiveOk) return { ...o, completed: true, completedAt: s.season };
       if (o.id === 'release_white' && isWhite && objectiveOk) return { ...o, completed: true, completedAt: s.season };
       if (o.id === 'release_hybrid' && objectiveOk) return { ...o, completed: true, completedAt: s.season };
+      if (o.id === 'break_color_yield_linkage' && isWhite && objectiveOk && release.traits.yield >= s.marketBaseline) return { ...o, completed: true, completedAt: s.season };
+      if (o.id === 'introgress_dr' && release.resistant && objectiveOk && release.traits.yield >= s.marketBaseline) return { ...o, completed: true, completedAt: s.season };
       return o;
     });
 
@@ -1264,7 +1308,10 @@ export const useGame = create<GameState>((set, get) => ({
     const correctDominant = traitDef.dominantAllele;
 
     if (dominantAllele !== correctDominant) {
-      set({ notices: [...s.notices, notice(`❌ That doesn't match the offspring data. Look at the phenotype ratios again.`)] });
+      const hint = traitDef.dominance === 'incomplete'
+        ? `❌ Look again — the offspring phenotype is different from both parents. What does that tell you about how the alleles interact?`
+        : `❌ That doesn't match the offspring data. Look at the phenotype ratios again.`;
+      set({ notices: [...s.notices, notice(hint)] });
       return false;
     }
 
@@ -1304,7 +1351,9 @@ export const useGame = create<GameState>((set, get) => ({
         : s.budget,
       notices: [
         ...s.notices,
-        notice(`🧬 Discovery: ${correctDominant} is dominant over ${recessiveAllele} for ${traitName}! Recessive plants now show ${recessiveAllele}${recessiveAllele}. Use test crosses (dominant × recessive) to resolve ${correctDominant}? individuals.`),
+        notice(traitDef.dominance === 'incomplete'
+          ? `🧬 Discovery: ${traitName} shows INCOMPLETE DOMINANCE! ${correctDominant}${correctDominant} = one phenotype, ${recessiveAllele}${recessiveAllele} = another, and ${correctDominant}${recessiveAllele} = intermediate. All three genotypes are distinguishable by phenotype alone!`
+          : `🧬 Discovery: ${correctDominant} is dominant over ${recessiveAllele} for ${traitName}! Recessive plants now show ${recessiveAllele}${recessiveAllele}. Use test crosses (dominant × recessive) to resolve ${correctDominant}? individuals.`),
         ...objNotices,
       ],
     });
@@ -1361,6 +1410,54 @@ export const useGame = create<GameState>((set, get) => ({
       notices: [
         ...s.notices,
         notice(`🧬 ${targetIndId} is ${genotypeStr}.`),
+        ...objNotices,
+      ],
+    });
+    return true;
+  },
+
+  interpretLinkage: (answer) => {
+    const s = get();
+    // Linkage is between COLOR and Y1 — the correct answer is 'linkage'
+    if (answer !== 'linkage') {
+      set({ notices: [...s.notices, notice(`❌ Look again at the data. Is color directly causing the yield difference, or could these genes just be physically close on the same chromosome?`)] });
+      return false;
+    }
+
+    const linkage: LinkageDiscovery = {
+      locus1: 'COLOR',
+      locus2: 'Y1',
+      trait1Name: 'color',
+      trait2Name: 'yield',
+      discoveredAt: s.season,
+    };
+
+    const updatedObjectives = s.objectives.map(o => {
+      if (o.completed) return o;
+      if (o.id === 'discover_linkage') return { ...o, completed: true, completedAt: s.season };
+      return o;
+    });
+    let objBonus = 0;
+    const objNotices: Notice[] = [];
+    for (let i = 0; i < updatedObjectives.length; i++) {
+      if (updatedObjectives[i].completed && !s.objectives[i].completed) {
+        objBonus += updatedObjectives[i].reward;
+        objNotices.push(notice(`🏆 Quest complete: "${updatedObjectives[i].title}" — earned $${updatedObjectives[i].reward}!`));
+      }
+    }
+
+    set({
+      discovery: {
+        ...s.discovery,
+        linkages: [...s.discovery.linkages, linkage],
+      },
+      objectives: updatedObjectives,
+      budget: objBonus > 0
+        ? { cash: s.budget.cash + objBonus, history: [...s.budget.history, { generation: s.season, cash: s.budget.cash + objBonus, reason: `+$${objBonus} quest bonus` }] }
+        : s.budget,
+      notices: [
+        ...s.notices,
+        notice(`🧬 Discovery: Color and yield are LINKED! The color locus and a major yield gene sit close together on the same chromosome. Red haplotypes carry the favorable yield allele. To get high-yielding white plants, you'll need to find rare recombinants in a large population.`),
         ...objNotices,
       ],
     });

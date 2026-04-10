@@ -25,10 +25,20 @@ export interface TraitDiscovery {
   dominanceDiscoveredAt?: number;
 }
 
+export interface LinkageDiscovery {
+  locus1: string;          // e.g., 'COLOR'
+  locus2: string;          // e.g., 'Y1'
+  trait1Name: string;      // e.g., 'color'
+  trait2Name: string;      // e.g., 'yield'
+  discoveredAt: number;    // season
+}
+
 export interface DiscoveryState {
   traitDiscoveries: Record<string, TraitDiscovery>;
   /** Set of individual IDs whose genotype at a given locus has been resolved via test cross. */
   resolvedGenotypes: Record<string, Set<string>>;  // locusId → Set<individualId>
+  /** Linkages the player has discovered. */
+  linkages: LinkageDiscovery[];
 }
 
 export function makeInitialDiscovery(): DiscoveryState {
@@ -43,6 +53,7 @@ export function makeInitialDiscovery(): DiscoveryState {
       SHAPE: new Set(),
       DR: new Set(),
     },
+    linkages: [],
   };
 }
 

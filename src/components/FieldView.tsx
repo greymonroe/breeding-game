@@ -34,6 +34,7 @@ export function FieldView() {
     discovery,
     interpretDominance,
     interpretTestCross,
+    interpretLinkage,
   } = useGame();
 
   const totalCost = nurseries
@@ -104,6 +105,7 @@ export function FieldView() {
           discovery={discovery}
           interpretDominance={interpretDominance}
           interpretTestCross={interpretTestCross}
+          interpretLinkage={interpretLinkage}
         />
       ))}
     </div>
@@ -114,7 +116,7 @@ function NurserySection({
   nursery, isActive, allNurseries, selectedIds, toggleSelect, clearSelection,
   setNurseryPopSize, moveIndividual,
   unlocked, release, releaseHybrid, deleteNursery, canDelete, measureTrait, makeControlledCross, archive, traits,
-  discovery, interpretDominance, interpretTestCross,
+  discovery, interpretDominance, interpretTestCross, interpretLinkage,
 }: {
   nursery: Nursery;
   isActive: boolean;
@@ -136,6 +138,7 @@ function NurserySection({
   discovery: import('../game/discovery').DiscoveryState;
   interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
   interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
+  interpretLinkage: (answer: 'linkage' | 'pleiotropy' | 'coincidence') => boolean;
 }) {
   const sorted = [...nursery.plants].sort(
     (a, b) => (b.phenotype.get('yield') ?? 0) - (a.phenotype.get('yield') ?? 0)
@@ -257,6 +260,7 @@ function NurserySection({
             discovery={discovery}
             interpretDominance={interpretDominance}
             interpretTestCross={interpretTestCross}
+            interpretLinkage={interpretLinkage}
           />
         </>
       )}
@@ -272,6 +276,7 @@ function FamilyGroupedGrid({
   discovery,
   interpretDominance,
   interpretTestCross,
+  interpretLinkage,
 }: {
   plants: Individual[];
   archive: Map<string, Individual>;
@@ -280,6 +285,7 @@ function FamilyGroupedGrid({
   discovery: import('../game/discovery').DiscoveryState;
   interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
   interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
+  interpretLinkage: (answer: 'linkage' | 'pleiotropy' | 'coincidence') => boolean;
 }) {
   // Group by familyId; collect ungrouped under null
   const groups = new Map<string | null, Individual[]>();
@@ -427,6 +433,143 @@ function FamilyGroupedGrid({
                     </div>
                   </div>
                 );
+              }
+            }
+
+            // ── Linkage interpretation ──
+            // Show on segregating families (both parents Rr or both have same color)
+            // where color dominance is known but linkage is not yet discovered
+            if (!interpretPanel && colorDisc.level !== 'unknown' && discovery.linkages.length === 0) {
+              // Both parents must be Rr (het) so offspring segregate for color
+              const pADom = pAColor >= 0.5;
+              const pBDom = pBColor >= 0.5;
+              // Segregating family: both parents red (at least one Rr) and offspring have both red and white
+              if (pADom && pBDom && redCount > 0 && whiteCount > 0 && members.length >= 10) {
+                // Calculate mean yield by color class
+                const redPlants = members.filter(p => (p.phenotype.get('color') ?? 0) >= 0.5);
+                const whitePlants = members.filter(p => (p.phenotype.get('color') ?? 0) < 0.5);
+                const meanRedYield = redPlants.reduce((s, p) => s + (p.phenotype.get('yield') ?? 0), 0) / redPlants.length;
+                const meanWhiteYield = whitePlants.reduce((s, p) => s + (p.phenotype.get('yield') ?? 0), 0) / whitePlants.length;
+
+                interpretPanel = (
+                  <div className="mt-1 rounded border border-purple-500/40 bg-purple-50 p-2 text-xs">
+                    <div className="font-semibold text-soil mb-1">🔗 Strange pattern: color and yield seem correlated in this family</div>
+                    <div className="flex gap-6 mb-2">
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-soil">{meanRedYield.toFixed(1)}</div>
+                        <div className="text-[10px] text-muted">Mean yield (Red, n={redPlants.length})</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-soil">{meanWhiteYield.toFixed(1)}</div>
+                        <div className="text-[10px] text-muted">Mean yield (White, n={whitePlants.length})</div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted mb-2">Red offspring yield more than white offspring. Why would flower color be associated with yield?</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <button onClick={() => interpretLinkage('pleiotropy')}
+                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                        Pleiotropy (color gene directly affects yield)
+                      </button>
+                      <button onClick={() => interpretLinkage('linkage')}
+                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                        Linkage (color and yield genes are near each other on the chromosome)
+                      </button>
+                      <button onClick={() => interpretLinkage('coincidence')}
+                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                        Coincidence (just random noise)
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+            }
+
+            // ── Shape interpretation ──
+            if (!interpretPanel) {
+              const shapeDisc = discovery.traitDiscoveries.shape;
+              const pAShape = pA.phenotype.get('shape') ?? -1;
+              const pBShape = pB.phenotype.get('shape') ?? -1;
+              // Parents must have different extreme phenotypes (Round vs Elongated)
+              const parentShapesDiffer = (pAShape >= 1.5 && pBShape < 0.5) || (pAShape < 0.5 && pBShape >= 1.5);
+
+              // Count offspring by shape class
+              const roundCount = members.filter(p => (p.phenotype.get('shape') ?? 0) >= 1.5).length;
+              const ovalCount = members.filter(p => { const v = p.phenotype.get('shape') ?? 0; return v >= 0.5 && v < 1.5; }).length;
+              const elongCount = members.filter(p => (p.phenotype.get('shape') ?? 0) < 0.5).length;
+
+              if (shapeDisc.level === 'unknown' && parentShapesDiffer) {
+                interpretPanel = (
+                  <div className="mt-1 rounded border border-amber-500/40 bg-amber-50 p-2 text-xs">
+                    <div className="font-semibold text-soil mb-1">🔬 You crossed a round-leaved plant with an elongated-leaved plant!</div>
+                    <div className="flex gap-4 mb-2">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-soil">{roundCount}</div>
+                        <div className="text-[10px] text-muted">Round</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-soil">{ovalCount}</div>
+                        <div className="text-[10px] text-muted">Oval</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-soil">{elongCount}</div>
+                        <div className="text-[10px] text-muted">Elongated</div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted mb-2">The offspring don't look like either parent — they're <strong>intermediate</strong>. What type of inheritance is this?</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => interpretDominance('shape', key!, 'L')}
+                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                        Incomplete dominance (blending in heterozygotes)
+                      </button>
+                      <button onClick={() => interpretDominance('shape', key!, 'WRONG_complete')}
+                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                        Complete dominance (one trait hides the other)
+                      </button>
+                    </div>
+                  </div>
+                );
+              } else if (shapeDisc.level !== 'unknown' && parentShapesDiffer) {
+                // Shape test cross: round (L?) × elongated (ll)
+                const roundParent = pAShape >= 1.5 ? pA : pB;
+                const elongParent = pAShape >= 1.5 ? pB : pA;
+                const eA0 = elongParent.genotype.haplotypes[0].get('SHAPE');
+                const eA1 = elongParent.genotype.haplotypes[1].get('SHAPE');
+                const isElongHomozygous = eA0 === shapeDisc.recessiveAllele && eA1 === shapeDisc.recessiveAllele;
+                const alreadyResolved = discovery.resolvedGenotypes.SHAPE?.has(roundParent.id);
+                // Only offer test cross if the round parent is truly Round (LL or Ll with LL phenotype)
+                const roundParentIsRound = (roundParent.phenotype.get('shape') ?? 0) >= 1.5;
+
+                if (isElongHomozygous && !alreadyResolved && roundParentIsRound) {
+                  interpretPanel = (
+                    <div className="mt-1 rounded border border-leaf/40 bg-leaf/5 p-2 text-xs">
+                      <div className="font-semibold text-soil mb-1">🧪 Test cross: is {roundParent.id} homozygous or heterozygous for shape?</div>
+                      <div className="flex gap-4 mb-2">
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-soil">{roundCount}</div>
+                          <div className="text-[10px] text-muted">Round ({shapeDisc.dominantAllele}{shapeDisc.dominantAllele})</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-soil">{ovalCount}</div>
+                          <div className="text-[10px] text-muted">Oval ({shapeDisc.dominantAllele}{shapeDisc.recessiveAllele})</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-soil">{elongCount}</div>
+                          <div className="text-[10px] text-muted">Elongated ({shapeDisc.recessiveAllele}{shapeDisc.recessiveAllele})</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => interpretTestCross('shape', key!, roundParent.id, 'homozygous')}
+                          className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                          Homozygous {shapeDisc.dominantAllele}{shapeDisc.dominantAllele} (all offspring round or oval)
+                        </button>
+                        <button onClick={() => interpretTestCross('shape', key!, roundParent.id, 'heterozygous')}
+                          className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                          Heterozygous {shapeDisc.dominantAllele}{shapeDisc.recessiveAllele} (some elongated offspring)
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
               }
             }
           }
