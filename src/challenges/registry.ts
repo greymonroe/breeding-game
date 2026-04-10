@@ -51,16 +51,37 @@ const manhattanPlot: ChallengeDefinition = {
   description: 'Scan a genome-wide association plot and identify the significant peaks.',
   difficulty: 2,
   generate(ctx) {
-    // Generate effect sizes for all loci across all chromosomes
-    const loci: Array<{ id: string; chr: number; pos: number; effect: number; isQtl: boolean }> = [];
+    // First pass: collect all loci and assign QTL effects
+    const raw: Array<{ id: string; chr: number; pos: number; type: string }> = [];
+    const qtlEffects: Array<{ chr: number; pos: number; effect: number }> = [];
     for (const chr of ctx.map.chromosomes) {
       for (const loc of chr.loci) {
-        const isQtl = loc.type === 'qtl';
-        // Simulate effect: QTLs get real effect, markers get noise
-        const effect = isQtl
-          ? 1.5 + ctx.rng() * 3 // QTLs: 1.5 - 4.5
-          : ctx.rng() * 0.8;     // noise: 0 - 0.8
-        loci.push({ id: loc.id, chr: chr.id, pos: loc.position, effect, isQtl });
+        raw.push({ id: loc.id, chr: chr.id, pos: loc.position, type: loc.type });
+        if (loc.type === 'qtl') {
+          qtlEffects.push({ chr: chr.id, pos: loc.position, effect: 1.5 + ctx.rng() * 3 });
+        }
+      }
+    }
+    // Second pass: markers near QTLs get elevated signal (LD decay)
+    // r² ≈ exp(-distance/25cM) — tight LD within ~10cM, fading by 30cM
+    const loci: Array<{ id: string; chr: number; pos: number; effect: number; isQtl: boolean }> = [];
+    for (const loc of raw) {
+      const isQtl = loc.type === 'qtl';
+      if (isQtl) {
+        const q = qtlEffects.find(q => q.chr === loc.chr && q.pos === loc.pos)!;
+        loci.push({ id: loc.id, chr: loc.chr, pos: loc.pos, effect: q.effect, isQtl: true });
+      } else {
+        // Base noise
+        let effect = ctx.rng() * 0.5;
+        // Add LD signal from nearby QTLs on same chromosome
+        for (const q of qtlEffects) {
+          if (q.chr === loc.chr) {
+            const dist = Math.abs(loc.pos - q.pos);
+            const r2 = Math.exp(-dist / 15); // LD decay ~15cM half-life
+            effect += q.effect * r2 * (0.6 + ctx.rng() * 0.4); // some noise in LD
+          }
+        }
+        loci.push({ id: loc.id, chr: loc.chr, pos: loc.pos, effect, isQtl: false });
       }
     }
     // Pick a target QTL (one of the major yield QTLs)

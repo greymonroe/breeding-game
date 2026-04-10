@@ -60,7 +60,7 @@ export function ManhattanPlotChallenge({ instance, onSubmit }: ChallengeChildPro
 
       {/* Manhattan Plot SVG */}
       <div className="overflow-x-auto rounded border border-soil/10 bg-white p-2">
-        <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ minWidth: 400 }}>
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full">
           {/* Background */}
           <rect x={pad.left} y={pad.top} width={plotW} height={plotH} fill="#faf7f2" />
 
@@ -89,7 +89,7 @@ export function ManhattanPlotChallenge({ instance, onSubmit }: ChallengeChildPro
             threshold
           </text>
 
-          {/* Data points */}
+          {/* Data points — invisible larger hit area for touch + visible dot */}
           {data.loci.map((loc) => {
             const cx = xScale(loc.chr, loc.pos);
             const cy = yScale(loc.effect);
@@ -97,18 +97,20 @@ export function ManhattanPlotChallenge({ instance, onSubmit }: ChallengeChildPro
             const color = chrColors[(loc.chr - 1) % chrColors.length];
 
             return (
-              <circle
-                key={loc.id}
-                cx={cx}
-                cy={cy}
-                r={isSelected ? 6 : 3}
-                fill={isSelected ? '#e07a3a' : color}
-                stroke={isSelected ? '#c0392b' : 'none'}
-                strokeWidth={isSelected ? 2 : 0}
-                opacity={isSelected ? 1 : 0.7}
-                className="cursor-pointer"
-                onClick={() => setSelected(loc.id)}
-              />
+              <g key={loc.id} className="cursor-pointer" onClick={() => setSelected(loc.id)}>
+                {/* Invisible touch target (r=10 ≈ 20px diameter) */}
+                <circle cx={cx} cy={cy} r={10} fill="transparent" />
+                {/* Visible dot */}
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={isSelected ? 6 : 3}
+                  fill={isSelected ? '#e07a3a' : color}
+                  stroke={isSelected ? '#c0392b' : 'none'}
+                  strokeWidth={isSelected ? 2 : 0}
+                  opacity={isSelected ? 1 : 0.7}
+                />
+              </g>
             );
           })}
         </svg>
