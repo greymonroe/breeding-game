@@ -146,7 +146,7 @@ export function PlantCard({ ind, selected, onClick }: Props) {
 
       {showTooltip && (
         <div
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded-xl border-2 border-soil/20 bg-white shadow-game-lg p-3 text-[11px] text-soil pointer-events-none"
+          className="fixed sm:absolute z-50 sm:bottom-full left-1/2 -translate-x-1/2 bottom-4 sm:bottom-auto sm:mb-2 w-[85vw] sm:w-48 max-w-[12rem] rounded-xl border-2 border-soil/20 bg-white shadow-game-lg p-3 text-[11px] text-soil pointer-events-none"
         >
           <div className="font-extrabold text-soil mb-1 font-mono text-[10px]">
             {ind.id}

@@ -44,23 +44,23 @@ export function FieldView() {
   return (
     <div className="space-y-4">
       {/* Season status & advance button */}
-      <div className="card-farm p-4 flex items-center gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">{'\u{2600}\u{FE0F}'}</span>
-            <span className="text-lg font-extrabold text-soil">Season {season}</span>
-          </div>
-          <div className="text-xs text-muted font-semibold">
-            {nurseries.length} {nurseries.length === 1 ? 'nursery' : 'nurseries'} &middot;
-            market baseline <span className="font-mono text-soil">{marketBaseline.toFixed(1)}</span>
-            {diseaseActive && <span className="ml-2 text-danger font-bold">{'\u{1F9A0}'} Outbreak!</span>}
+      <div className="card-farm p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+        <div className="flex-1 flex items-center gap-2">
+          <span className="text-xl sm:text-2xl">{'\u{2600}\u{FE0F}'}</span>
+          <div>
+            <span className="text-base sm:text-lg font-extrabold text-soil">Season {season}</span>
+            <div className="text-[10px] sm:text-xs text-muted font-semibold">
+              {nurseries.length} {nurseries.length === 1 ? 'nursery' : 'nurseries'} &middot;
+              mkt <span className="font-mono text-soil">{marketBaseline.toFixed(1)}</span>
+              {diseaseActive && <span className="ml-1 text-danger font-bold">{'\u{1F9A0}'} Outbreak!</span>}
+            </div>
           </div>
         </div>
         <button
           onClick={advanceSeason}
           disabled={selectedIds.length === 0 || totalCost > budget.cash}
           title={selectedIds.length === 0 ? 'Select parents in at least one nursery first.' : ''}
-          className="rounded-xl bg-gradient-to-b from-leaf to-leaf-dark px-6 py-3 text-sm font-extrabold text-white shadow-game hover:shadow-game-lg disabled:opacity-40 disabled:shadow-none transition-all border-2 border-leaf-dark/50"
+          className="rounded-xl bg-gradient-to-b from-leaf to-leaf-dark px-4 sm:px-6 py-2.5 sm:py-3 text-sm font-extrabold text-white shadow-game hover:shadow-game-lg disabled:opacity-40 disabled:shadow-none transition-all border-2 border-leaf-dark/50 min-h-[44px]"
         >
           {'\u{23ED}'} Advance Season
           {totalCost > 0 && <span className="block text-[10px] font-semibold opacity-80">&minus;${totalCost}</span>}
@@ -70,8 +70,8 @@ export function FieldView() {
       <Portfolio />
 
       {/* Nursery tabs */}
-      <div className="card-farm p-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-extrabold text-soil uppercase tracking-wide">{'\u{1F33E}'} Nurseries:</span>
+      <div className="card-farm p-2 sm:p-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <span className="text-[10px] sm:text-xs font-extrabold text-soil uppercase tracking-wide">{'\u{1F33E}'} Nurseries:</span>
         {nurseries.map((n) => (
           <button
             key={n.id}
@@ -192,22 +192,22 @@ function NurserySection({
       ) : (
         <>
           {/* Controls bar */}
-          <div className="flex flex-wrap items-center gap-2 mb-3 text-xs bg-soil/5 rounded-xl px-3 py-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3 text-[10px] sm:text-xs bg-soil/5 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2">
             <label className="flex items-center gap-1 font-semibold text-soil">
-              Next pop
+              Pop
               <input
                 type="number"
                 value={nursery.popSize}
                 min={1}
                 max={300}
                 onChange={(e) => setNurseryPopSize(nursery.id, Math.max(1, Number(e.target.value) || 1))}
-                className="w-16 rounded-lg border-2 border-soil/20 px-2 py-1 font-mono bg-white"
+                className="w-14 rounded-lg border-2 border-soil/20 px-1.5 py-1 font-mono bg-white text-xs min-h-[36px]"
               />
             </label>
             <span className="text-muted font-semibold">${nursery.popSize * Costs.perPlant}</span>
-            <span className="text-muted">&middot; open pollination</span>
-            <button onClick={clearSelection} className="ml-auto rounded-lg border-2 border-soil/20 px-3 py-1 font-bold hover:bg-white transition-colors">
-              Clear selection
+            <span className="text-muted hidden sm:inline">&middot; open pollination</span>
+            <button onClick={clearSelection} className="ml-auto rounded-lg border-2 border-soil/20 px-2 sm:px-3 py-1 font-bold hover:bg-white transition-colors min-h-[36px]">
+              Clear
             </button>
           </div>
 
@@ -242,17 +242,17 @@ function NurserySection({
                   </div>
                 </div>
                 <p className="text-[11px] text-muted mb-3">Across your whole nursery, red plants consistently out-yield white plants. Why?</p>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button onClick={() => interpretLinkage('pleiotropy')}
-                    className="rounded-lg border-2 border-soil/20 px-3 py-1.5 text-[11px] font-bold hover:bg-white transition-colors">
-                    Pleiotropy (color gene directly affects yield)
+                    className="rounded-xl border-2 border-soil/20 px-3 py-2.5 text-[11px] font-bold hover:bg-white transition-colors min-h-[44px]">
+                    Pleiotropy (color gene affects yield)
                   </button>
                   <button onClick={() => interpretLinkage('linkage')}
-                    className="rounded-lg border-2 border-purple-400/40 px-3 py-1.5 text-[11px] font-bold hover:bg-purple-100 transition-colors text-purple-700">
-                    Linkage (nearby genes on same chromosome)
+                    className="rounded-xl border-2 border-purple-400/40 px-3 py-2.5 text-[11px] font-bold hover:bg-purple-100 transition-colors text-purple-700 min-h-[44px]">
+                    Linkage (nearby on chromosome)
                   </button>
                   <button onClick={() => interpretLinkage('coincidence')}
-                    className="rounded-lg border-2 border-soil/20 px-3 py-1.5 text-[11px] font-bold hover:bg-white transition-colors">
+                    className="rounded-xl border-2 border-soil/20 px-3 py-2.5 text-[11px] font-bold hover:bg-white transition-colors min-h-[44px]">
                     Coincidence (random noise)
                   </button>
                 </div>
@@ -286,7 +286,7 @@ function NurserySection({
           )}
 
           {focused && (
-            <div className="border-t-2 border-soil/10 pt-3 mb-3 flex flex-wrap items-center gap-2 text-xs">
+            <div className="border-t-2 border-soil/10 pt-2 sm:pt-3 mb-2 sm:mb-3 flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs">
               <span className="bg-accent/10 rounded-lg px-2 py-1 font-bold text-soil">
                 {focused.id} &mdash; Y {focused.phenotype.has('yield') ? focused.phenotype.get('yield')!.toFixed(1) : '?'}, F{' '}
                 {focused.phenotype.has('flavor') ? focused.phenotype.get('flavor')!.toFixed(1) : '?'},{' '}
@@ -295,7 +295,7 @@ function NurserySection({
               </span>
               <button
                 onClick={() => release(focused.id)}
-                className="rounded-xl bg-gradient-to-b from-accent to-accent/90 px-4 py-1.5 text-xs font-extrabold text-white shadow-sm hover:shadow-md transition-all border border-accent/50"
+                className="rounded-xl bg-gradient-to-b from-accent to-accent/90 px-3 sm:px-4 py-2 text-xs font-extrabold text-white shadow-sm hover:shadow-md transition-all border border-accent/50 min-h-[44px]"
               >
                 {'\u{1F4E6}'} Release ($20)
               </button>
@@ -447,13 +447,13 @@ function FamilyGroupedGrid({
                     </div>
                   </div>
                   <p className="text-[11px] text-muted mb-3 font-semibold">Which allele is <strong>dominant</strong>?</p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button onClick={() => interpretDominance('color', key!, 'R')}
-                      className="rounded-xl border-2 border-danger/30 px-4 py-2 text-[11px] font-bold hover:bg-danger/10 transition-colors">
+                      className="rounded-xl border-2 border-danger/30 px-4 py-2.5 text-[11px] font-bold hover:bg-danger/10 transition-colors min-h-[44px]">
                       R (Red is dominant)
                     </button>
                     <button onClick={() => interpretDominance('color', key!, 'r')}
-                      className="rounded-xl border-2 border-soil/20 px-4 py-2 text-[11px] font-bold hover:bg-soil/5 transition-colors">
+                      className="rounded-xl border-2 border-soil/20 px-4 py-2.5 text-[11px] font-bold hover:bg-soil/5 transition-colors min-h-[44px]">
                       r (White is dominant)
                     </button>
                   </div>
@@ -481,13 +481,13 @@ function FamilyGroupedGrid({
                         <div className="text-[10px] text-muted font-bold">White ({colorDisc.recessiveAllele}{colorDisc.recessiveAllele})</div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={() => interpretTestCross('color', key!, domParent.id, 'homozygous')}
-                        className="rounded-xl border-2 border-leaf/30 px-4 py-2 text-[11px] font-bold hover:bg-leaf/10 transition-colors">
+                        className="rounded-xl border-2 border-leaf/30 px-4 py-2.5 text-[11px] font-bold hover:bg-leaf/10 transition-colors min-h-[44px]">
                         Homozygous {colorDisc.dominantAllele}{colorDisc.dominantAllele}
                       </button>
                       <button onClick={() => interpretTestCross('color', key!, domParent.id, 'heterozygous')}
-                        className="rounded-xl border-2 border-accent/30 px-4 py-2 text-[11px] font-bold hover:bg-accent/10 transition-colors">
+                        className="rounded-xl border-2 border-accent/30 px-4 py-2.5 text-[11px] font-bold hover:bg-accent/10 transition-colors min-h-[44px]">
                         Heterozygous {colorDisc.dominantAllele}{colorDisc.recessiveAllele}
                       </button>
                     </div>
@@ -526,13 +526,13 @@ function FamilyGroupedGrid({
                       </div>
                     </div>
                     <p className="text-[11px] text-muted mb-3 font-semibold">The offspring are <strong>intermediate</strong>. What type of inheritance?</p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={() => interpretDominance('shape', key!, 'L')}
-                        className="rounded-xl border-2 border-amber-400/40 px-4 py-2 text-[11px] font-bold hover:bg-amber-100 transition-colors">
+                        className="rounded-xl border-2 border-amber-400/40 px-4 py-2.5 text-[11px] font-bold hover:bg-amber-100 transition-colors min-h-[44px]">
                         Incomplete dominance
                       </button>
                       <button onClick={() => interpretDominance('shape', key!, 'WRONG_complete')}
-                        className="rounded-xl border-2 border-soil/20 px-4 py-2 text-[11px] font-bold hover:bg-soil/5 transition-colors">
+                        className="rounded-xl border-2 border-soil/20 px-4 py-2.5 text-[11px] font-bold hover:bg-soil/5 transition-colors min-h-[44px]">
                         Complete dominance
                       </button>
                     </div>
@@ -565,13 +565,13 @@ function FamilyGroupedGrid({
                           <div className="text-[10px] text-muted font-bold">Elongated ({shapeDisc.recessiveAllele}{shapeDisc.recessiveAllele})</div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button onClick={() => interpretTestCross('shape', key!, roundParent.id, 'homozygous')}
-                          className="rounded-xl border-2 border-leaf/30 px-4 py-2 text-[11px] font-bold hover:bg-leaf/10 transition-colors">
+                          className="rounded-xl border-2 border-leaf/30 px-4 py-2.5 text-[11px] font-bold hover:bg-leaf/10 transition-colors min-h-[44px]">
                           Homozygous {shapeDisc.dominantAllele}{shapeDisc.dominantAllele}
                         </button>
                         <button onClick={() => interpretTestCross('shape', key!, roundParent.id, 'heterozygous')}
-                          className="rounded-xl border-2 border-accent/30 px-4 py-2 text-[11px] font-bold hover:bg-accent/10 transition-colors">
+                          className="rounded-xl border-2 border-accent/30 px-4 py-2.5 text-[11px] font-bold hover:bg-accent/10 transition-colors min-h-[44px]">
                           Heterozygous {shapeDisc.dominantAllele}{shapeDisc.recessiveAllele}
                         </button>
                       </div>
@@ -592,7 +592,7 @@ function FamilyGroupedGrid({
           >
             {header}
             {interpretPanel}
-            <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8">
+            <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
               {members.map((ind) => (
                 <PlantCard
                   key={ind.id}

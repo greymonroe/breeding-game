@@ -149,6 +149,16 @@ body {
   transition: width 0.3s ease;
 }
 
+/* ── Mobile touch improvements ── */
+@media (max-width: 640px) {
+  /* Prevent double-tap zoom on buttons */
+  button { touch-action: manipulation; }
+  /* Ensure inputs are large enough */
+  input[type="number"] { font-size: 16px; }
+  /* Prevent iOS zoom on input focus */
+  select, textarea, input { font-size: 16px; }
+}
+
 /* ── Scrollbar styling ── */
 ::-webkit-scrollbar {
   width: 6px;

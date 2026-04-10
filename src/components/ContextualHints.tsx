@@ -133,7 +133,7 @@ export function ContextualHints() {
       {[...activeHints, ...fadingHints].slice(0, 2).map((hint) => (
         <div
           key={hint.id}
-          className={`flex items-start gap-3 rounded-xl border-2 border-sky/30 bg-gradient-to-r from-sky-light/20 to-sky/5 px-4 py-3 text-xs text-soil transition-opacity duration-400 shadow-sm ${
+          className={`flex items-start gap-2 sm:gap-3 rounded-xl border-2 border-sky/30 bg-gradient-to-r from-sky-light/20 to-sky/5 px-3 sm:px-4 py-2 sm:py-3 text-[11px] sm:text-xs text-soil transition-opacity duration-400 shadow-sm ${
             fading.has(hint.id) ? 'opacity-0' : 'opacity-100'
           }`}
         >

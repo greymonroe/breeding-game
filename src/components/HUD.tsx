@@ -5,18 +5,17 @@ export function HUD() {
   const totalPlants = useGame((s) => s.totalPlants());
   const stat = history[history.length - 1];
 
+  const yieldMeasured = stat.meanYield > 1;
+  const yieldDisplay = yieldMeasured ? stat.meanYield.toFixed(1) : '?';
+  const yieldColor = !yieldMeasured ? 'text-accent' : undefined;
+
   const trustPct = Math.round(trust * 100);
   const trustColor = trust >= 0.8 ? 'text-leaf' : trust >= 0.5 ? 'text-accent' : 'text-danger';
   const trustBg = trust >= 0.8 ? 'bg-leaf' : trust >= 0.5 ? 'bg-accent' : 'bg-danger';
   const cashColor = budget.cash < 50 ? 'text-danger' : 'text-soil';
 
-  // Show "?" if yield hasn't been measured (meanYield is 0 or very close)
-  const yieldMeasured = stat.meanYield > 1;
-  const yieldDisplay = yieldMeasured ? stat.meanYield.toFixed(1) : '?';
-  const yieldColor = !yieldMeasured ? 'text-accent' : undefined;
-
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
+    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2 text-xs">
       <HudStat icon={'\u{2600}'} label="Season" value={`${season}`} />
       <HudStat icon={'\u{1FA99}'} label="Cash" value={`$${budget.cash}`} valueClass={cashColor} />
       <HudStat icon={'\u{1F33F}'} label="Plants" value={`${totalPlants}`} />
@@ -27,18 +26,18 @@ export function HUD() {
         valueClass={yieldColor}
         sub={`mkt ${marketBaseline.toFixed(1)}`}
       />
-      <div className="rounded-xl border border-soil/15 bg-white/80 px-3 py-1.5">
-        <div className="flex items-center gap-1 text-[10px] text-muted font-semibold uppercase tracking-wide mb-0.5">
-          <span>{'\u{1F91D}'}</span> Trust
+      <div className="rounded-lg sm:rounded-xl border border-soil/15 bg-white/80 px-2 sm:px-3 py-1 sm:py-1.5">
+        <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-muted font-semibold uppercase tracking-wide mb-0.5">
+          <span>{'\u{1F91D}'}</span> <span className="hidden sm:inline">Trust</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="flex-1 h-2 bg-soil/10 rounded-full overflow-hidden">
+        <div className="flex items-center gap-1">
+          <div className="flex-1 h-1.5 sm:h-2 bg-soil/10 rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${trustBg} transition-all duration-500`} style={{ width: `${trustPct}%` }} />
           </div>
-          <span className={`font-extrabold font-mono text-sm ${trustColor}`}>{trustPct}%</span>
+          <span className={`font-extrabold font-mono text-xs sm:text-sm ${trustColor}`}>{trustPct}%</span>
         </div>
       </div>
-      <HudStat icon={'\u{1F4E6}'} label="Releases" value={`${releases.length}`} />
+      <HudStat icon={'\u{1F4E6}'} label="Rel" value={`${releases.length}`} />
     </div>
   );
 }
@@ -47,14 +46,14 @@ function HudStat({ icon, label, value, valueClass, sub }: {
   icon: string; label: string; value: string; valueClass?: string; sub?: string;
 }) {
   return (
-    <div className="rounded-xl border border-soil/15 bg-white/80 px-3 py-1.5">
-      <div className="flex items-center gap-1 text-[10px] text-muted font-semibold uppercase tracking-wide mb-0.5">
-        <span>{icon}</span> {label}
+    <div className="rounded-lg sm:rounded-xl border border-soil/15 bg-white/80 px-2 sm:px-3 py-1 sm:py-1.5">
+      <div className="flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] text-muted font-semibold uppercase tracking-wide mb-0.5">
+        <span>{icon}</span> <span className="truncate">{label}</span>
       </div>
-      <div className={`font-extrabold font-mono text-sm leading-tight ${valueClass ?? 'text-soil'}`}>
+      <div className={`font-extrabold font-mono text-xs sm:text-sm leading-tight ${valueClass ?? 'text-soil'}`}>
         {value}
       </div>
-      {sub && <div className="text-[9px] text-muted font-mono">{sub}</div>}
+      {sub && <div className="text-[8px] sm:text-[9px] text-muted font-mono truncate">{sub}</div>}
     </div>
   );
 }
