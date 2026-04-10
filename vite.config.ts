@@ -12,6 +12,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         lab: resolve(__dirname, 'lab.html'),
         popgen: resolve(__dirname, 'popgen.html'),
+        linkage: resolve(__dirname, 'linkage.html'),
       },
     },
   },
