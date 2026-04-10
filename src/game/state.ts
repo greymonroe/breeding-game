@@ -5,8 +5,10 @@ import {
   produceGameteWithTrace,
   discoverAssociations,
   geneEdit,
+  gaussian,
   genomicSelect,
   genotypeIndividuals,
+  hybridGeneticValue,
   inbreedingCoefficient,
   individualUniformity,
   makeMarkerKnowledge,
@@ -65,12 +67,17 @@ export interface ReleasedVariety {
   name: string;
   releasedAtSeason: number;
   parentId: string;
+  kind: 'inbred' | 'hybrid';
+  /** For hybrids: archive IDs of the two inbred parent lines. */
+  hybridParents?: [string, string];
   traits: { yield: number; flavor: number; color: number; shape: number };
   resistant: boolean;
   /** Genotypic uniformity at functional loci, computed at release time. */
   uniformity: number;
   totalEarned: number;
   lastSeasonRevenue: number;
+  /** Per-season cost to maintain (0 for inbreds, >0 for hybrids). */
+  maintenanceCost: number;
 }
 
 export interface GenerationStat {
@@ -122,6 +129,14 @@ function makeObjectives(): Objective[] {
       description: 'Release a white-flowered variety with competitive yield.',
       reward: 400,
       availableAt: 5,
+      completed: false,
+    },
+    {
+      id: 'release_hybrid',
+      title: 'Release an F1 hybrid',
+      description: 'Develop two inbred parent lines and release a high-performing F1 hybrid.',
+      reward: 600,
+      availableAt: 8,
       completed: false,
     },
   ];
@@ -194,6 +209,7 @@ interface GameState {
   advanceSeason: () => void;
 
   release: (id: string) => void;
+  releaseHybrid: (parentAId: string, parentBId: string) => void;
   unlockTech: (id: TechId) => boolean;
   genotypeAll: (nurseryId?: string) => void;
   runGwas: (traitName: string, nurseryId?: string) => void;
@@ -268,7 +284,7 @@ function makeInitial(): Omit<GameState,
   | 'setActiveNursery' | 'createNursery' | 'deleteNursery' | 'renameNursery'
   | 'setNurseryPopSize' | 'moveIndividual'
   | 'toggleSelect' | 'clearSelection' | 'autoSelectTopInActive'
-  | 'advanceSeason' | 'release' | 'unlockTech' | 'genotypeAll' | 'runGwas'
+  | 'advanceSeason' | 'release' | 'releaseHybrid' | 'unlockTech' | 'genotypeAll' | 'runGwas'
   | 'acquireWildAccession' | 'introducePlantFromBank' | 'mutagenizeField'
   | 'editIndividual' | 'trainPredictor' | 'dismissNotice' | 'reset'
   | 'measureTrait' | 'makeControlledCross'
@@ -581,7 +597,8 @@ export const useGame = create<GameState>((set, get) => ({
       const share = winners.has(r.id) ? 1 : COMPETITION_LOSER_SHARE;
       const seg = segmentKey(r.traits.color, r.resistant);
       const demand = market[seg];
-      const rev = Math.round(base * share * demand * newTrust);
+      const gross = Math.round(base * share * demand * newTrust);
+      const rev = gross - (r.maintenanceCost ?? 0);
       totalIncome += rev;
       return { ...r, lastSeasonRevenue: rev, totalEarned: r.totalEarned + rev };
     });
@@ -675,6 +692,7 @@ export const useGame = create<GameState>((set, get) => ({
       name: `Variety ${s.releases.length + 1}`,
       releasedAtSeason: s.season,
       parentId: ind.id,
+      kind: 'inbred',
       traits: {
         yield: ind.phenotype.get('yield') ?? 0,
         flavor: ind.phenotype.get('flavor') ?? 0,
@@ -685,6 +703,7 @@ export const useGame = create<GameState>((set, get) => ({
       uniformity,
       totalEarned: 0,
       lastSeasonRevenue: 0,
+      maintenanceCost: 0,
     };
 
     // Trust dynamics from this release. The exact uniformity is hidden from
@@ -769,6 +788,155 @@ export const useGame = create<GameState>((set, get) => ({
         ...objNews,
         news(
           `📦 You released ${release.name} into the ${SEGMENT_LABELS[seg]} segment (yield ${release.traits.yield.toFixed(1)}, flavor ${release.traits.flavor.toFixed(1)}). ${trustNote}`,
+          s.season,
+          'release'
+        ),
+        ...s.news,
+      ].slice(0, 50),
+    });
+  },
+
+  releaseHybrid: (parentAId, parentBId) => {
+    const s = get();
+    if (!s.unlocked.has('hybrid_breeding')) {
+      set({ notices: [...s.notices, notice('Unlock Hybrid breeding in the Tech tree first.')] });
+      return;
+    }
+    // Find parents across all nurseries and archive
+    const findInd = (id: string): Individual | undefined => {
+      for (const n of s.nurseries) {
+        const found = n.plants.find((p) => p.id === id);
+        if (found) return found;
+      }
+      return s.archive.get(id);
+    };
+    const parentA = findInd(parentAId);
+    const parentB = findInd(parentBId);
+    if (!parentA || !parentB) return;
+    if (parentAId === parentBId) {
+      set({ notices: [...s.notices, notice('A hybrid requires two different parents.')] });
+      return;
+    }
+    if (!parentA.phenotype.has('yield') || !parentA.phenotype.has('flavor') ||
+        !parentB.phenotype.has('yield') || !parentB.phenotype.has('flavor')) {
+      set({ notices: [...s.notices, notice('Both parents must have yield and flavor measured.')] });
+      return;
+    }
+    if (s.budget.cash < Costs.hybridReleaseFee) {
+      set({ notices: [...s.notices, notice(`Need $${Costs.hybridReleaseFee} hybrid registration fee.`)] });
+      return;
+    }
+
+    // Compute F1 traits from the two parents
+    const yieldTrait = s.traits.find((t) => t.name === 'yield');
+    const flavorTrait = s.traits.find((t) => t.name === 'flavor');
+    const colorTrait = s.traits.find((t) => t.name === 'color');
+    const shapeTrait = s.traits.find((t) => t.name === 'shape');
+    if (!yieldTrait || !flavorTrait || !colorTrait || !shapeTrait) return;
+
+    const f1Yield = yieldTrait.type === 'quantitative'
+      ? hybridGeneticValue(parentA, parentB, yieldTrait) + gaussian(s.rng) * Math.sqrt(yieldTrait.environmentalVariance)
+      : 0;
+    const f1Flavor = flavorTrait.type === 'quantitative'
+      ? hybridGeneticValue(parentA, parentB, flavorTrait) + gaussian(s.rng) * Math.sqrt(flavorTrait.environmentalVariance)
+      : 0;
+    // Qualitative traits: F1 gets one allele from each parent
+    const colorDose = (parentA.genotype.haplotypes[0].get('COLOR') === 'R' ? 1 : 0)
+                    + (parentB.genotype.haplotypes[0].get('COLOR') === 'R' ? 1 : 0);
+    const f1Color = colorDose >= 1 ? 1 : 0; // complete dominance
+    const shapeDose = (parentA.genotype.haplotypes[0].get('SHAPE') === 'L' ? 1 : 0)
+                    + (parentB.genotype.haplotypes[0].get('SHAPE') === 'L' ? 1 : 0);
+    const f1Shape = shapeDose === 2 ? 1 : shapeDose === 1 ? 0.5 : 0; // incomplete dominance
+
+    const drA = parentA.genotype.haplotypes[0].get('DR');
+    const drB = parentB.genotype.haplotypes[0].get('DR');
+    const resistant = drA === 'R' || drB === 'R';
+
+    // F1 uniformity depends on how inbred each parent is.
+    // Fully inbred parents → all F1 seeds are genetically identical → uniformity 1.0.
+    // Non-inbred parents → variable gametes → F1 seed lot is not uniform.
+    const uniA = individualUniformity(parentA, FUNCTIONAL_LOCI);
+    const uniB = individualUniformity(parentB, FUNCTIONAL_LOCI);
+    const uniformity = uniA * uniB;
+
+    const release: ReleasedVariety = {
+      id: `var_${s.releases.length + 1}`,
+      name: `Hybrid ${s.releases.length + 1}`,
+      releasedAtSeason: s.season,
+      parentId: parentAId,
+      kind: 'hybrid',
+      hybridParents: [parentAId, parentBId],
+      traits: { yield: f1Yield, flavor: f1Flavor, color: f1Color, shape: f1Shape },
+      resistant,
+      uniformity,
+      totalEarned: 0,
+      lastSeasonRevenue: 0,
+      maintenanceCost: Costs.hybridMaintenanceCost,
+    };
+
+    // Trust dynamics (same as inbred release)
+    let trustDelta = 0;
+    let trustNote = '';
+    if (uniformity >= 0.92) {
+      trustDelta = 0.04;
+      trustNote = 'Farmers love it. Uniform F1 hybrid, vigorous stand. Trust ↑.';
+    } else if (uniformity >= 0.8) {
+      trustDelta = -0.02;
+      trustNote = 'Hybrid performs well, but some off-types noted — are the parent lines pure?';
+    } else if (uniformity >= 0.6) {
+      trustDelta = -0.25;
+      trustNote = '⚠ F1 seed lot is variable — parent lines are not sufficiently inbred. Trust ↓.';
+    } else {
+      trustDelta = -0.5;
+      trustNote = '🚨 Hybrid seed is highly variable — parents are segregating. Trust collapses.';
+    }
+    const newTrust = Math.max(0.1, Math.min(1, s.trust + trustDelta));
+    const seg = segmentKey(release.traits.color, release.resistant);
+
+    // Check objectives
+    const objectiveOk = uniformity >= 0.8;
+    const isRed = release.traits.color >= 0.5;
+    const isWhite = !isRed;
+    const updatedObjectives = s.objectives.map((o) => {
+      if (o.completed) return o;
+      if (o.availableAt > s.season) return o;
+      if (o.id === 'release_red' && isRed && objectiveOk) return { ...o, completed: true, completedAt: s.season };
+      if (o.id === 'release_white' && isWhite && objectiveOk) return { ...o, completed: true, completedAt: s.season };
+      if (o.id === 'release_hybrid' && objectiveOk) return { ...o, completed: true, completedAt: s.season };
+      return o;
+    });
+
+    let objBonus = 0;
+    const objNotices: Notice[] = [];
+    const objNews: NewsItem[] = [];
+    for (let i = 0; i < updatedObjectives.length; i++) {
+      if (updatedObjectives[i].completed && !s.objectives[i].completed) {
+        objBonus += updatedObjectives[i].reward;
+        objNotices.push(notice(`🏆 Objective complete: "${updatedObjectives[i].title}" — earned $${updatedObjectives[i].reward} bonus!`));
+        objNews.push(news(`🏆 Objective "${updatedObjectives[i].title}" completed! +$${updatedObjectives[i].reward}.`, s.season, 'event'));
+      }
+    }
+
+    const budgetAfterRelease = spend(s.budget, Costs.hybridReleaseFee, `registered ${release.name}`, s.season);
+    const finalCash = budgetAfterRelease.cash + objBonus;
+    const finalHistory = objBonus > 0
+      ? [...budgetAfterRelease.history, { generation: s.season, cash: finalCash, reason: `+$${objBonus} objective bonus` }]
+      : budgetAfterRelease.history;
+
+    set({
+      releases: [...s.releases, release],
+      budget: { cash: finalCash, history: finalHistory },
+      trust: newTrust,
+      objectives: updatedObjectives,
+      notices: [
+        ...s.notices,
+        notice(`🌽 ${release.name} (F1) added to portfolio (${SEGMENT_LABELS[seg]}, yield ${release.traits.yield.toFixed(1)}, maintenance $${release.maintenanceCost}/season). ${trustNote}`),
+        ...objNotices,
+      ],
+      news: [
+        ...objNews,
+        news(
+          `🌽 You released ${release.name} — an F1 hybrid into the ${SEGMENT_LABELS[seg]} segment (yield ${release.traits.yield.toFixed(1)}, flavor ${release.traits.flavor.toFixed(1)}). ${trustNote}`,
           s.season,
           'release'
         ),

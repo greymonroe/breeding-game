@@ -17,6 +17,10 @@ export const Costs = {
   wildAccession: 30,
   /** $ to train the genomic predictor (one-shot per training) */
   trainPredictor: 20,
+  /** Flat $ to register a hybrid variety (higher than inbred). */
+  hybridReleaseFee: 40,
+  /** Per-season cost to maintain inbred parent lines for hybrid seed production. */
+  hybridMaintenanceCost: 10,
 };
 
 /**

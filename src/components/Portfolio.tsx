@@ -155,6 +155,9 @@ export function Portfolio() {
               <div className="flex items-center justify-between mb-1">
                 <div className="font-semibold text-soil">
                   {rel.name}
+                  {rel.kind === 'hybrid' && (
+                    <span className="ml-1 inline-block px-1 py-0.5 rounded text-[8px] font-bold bg-sky/20 text-sky">F1</span>
+                  )}
                   {winner && <span className="ml-1 text-[10px] text-leaf font-semibold">&#9733;</span>}
                 </div>
                 <div className={`font-mono font-bold ${rev > 0 ? 'text-leaf' : 'text-muted'}`}>
@@ -176,7 +179,15 @@ export function Portfolio() {
 
               <div className="text-[11px] text-muted font-mono mb-1">
                 Y {rel.traits.yield.toFixed(1)} / F {rel.traits.flavor.toFixed(1)} / released S{rel.releasedAtSeason}
+                {rel.maintenanceCost > 0 && (
+                  <span className="text-accent"> · −${rel.maintenanceCost}/season</span>
+                )}
               </div>
+              {rel.kind === 'hybrid' && rel.hybridParents && (
+                <div className="text-[10px] text-muted mb-1">
+                  Parents: <span className="font-mono">{rel.hybridParents[0]} × {rel.hybridParents[1]}</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="text-[10px] text-muted">

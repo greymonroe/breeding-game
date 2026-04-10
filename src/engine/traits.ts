@@ -37,6 +37,32 @@ export function qualitativeValue(ind: Individual, trait: QualitativeTrait): numb
   return trait.values.het;
 }
 
+/**
+ * Compute the F1 genetic value from two parents without running meiosis.
+ * For each locus, take one allele from each parent (haplotype[0], since
+ * a fully inbred parent has identical haplotypes). Apply the standard
+ * additive + dominance model to the resulting diploid genotype.
+ */
+export function hybridGeneticValue(
+  parentA: Individual,
+  parentB: Individual,
+  trait: QuantitativeTrait,
+): number {
+  let g = trait.baseline;
+  for (const locusId of trait.loci) {
+    const fav = trait.favorable.get(locusId)!;
+    const eff = trait.effects.get(locusId) ?? 0;
+    const dom = trait.dominance.get(locusId) ?? 0;
+    // Take one representative allele from each parent
+    const aAllele = parentA.genotype.haplotypes[0].get(locusId);
+    const bAllele = parentB.genotype.haplotypes[0].get(locusId);
+    const dose = (aAllele === fav ? 1 : 0) + (bAllele === fav ? 1 : 0);
+    g += eff * dose;
+    if (dose === 1) g += dom;
+  }
+  return g;
+}
+
 export function computePhenotype(ind: Individual, trait: Trait, rng: RNG): number {
   if (trait.type === 'qualitative') return qualitativeValue(ind, trait);
   const g = geneticValue(ind, trait);

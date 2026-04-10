@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGame, type Nursery } from '../game/state';
 import type { Individual } from '../engine';
+import { hybridGeneticValue } from '../engine';
 import { PlantCard } from './PlantCard';
 import { PedigreeGraph } from '../challenges/visualizations/PedigreeGraph';
 import { Portfolio } from './Portfolio';
@@ -20,6 +21,7 @@ export function FieldView() {
     clearSelection,
     advanceSeason,
     release,
+    releaseHybrid,
     budget,
     unlocked,
     marketBaseline,
@@ -28,6 +30,7 @@ export function FieldView() {
     measureTrait,
     makeControlledCross,
     archive,
+    traits,
   } = useGame();
 
   const totalCost = nurseries
@@ -88,11 +91,13 @@ export function FieldView() {
           moveIndividual={moveIndividual}
           unlocked={unlocked}
           release={release}
+          releaseHybrid={releaseHybrid}
           deleteNursery={deleteNursery}
           canDelete={nurseries.length > 1}
           measureTrait={measureTrait}
           makeControlledCross={makeControlledCross}
           archive={archive}
+          traits={traits}
         />
       ))}
     </div>
@@ -102,7 +107,7 @@ export function FieldView() {
 function NurserySection({
   nursery, isActive, allNurseries, selectedIds, toggleSelect, clearSelection,
   setNurseryPopSize, moveIndividual,
-  unlocked, release, deleteNursery, canDelete, measureTrait, makeControlledCross, archive,
+  unlocked, release, releaseHybrid, deleteNursery, canDelete, measureTrait, makeControlledCross, archive, traits,
 }: {
   nursery: Nursery;
   isActive: boolean;
@@ -114,11 +119,13 @@ function NurserySection({
   moveIndividual: (indId: string, toId: string) => void;
   unlocked: Set<string>;
   release: (id: string) => void;
+  releaseHybrid: (a: string, b: string) => void;
   deleteNursery: (id: string) => void;
   canDelete: boolean;
   measureTrait: (nurseryId: string, traitName: string) => void;
   makeControlledCross: (a: string, b: string, count: number) => void;
   archive: Map<string, Individual>;
+  traits: import('../engine').Trait[];
 }) {
   const sorted = [...nursery.plants].sort(
     (a, b) => (b.phenotype.get('yield') ?? 0) - (a.phenotype.get('yield') ?? 0)
@@ -180,6 +187,14 @@ function NurserySection({
               parentA={selectedHere[0]}
               parentB={selectedHere[1]}
               makeControlledCross={makeControlledCross}
+            />
+          )}
+          {selectedHere.length === 2 && unlocked.has('hybrid_breeding') && (
+            <HybridReleasePanel
+              parentA={selectedHere[0]}
+              parentB={selectedHere[1]}
+              releaseHybrid={releaseHybrid}
+              traits={traits}
             />
           )}
           {selectedHere.length === 2 && !unlocked.has('controlled_cross') && (
@@ -548,6 +563,71 @@ function ControlledCrossPanel({
       >
         Make F1 family
       </button>
+    </div>
+  );
+}
+
+function HybridReleasePanel({
+  parentA,
+  parentB,
+  releaseHybrid,
+  traits,
+}: {
+  parentA: Individual;
+  parentB: Individual;
+  releaseHybrid: (a: string, b: string) => void;
+  traits: import('../engine').Trait[];
+}) {
+  const yieldTrait = traits.find((t) => t.name === 'yield');
+  const flavorTrait = traits.find((t) => t.name === 'flavor');
+  const predictedYield = yieldTrait?.type === 'quantitative'
+    ? hybridGeneticValue(parentA, parentB, yieldTrait)
+    : null;
+  const predictedFlavor = flavorTrait?.type === 'quantitative'
+    ? hybridGeneticValue(parentA, parentB, flavorTrait)
+    : null;
+  const parentAYield = parentA.phenotype.get('yield');
+  const parentBYield = parentB.phenotype.get('yield');
+  const midparent = parentAYield != null && parentBYield != null
+    ? (parentAYield + parentBYield) / 2
+    : null;
+  const heterosis = predictedYield != null && midparent != null && midparent > 0
+    ? ((predictedYield - midparent) / midparent * 100)
+    : null;
+
+  return (
+    <div className="mb-2 rounded border border-sky/40 bg-sky/5 px-2 py-1.5 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-soil font-semibold">🌽 Release as F1 hybrid:</span>
+        <span className="font-mono text-soil">{parentA.id}</span>
+        <span className="text-muted">×</span>
+        <span className="font-mono text-soil">{parentB.id}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted">
+        {predictedYield != null && (
+          <span>Predicted yield: <span className="font-mono font-semibold text-soil">{predictedYield.toFixed(1)}</span></span>
+        )}
+        {predictedFlavor != null && (
+          <span>Flavor: <span className="font-mono font-semibold text-soil">{predictedFlavor.toFixed(1)}</span></span>
+        )}
+        {heterosis != null && (
+          <span className={heterosis > 0 ? 'text-leaf font-semibold' : 'text-danger'}>
+            Heterosis: {heterosis > 0 ? '+' : ''}{heterosis.toFixed(1)}%
+          </span>
+        )}
+        <span>Fee: ${Costs.hybridReleaseFee} + ${Costs.hybridMaintenanceCost}/season</span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2">
+        <button
+          onClick={() => releaseHybrid(parentA.id, parentB.id)}
+          className="rounded bg-sky px-3 py-1 text-[11px] font-bold text-white hover:bg-sky/90"
+        >
+          🌽 Release hybrid (${Costs.hybridReleaseFee})
+        </button>
+        <span className="text-[10px] text-muted">
+          Tip: inbred parents produce uniform F1 seed. Heterozygous parents → variable seed lot.
+        </span>
+      </div>
     </div>
   );
 }
