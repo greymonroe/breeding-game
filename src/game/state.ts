@@ -101,20 +101,6 @@ export interface NewsItem {
   kind: 'event' | 'release' | 'disease' | 'price' | 'system';
 }
 
-export interface Experiment {
-  id: string;
-  type: 'dominance_test' | 'test_cross';
-  traitName: string;
-  locusId: string;
-  parentAId: string;
-  parentBId: string;
-  familyId: string;
-  offspringCount: number;
-  /** For test_cross: which dominant-phenotype individual are we resolving? */
-  targetIndividualId?: string;
-  status: 'awaiting_result' | 'complete';
-}
-
 export type SelectionMode = 'phenotype' | 'mas' | 'gp';
 
 export interface Objective {
@@ -207,9 +193,8 @@ interface GameState {
   germplasm: Individual[];
   predictor: GenomicPredictor | null;
 
-  // ── Discovery & experiments ──
+  // ── Discovery ──
   discovery: DiscoveryState;
-  experiments: Experiment[];
 
   // ── Challenges ──
   challengeCompletion: Map<string, ChallengeCompletion>;
@@ -259,10 +244,10 @@ interface GameState {
   reset: () => void;
 
   // ── Discovery actions ──
-  startDominanceTest: (traitName: string, parentAId: string, parentBId: string) => void;
-  interpretDominanceTest: (experimentId: string, dominantAllele: string) => boolean;
-  startTestCross: (traitName: string, dominantIndId: string, recessiveIndId: string) => void;
-  interpretTestCross: (experimentId: string, answer: 'homozygous' | 'heterozygous') => boolean;
+  /** Interpret a cross family to discover dominance. The family must have parents with different phenotypes. */
+  interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
+  /** Interpret a cross family as a test cross. One parent must have the dominant phenotype, the other recessive. */
+  interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
 
   // ── Challenge actions ──
   startChallenge: (definitionId: string) => void;
@@ -326,7 +311,7 @@ function makeInitial(): Omit<GameState,
   | 'setNurseryPopSize' | 'moveIndividual'
   | 'toggleSelect' | 'clearSelection' | 'autoSelectTopInActive'
   | 'advanceSeason' | 'release' | 'releaseHybrid' | 'unlockTech' | 'genotypeAll' | 'runGwas'
-  | 'startDominanceTest' | 'interpretDominanceTest' | 'startTestCross' | 'interpretTestCross'
+  | 'interpretDominance' | 'interpretTestCross'
   | 'acquireWildAccession' | 'introducePlantFromBank' | 'mutagenizeField'
   | 'editIndividual' | 'trainPredictor' | 'dismissNotice' | 'reset'
   | 'measureTrait' | 'makeControlledCross'
@@ -373,7 +358,6 @@ function makeInitial(): Omit<GameState,
     germplasm: [],
     predictor: null,
     discovery: makeInitialDiscovery(),
-    experiments: [],
     challengeCompletion: new Map(),
     activeChallenge: null,
     meiosisTrace: null,
@@ -1268,79 +1252,22 @@ export const useGame = create<GameState>((set, get) => ({
   reset: () => set(makeInitial()),
 
   // ── Discovery actions ──
+  // These work on existing cross families — no separate experiment creation needed.
 
-  startDominanceTest: (traitName, parentAId, parentBId) => {
+  interpretDominance: (traitName, _familyId, dominantAllele) => {
     const s = get();
     const disc = s.discovery.traitDiscoveries[traitName];
-    if (!disc || disc.level !== 'unknown') {
-      set({ notices: [...s.notices, notice('Dominance for this trait is already known.')] });
-      return;
-    }
-    // Find parents
-    const findInd = (id: string) => {
-      for (const n of s.nurseries) { const f = n.plants.find(p => p.id === id); if (f) return f; }
-      return s.archive.get(id);
-    };
-    const pA = findInd(parentAId);
-    const pB = findInd(parentBId);
-    if (!pA || !pB) return;
-    // Produce 20 F1 offspring in a temporary experiment nursery
-    const offspring = crossIndividuals(pA, pB, s.map, s.traits, s.rng, 20);
-    const familyId = `exp_dom_${traitName}_${s.season}`;
-    for (const c of offspring) c.familyId = familyId;
-    const expNursery: Nursery = {
-      id: nurseryId(),
-      name: `Dominance test: ${traitName}`,
-      plants: offspring,
-      popSize: 0,
-    };
-    const experiment: Experiment = {
-      id: `exp_${Date.now()}`,
-      type: 'dominance_test',
-      traitName,
-      locusId: disc.locusId,
-      parentAId,
-      parentBId,
-      familyId,
-      offspringCount: offspring.length,
-      status: 'awaiting_result',
-    };
-    // Archive parents and offspring
-    const archive = new Map(s.archive);
-    archive.set(pA.id, pA);
-    archive.set(pB.id, pB);
-    for (const c of offspring) archive.set(c.id, c);
-    set({
-      nurseries: [...s.nurseries, expNursery],
-      experiments: [...s.experiments, experiment],
-      archive,
-      notices: [
-        ...s.notices,
-        notice(`🔬 Dominance test started for ${traitName}. Check the "${expNursery.name}" nursery and observe the F1 phenotypes, then interpret your results.`),
-      ],
-    });
-  },
+    if (!disc || disc.level !== 'unknown') return false;
 
-  interpretDominanceTest: (experimentId, dominantAllele) => {
-    const s = get();
-    const exp = s.experiments.find(e => e.id === experimentId);
-    if (!exp || exp.type !== 'dominance_test' || exp.status !== 'awaiting_result') return false;
-    const disc = s.discovery.traitDiscoveries[exp.traitName];
-    if (!disc) return false;
-
-    // Check answer: the dominant allele should be the one that appears in heterozygotes
-    // For COLOR: 'R' is dominant. For SHAPE: 'L' is dominant. For DR: 'R' is dominant.
-    const traitDef = s.traits.find(t => t.name === exp.traitName);
+    const traitDef = s.traits.find(t => t.name === traitName);
     if (!traitDef || traitDef.type !== 'qualitative') return false;
     const correctDominant = traitDef.dominantAllele;
-    const correct = dominantAllele === correctDominant;
 
-    if (!correct) {
+    if (dominantAllele !== correctDominant) {
       set({ notices: [...s.notices, notice(`❌ That doesn't match the offspring data. Look at the phenotype ratios again.`)] });
       return false;
     }
 
-    // Determine the recessive allele from the locus definition
     const locus = s.map.chromosomes.flatMap(c => c.loci).find(l => l.id === disc.locusId);
     const recessiveAllele = locus?.alleles.find(a => a !== correctDominant) ?? '?';
 
@@ -1351,14 +1278,10 @@ export const useGame = create<GameState>((set, get) => ({
       recessiveAllele,
       dominanceDiscoveredAt: s.season,
     };
-    const updatedExperiments = s.experiments.map(e =>
-      e.id === experimentId ? { ...e, status: 'complete' as const } : e
-    );
 
-    // Check quest completion
     const updatedObjectives = s.objectives.map(o => {
       if (o.completed) return o;
-      if (o.id === `discover_${exp.traitName}_dominance`) return { ...o, completed: true, completedAt: s.season };
+      if (o.id === `discover_${traitName}_dominance`) return { ...o, completed: true, completedAt: s.season };
       return o;
     });
     let objBonus = 0;
@@ -1373,93 +1296,27 @@ export const useGame = create<GameState>((set, get) => ({
     set({
       discovery: {
         ...s.discovery,
-        traitDiscoveries: { ...s.discovery.traitDiscoveries, [exp.traitName]: updatedDisc },
+        traitDiscoveries: { ...s.discovery.traitDiscoveries, [traitName]: updatedDisc },
       },
-      experiments: updatedExperiments,
       objectives: updatedObjectives,
       budget: objBonus > 0
         ? { cash: s.budget.cash + objBonus, history: [...s.budget.history, { generation: s.season, cash: s.budget.cash + objBonus, reason: `+$${objBonus} quest bonus` }] }
         : s.budget,
       notices: [
         ...s.notices,
-        notice(`🧬 Discovery: ${correctDominant} is dominant over ${recessiveAllele} for ${exp.traitName}! Plants with the recessive phenotype are now shown as ${recessiveAllele}${recessiveAllele}. Dominant-phenotype plants show ${correctDominant}? — use a test cross to find out if they're homozygous or heterozygous.`),
+        notice(`🧬 Discovery: ${correctDominant} is dominant over ${recessiveAllele} for ${traitName}! Recessive plants now show ${recessiveAllele}${recessiveAllele}. Use test crosses (dominant × recessive) to resolve ${correctDominant}? individuals.`),
         ...objNotices,
       ],
     });
     return true;
   },
 
-  startTestCross: (traitName, dominantIndId, recessiveIndId) => {
+  interpretTestCross: (traitName, _familyId, targetIndId, answer) => {
     const s = get();
     const disc = s.discovery.traitDiscoveries[traitName];
-    if (!disc || disc.level === 'unknown') {
-      set({ notices: [...s.notices, notice(`Discover dominance for ${traitName} first.`)] });
-      return;
-    }
-    const findInd = (id: string) => {
-      for (const n of s.nurseries) { const f = n.plants.find(p => p.id === id); if (f) return f; }
-      return s.archive.get(id);
-    };
-    const dominant = findInd(dominantIndId);
-    const recessive = findInd(recessiveIndId);
-    if (!dominant || !recessive) return;
+    if (!disc || disc.level === 'unknown') return false;
 
-    // Verify the dominant individual actually has the dominant phenotype
-    const domPhenotype = dominant.phenotype.get(traitName);
-    const recPhenotype = recessive.phenotype.get(traitName);
-    if (domPhenotype == null || recPhenotype == null) {
-      set({ notices: [...s.notices, notice('Both plants need measured phenotypes for this trait.')] });
-      return;
-    }
-
-    // Produce 20 offspring
-    const offspring = crossIndividuals(dominant, recessive, s.map, s.traits, s.rng, 20);
-    const familyId = `exp_tc_${traitName}_${dominantIndId}_${s.season}`;
-    for (const c of offspring) c.familyId = familyId;
-    const expNursery: Nursery = {
-      id: nurseryId(),
-      name: `Test cross: ${dominantIndId}`,
-      plants: offspring,
-      popSize: 0,
-    };
-    const experiment: Experiment = {
-      id: `exp_${Date.now()}`,
-      type: 'test_cross',
-      traitName,
-      locusId: disc.locusId,
-      parentAId: dominantIndId,
-      parentBId: recessiveIndId,
-      familyId,
-      offspringCount: offspring.length,
-      targetIndividualId: dominantIndId,
-      status: 'awaiting_result',
-    };
-    const archive = new Map(s.archive);
-    archive.set(dominant.id, dominant);
-    archive.set(recessive.id, recessive);
-    for (const c of offspring) archive.set(c.id, c);
-    set({
-      nurseries: [...s.nurseries, expNursery],
-      experiments: [...s.experiments, experiment],
-      archive,
-      notices: [
-        ...s.notices,
-        notice(`🔬 Test cross started: ${dominantIndId} × ${recessiveIndId}. Examine the offspring phenotypes to determine if ${dominantIndId} is homozygous or heterozygous.`),
-      ],
-    });
-  },
-
-  interpretTestCross: (experimentId, answer) => {
-    const s = get();
-    const exp = s.experiments.find(e => e.id === experimentId);
-    if (!exp || exp.type !== 'test_cross' || exp.status !== 'awaiting_result') return false;
-    if (!exp.targetIndividualId) return false;
-
-    const disc = s.discovery.traitDiscoveries[exp.traitName];
-    if (!disc) return false;
-
-    // Determine the actual genotype of the target individual
-    const target = s.archive.get(exp.targetIndividualId);
+    const target = s.archive.get(targetIndId);
     if (!target) return false;
     const a0 = target.genotype.haplotypes[0].get(disc.locusId);
     const a1 = target.genotype.haplotypes[1].get(disc.locusId);
@@ -1471,23 +1328,17 @@ export const useGame = create<GameState>((set, get) => ({
       return false;
     }
 
-    // Resolve genotype
     const resolvedGenotypes = { ...s.discovery.resolvedGenotypes };
     resolvedGenotypes[disc.locusId] = new Set(resolvedGenotypes[disc.locusId]);
-    resolvedGenotypes[disc.locusId].add(exp.targetIndividualId);
-
-    const updatedExperiments = s.experiments.map(e =>
-      e.id === experimentId ? { ...e, status: 'complete' as const } : e
-    );
+    resolvedGenotypes[disc.locusId].add(targetIndId);
 
     const genotypeStr = isHomozygous
       ? `${disc.dominantAllele}${disc.dominantAllele} (homozygous dominant)`
       : `${disc.dominantAllele}${disc.recessiveAllele} (heterozygous)`;
 
-    // Check quest completion
     const updatedObjectives = s.objectives.map(o => {
       if (o.completed) return o;
-      if (o.id === 'identify_homozygous_red' && isHomozygous && exp.traitName === 'color') {
+      if (o.id === 'identify_homozygous_red' && isHomozygous && traitName === 'color') {
         return { ...o, completed: true, completedAt: s.season };
       }
       return o;
@@ -1503,14 +1354,13 @@ export const useGame = create<GameState>((set, get) => ({
 
     set({
       discovery: { ...s.discovery, resolvedGenotypes },
-      experiments: updatedExperiments,
       objectives: updatedObjectives,
       budget: objBonus > 0
         ? { cash: s.budget.cash + objBonus, history: [...s.budget.history, { generation: s.season, cash: s.budget.cash + objBonus, reason: `+$${objBonus} quest bonus` }] }
         : s.budget,
       notices: [
         ...s.notices,
-        notice(`🧬 Test cross result: ${exp.targetIndividualId} is ${genotypeStr}. Its genotype is now visible on its plant card.`),
+        notice(`🧬 ${targetIndId} is ${genotypeStr}.`),
         ...objNotices,
       ],
     });

@@ -31,6 +31,9 @@ export function FieldView() {
     makeControlledCross,
     archive,
     traits,
+    discovery,
+    interpretDominance,
+    interpretTestCross,
   } = useGame();
 
   const totalCost = nurseries
@@ -98,6 +101,9 @@ export function FieldView() {
           makeControlledCross={makeControlledCross}
           archive={archive}
           traits={traits}
+          discovery={discovery}
+          interpretDominance={interpretDominance}
+          interpretTestCross={interpretTestCross}
         />
       ))}
     </div>
@@ -108,6 +114,7 @@ function NurserySection({
   nursery, isActive, allNurseries, selectedIds, toggleSelect, clearSelection,
   setNurseryPopSize, moveIndividual,
   unlocked, release, releaseHybrid, deleteNursery, canDelete, measureTrait, makeControlledCross, archive, traits,
+  discovery, interpretDominance, interpretTestCross,
 }: {
   nursery: Nursery;
   isActive: boolean;
@@ -126,6 +133,9 @@ function NurserySection({
   makeControlledCross: (a: string, b: string, count: number) => void;
   archive: Map<string, Individual>;
   traits: import('../engine').Trait[];
+  discovery: import('../game/discovery').DiscoveryState;
+  interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
+  interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
 }) {
   const sorted = [...nursery.plants].sort(
     (a, b) => (b.phenotype.get('yield') ?? 0) - (a.phenotype.get('yield') ?? 0)
@@ -244,6 +254,9 @@ function NurserySection({
             archive={archive}
             selectedIds={selectedIds}
             toggleSelect={toggleSelect}
+            discovery={discovery}
+            interpretDominance={interpretDominance}
+            interpretTestCross={interpretTestCross}
           />
         </>
       )}
@@ -256,11 +269,17 @@ function FamilyGroupedGrid({
   archive,
   selectedIds,
   toggleSelect,
+  discovery,
+  interpretDominance,
+  interpretTestCross,
 }: {
   plants: Individual[];
   archive: Map<string, Individual>;
   selectedIds: string[];
   toggleSelect: (id: string) => void;
+  discovery: import('../game/discovery').DiscoveryState;
+  interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
+  interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
 }) {
   // Group by familyId; collect ungrouped under null
   const groups = new Map<string | null, Individual[]>();
@@ -330,6 +349,89 @@ function FamilyGroupedGrid({
             </div>
           );
         }
+        // Detect if this cross family can be interpreted
+        let interpretPanel: React.ReactNode = null;
+        if (!isUngrouped && sample.parents && sample.parents[0] !== sample.parents[1]) {
+          const pA = archive.get(sample.parents[0]);
+          const pB = archive.get(sample.parents[1]);
+          if (pA && pB) {
+            const colorDisc = discovery.traitDiscoveries.color;
+            const pAColor = pA.phenotype.get('color') ?? 0;
+            const pBColor = pB.phenotype.get('color') ?? 0;
+            const parentsHaveDiffColor = (pAColor >= 0.5) !== (pBColor >= 0.5);
+
+            // Count offspring phenotypes for color
+            const redCount = members.filter(p => (p.phenotype.get('color') ?? 0) >= 0.5).length;
+            const whiteCount = members.filter(p => (p.phenotype.get('color') ?? 0) < 0.5).length;
+
+            if (colorDisc.level === 'unknown' && parentsHaveDiffColor) {
+              // Dominance discovery opportunity
+              interpretPanel = (
+                <div className="mt-1 rounded border border-sky/40 bg-sky/5 p-2 text-xs">
+                  <div className="font-semibold text-soil mb-1">🔬 You crossed a red plant with a white plant!</div>
+                  <div className="flex gap-4 mb-2">
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-soil">{redCount}</div>
+                      <div className="text-[10px] text-muted">Red</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-soil">{whiteCount}</div>
+                      <div className="text-[10px] text-muted">White</div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted mb-2">Based on these offspring, which allele is <strong>dominant</strong>?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => interpretDominance('color', key!, 'R')}
+                      className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                      R (Red is dominant)
+                    </button>
+                    <button onClick={() => interpretDominance('color', key!, 'r')}
+                      className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                      r (White is dominant)
+                    </button>
+                  </div>
+                </div>
+              );
+            } else if (colorDisc.level !== 'unknown' && parentsHaveDiffColor) {
+              // Check if this is a test cross (one parent is dominant, one recessive)
+              const domParent = pAColor >= 0.5 ? pA : pB;
+              const recParent = pAColor >= 0.5 ? pB : pA;
+              const recA0 = recParent.genotype.haplotypes[0].get('COLOR');
+              const recA1 = recParent.genotype.haplotypes[1].get('COLOR');
+              const isRecessiveHomozygous = recA0 === colorDisc.recessiveAllele && recA1 === colorDisc.recessiveAllele;
+              const alreadyResolved = discovery.resolvedGenotypes.COLOR?.has(domParent.id);
+
+              if (isRecessiveHomozygous && !alreadyResolved) {
+                interpretPanel = (
+                  <div className="mt-1 rounded border border-leaf/40 bg-leaf/5 p-2 text-xs">
+                    <div className="font-semibold text-soil mb-1">🧪 Test cross result: is {domParent.id} homozygous or heterozygous?</div>
+                    <div className="flex gap-4 mb-2">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-soil">{redCount}</div>
+                        <div className="text-[10px] text-muted">Red ({colorDisc.dominantAllele})</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-soil">{whiteCount}</div>
+                        <div className="text-[10px] text-muted">White ({colorDisc.recessiveAllele}{colorDisc.recessiveAllele})</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => interpretTestCross('color', key!, domParent.id, 'homozygous')}
+                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                        Homozygous {colorDisc.dominantAllele}{colorDisc.dominantAllele} (all dominant offspring)
+                      </button>
+                      <button onClick={() => interpretTestCross('color', key!, domParent.id, 'heterozygous')}
+                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                        Heterozygous {colorDisc.dominantAllele}{colorDisc.recessiveAllele} (segregating offspring)
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+            }
+          }
+        }
+
         return (
           <div
             key={key ?? 'ungrouped'}
@@ -338,6 +440,7 @@ function FamilyGroupedGrid({
             } p-2`}
           >
             {header}
+            {interpretPanel}
             <div className="mt-1 grid grid-cols-6 gap-1 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-16">
               {members.map((ind) => (
                 <PlantCard

@@ -5,13 +5,19 @@ import { ExperimentLab } from './ExperimentLab';
 export function LabView() {
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-leaf/30 bg-leaf/5 p-3 text-xs text-soil">
-        The <strong>Lab</strong> is where you discover genetics through experiments
-        and use advanced breeding tools.
-      </div>
+      {/* Lab Notebook — always available */}
       <ExperimentLab />
-      <MarkerLab />
-      <AdvancedLab />
+
+      {/* DNA Lab — tech-gated tools */}
+      <div className="rounded-lg border border-soil/20 bg-white p-3">
+        <h3 className="text-sm font-semibold text-soil mb-1">DNA Lab</h3>
+        <p className="text-[11px] text-muted mb-3">
+          Molecular tools for marker analysis, mutagenesis, gene editing, and genomic prediction.
+          Unlock these in the Tech tree.
+        </p>
+        <MarkerLab />
+        <AdvancedLab />
+      </div>
     </div>
   );
 }
