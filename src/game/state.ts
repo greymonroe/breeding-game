@@ -1639,3 +1639,8 @@ export const useGame = create<GameState>((set, get) => ({
   dismissChallenge: () => set({ activeChallenge: null }),
   dismissMeiosis: () => set({ meiosisTrace: null }),
 }));
+
+// Expose store for Playwright/dev access
+if (typeof window !== 'undefined') {
+  (window as any).__GAME__ = useGame;
+}
