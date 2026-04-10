@@ -22,6 +22,7 @@ const TOP_MARGIN = 16;
 export function ChromosomeView() {
   const map = useGame((s) => s.map);
   const markers = useGame((s) => s.markers);
+  const linkages = useGame((s) => s.discovery.linkages);
   const [hoveredLocus, setHoveredLocus] = useState<string | null>(null);
 
   const maxLen = Math.max(...map.chromosomes.map((c) => c.length));
@@ -174,6 +175,47 @@ export function ChromosomeView() {
               }
 
               return null;
+            })}
+
+            {/* Discovered linkage brackets */}
+            {linkages.map((link) => {
+              const l1 = chr.loci.find(l => l.id === link.locus1);
+              const l2 = chr.loci.find(l => l.id === link.locus2);
+              if (!l1 || !l2) return null;
+              const x1 = scale(Math.min(l1.position, l2.position), chr.length);
+              const x2 = scale(Math.max(l1.position, l2.position), chr.length);
+              const bracketY = y + CHR_HEIGHT + 6;
+              const dist = Math.abs(l1.position - l2.position);
+              return (
+                <g key={`link-${link.locus1}-${link.locus2}`}>
+                  {/* Bracket */}
+                  <path
+                    d={`M${x1} ${y + CHR_HEIGHT + 2} L${x1} ${bracketY} L${x2} ${bracketY} L${x2} ${y + CHR_HEIGHT + 2}`}
+                    fill="none"
+                    stroke="#9333ea"
+                    strokeWidth={1.2}
+                    strokeDasharray="3 2"
+                  />
+                  {/* Distance label */}
+                  <text
+                    x={(x1 + x2) / 2}
+                    y={bracketY + 9}
+                    textAnchor="middle"
+                    fontSize="7"
+                    fontWeight="600"
+                    fill="#9333ea"
+                  >
+                    {dist.toFixed(0)} cM linked
+                  </text>
+                  {/* Locus labels below bracket */}
+                  <text x={x1} y={bracketY + 9} textAnchor="middle" fontSize="6" fill="#9333ea">
+                    {l1.position < l2.position ? link.locus1 : link.locus2}
+                  </text>
+                  <text x={x2} y={bracketY + 9} textAnchor="middle" fontSize="6" fill="#9333ea">
+                    {l1.position < l2.position ? link.locus2 : link.locus1}
+                  </text>
+                </g>
+              );
             })}
           </g>
         );
