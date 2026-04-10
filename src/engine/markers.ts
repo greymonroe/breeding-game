@@ -85,6 +85,8 @@ export function discoverAssociations(
     const m0 = mean(buckets[0]);
     const m2 = mean(buckets[2]);
     if (m0 == null || m2 == null) continue;
+    // Require at least 3 individuals per allele class for reliable estimate
+    if (buckets[0].length < 3 || buckets[2].length < 3) continue;
     const effect = (m2 - m0) / 2;
     if (Math.abs(effect) >= threshold) {
       found.push({

@@ -25,7 +25,7 @@ import {
 } from './src/game/economy.js';
 
 // ── Initialize ──
-const seed = 42;
+const seed = 7777;
 const rng = makeRng(seed);
 const starter = makeStarterPopulation(seed);
 const { map, traits } = starter;

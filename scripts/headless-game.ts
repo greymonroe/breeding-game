@@ -21,6 +21,10 @@ import {
   type RNG,
   type Trait,
 } from '../src/engine';
+import { mutagenize } from '../src/engine/mutation';
+import { geneEdit } from '../src/engine/editing';
+import { trainGenomicPredictor, genomicSelect, type GenomicPredictor } from '../src/engine/prediction';
+import { hybridGeneticValue } from '../src/engine/traits';
 import { makeStarterPopulation } from '../src/game/starter';
 import {
   Costs,
@@ -368,7 +372,7 @@ export class HeadlessGame {
     const phenotyped = pop.filter((p) => p.phenotype.has(traitName));
     if (phenotyped.length < 5) return;
     const allLoci = this.map.chromosomes.flatMap((c) => c.loci);
-    const { knowledge } = discoverAssociations(this.markers, phenotyped, allLoci, traitName, 0.3);
+    const { knowledge } = discoverAssociations(this.markers, phenotyped, allLoci, traitName, 0.5);
     this.markers = knowledge;
   }
 
@@ -393,6 +397,77 @@ export class HeadlessGame {
       }
     }
     return wild;
+  }
+
+  // ── Advanced tech methods ──
+
+  mutagenizePopulation(popName: string): number {
+    const pop = this.populations.get(popName);
+    if (!pop || this.cash < Costs.mutagenize) return 0;
+    this.cash -= Costs.mutagenize;
+    const mutated = mutagenize(pop, this.map, this.traits, this.rng, 0.5);
+    this.populations.set(popName, mutated);
+    return Costs.mutagenize;
+  }
+
+  editGene(popName: string, indIndex: number, locusId: string, allele: string): Individual | null {
+    const pop = this.populations.get(popName);
+    if (!pop || indIndex >= pop.length || this.cash < Costs.geneEdit) return null;
+    this.cash -= Costs.geneEdit;
+    const edited = geneEdit(pop[indIndex], locusId, allele, this.traits, this.rng);
+    pop[indIndex] = edited;
+    return edited;
+  }
+
+  trainPredictor(popName: string, traitName: string): GenomicPredictor | null {
+    const pop = this.populations.get(popName);
+    if (!pop || this.cash < Costs.trainPredictor) return null;
+    this.cash -= Costs.trainPredictor;
+    return trainGenomicPredictor(pop, this.map, traitName, 1);
+  }
+
+  genomicSelect(pop: Individual[], predictor: GenomicPredictor, n: number): Individual[] {
+    return genomicSelect(pop, predictor, n);
+  }
+
+  /** Compute F1 hybrid yield between two inbred parents (deterministic). */
+  hybridYield(a: Individual, b: Individual): number {
+    const yieldTrait = this.traits.find(t => t.name === 'yield');
+    if (!yieldTrait) return 0;
+    return hybridGeneticValue(a, b, yieldTrait as any);
+  }
+
+  /** Release an F1 hybrid variety (higher cost, but exploits heterosis). */
+  releaseHybrid(parentA: Individual, parentB: Individual): { ok: boolean; yield: number } {
+    if (this.cash < Costs.hybridReleaseFee) return { ok: false, yield: 0 };
+    const yieldTrait = this.traits.find(t => t.name === 'yield');
+    const flavorTrait = this.traits.find(t => t.name === 'flavor');
+    if (!yieldTrait || !flavorTrait) return { ok: false, yield: 0 };
+
+    const yieldVal = hybridGeneticValue(parentA, parentB, yieldTrait as any)
+      + (this.rng() - 0.5) * Math.sqrt((yieldTrait as any).environmentalVariance ?? 0) * 2;
+    const flavorVal = hybridGeneticValue(parentA, parentB, flavorTrait as any)
+      + (this.rng() - 0.5) * Math.sqrt((flavorTrait as any).environmentalVariance ?? 0) * 2;
+    const colorVal = parentA.phenotype.get('color') ?? 0; // F1 color from dominant parent
+
+    this.cash -= Costs.hybridReleaseFee;
+
+    const aR = parentA.genotype.haplotypes[0].get('DR') === 'R' || parentA.genotype.haplotypes[1].get('DR') === 'R';
+    const bR = parentB.genotype.haplotypes[0].get('DR') === 'R' || parentB.genotype.haplotypes[1].get('DR') === 'R';
+
+    this.releases.push({
+      id: `hyb_${this.releases.length + 1}`,
+      traits: { yield: yieldVal, flavor: flavorVal, color: colorVal },
+      resistant: aR || bR,
+      uniformity: individualUniformity(parentA, FUNCTIONAL_LOCI) * individualUniformity(parentB, FUNCTIONAL_LOCI),
+      totalEarned: 0,
+      lastSeasonRevenue: 0,
+      releasedAt: this.season,
+    });
+
+    // Hybrids are uniform (F1) — trust boost
+    this.trust = Math.min(1, this.trust + 0.03);
+    return { ok: true, yield: yieldVal };
   }
 
   sortByYield(pop: Individual[]): Individual[] {

@@ -1364,7 +1364,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (!s.unlocked.has('mutagenesis')) return;
     if (s.budget.cash < Costs.mutagenize) return;
     const active = s.activeNursery();
-    const mutated = mutagenize(active.plants, s.map, s.traits, s.rng, 0.3);
+    const mutated = mutagenize(active.plants, s.map, s.traits, s.rng, 0.5);
     for (const m of mutated) stripPaidPhenotypes(m);
     const archive = new Map(s.archive);
     for (const m of mutated) archive.set(m.id, m);

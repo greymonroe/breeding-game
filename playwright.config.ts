@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['playwright-bot.ts', 'playwright-eval.ts'],
+  testMatch: ['playwright-bot.ts', 'playwright-eval.ts', 'mobile-test.ts'],
   timeout: 300_000,
   use: {
     browserName: 'chromium',

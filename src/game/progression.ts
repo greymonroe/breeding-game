@@ -93,7 +93,7 @@ export const TECHS: Tech[] = [
     id: 'hybrid_breeding',
     name: 'Hybrid breeding',
     tier: 4,
-    cost: 120,
+    cost: 80,
     requires: ['pedigree', 'controlled_cross'],
     description: 'Develop inbreds and produce F1 hybrids that exploit heterosis.',
     blurb: 'Crossing two complementary inbred lines yields F1 hybrids with vigor (heterosis) absent in the parents.',

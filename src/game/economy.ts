@@ -18,9 +18,9 @@ export const Costs = {
   /** $ to train the genomic predictor (one-shot per training) */
   trainPredictor: 20,
   /** Flat $ to register a hybrid variety (higher than inbred). */
-  hybridReleaseFee: 40,
+  hybridReleaseFee: 25,
   /** Per-season cost to maintain inbred parent lines for hybrid seed production. */
-  hybridMaintenanceCost: 10,
+  hybridMaintenanceCost: 5,
 };
 
 /**
@@ -43,10 +43,13 @@ export function varietyBaseRevenue(opts: {
   marketBaseline: number;
   diseaseActive: boolean;
 }): number {
-  const yieldPremium = Math.max(0, opts.yieldValue - opts.marketBaseline) * 12;
+  const yieldPremium = Math.max(0, opts.yieldValue - opts.marketBaseline) * 15;
   const flavorPremium = Math.max(0, opts.flavor - 50) * 2;
   let total = yieldPremium + flavorPremium;
-  if (opts.diseaseActive && !opts.resistant) total *= 0.05;
+  // Disease: non-resistant lose 70% revenue (not 95%) — meaningful but not game-ending
+  if (opts.diseaseActive && !opts.resistant) total *= 0.30;
+  // Resistance bonus during outbreak: +50% premium
+  if (opts.diseaseActive && opts.resistant) total *= 1.5;
   return total;
 }
 

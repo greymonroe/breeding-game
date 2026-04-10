@@ -198,34 +198,54 @@ async function answerPanels(page: Page): Promise<boolean> {
     return true;
   }
 
-  // Test cross — read the offspring panel to decide
-  const homBtn = page.getByRole('button', { name: /^Homozygous/i });
-  const hetBtn = page.getByRole('button', { name: /^Heterozygous/i });
-  if (await homBtn.count() > 0 && await homBtn.first().isVisible()) {
-    // Look at the panel text to see recessive offspring count
-    const panels = page.locator('[class*="border-leaf"]');
-    let recessiveCount = 0;
-    for (let i = 0; i < await panels.count(); i++) {
-      const text = await panels.nth(i).innerText();
-      // Match: "N\nWhite" or "N\nElongated"
-      const match = text.match(/(\d+)\n\s*(White|Elongated)/i);
-      if (match) { recessiveCount = parseInt(match[1]); break; }
+  // Test cross — find individual panels and answer each one scoped to its own context
+  const testCrossPanels = page.locator('div:has(> div:has-text("Test cross result"))');
+  for (let i = 0; i < await testCrossPanels.count(); i++) {
+    const panel = testCrossPanels.nth(i);
+    if (!await panel.isVisible()) continue;
+
+    const panelText = await panel.innerText();
+    // Extract plant ID from "is {id} homozygous or heterozygous?"
+    const idMatch = panelText.match(/is (\S+) homozygous/);
+    const plantId = idMatch ? idMatch[1] : '?';
+
+    // Check if we already failed on this plant (avoid infinite retries)
+    if (failedTestCrosses.has(plantId)) continue;
+
+    // Count recessive offspring from THIS panel's text
+    const recessiveMatch = panelText.match(/(\d+)\n\s*(White|Elongated)/i);
+    const recessiveCount = recessiveMatch ? parseInt(recessiveMatch[1]) : 0;
+
+    // Find buttons scoped to this panel
+    const panelHomBtn = panel.getByRole('button', { name: /^Homozygous/i });
+    const panelHetBtn = panel.getByRole('button', { name: /^Heterozygous/i });
+    if (await panelHomBtn.count() === 0) continue;
+
+    const answer = recessiveCount > 0 ? 'heterozygous' : 'homozygous';
+    const btn = recessiveCount > 0 ? panelHetBtn : panelHomBtn;
+
+    log(`  🧪 Test cross ${plantId}: ${recessiveCount} recessive → ${answer}`);
+    await btn.first().click();
+    await sleep(SLOW_MO);
+
+    // Check if the panel is still visible (wrong answer)
+    if (await panel.isVisible().catch(() => false)) {
+      const stillHasBtn = await panel.getByRole('button', { name: /^Homozygous/i }).count();
+      if (stillHasBtn > 0) {
+        log(`    ❌ Wrong answer — marking ${plantId} to skip`);
+        failedTestCrosses.add(plantId);
+      }
     }
 
-    if (recessiveCount > 0) {
-      log(`  🧪 Test cross: ${recessiveCount} recessive offspring → Heterozygous`);
-      await hetBtn.first().click();
-    } else {
-      log(`  🧪 Test cross: 0 recessive offspring → Homozygous`);
-      await homBtn.first().click();
-    }
-    await sleep(SLOW_MO);
     await dismissNotices(page);
     return true;
   }
 
   return false;
 }
+
+/** Track plants where we already gave a wrong test cross answer to avoid retrying */
+const failedTestCrosses = new Set<string>();
 
 async function screenshot(page: Page, name: string) {
   await page.screenshot({ path: `/tmp/bg-${name}.png`, fullPage: true });
