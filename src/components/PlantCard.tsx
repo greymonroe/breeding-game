@@ -4,6 +4,13 @@ import { MEASURE_COST } from '../game/economy';
 import { GenotypeBar } from '../challenges/visualizations/GenotypeBar';
 import { useGame } from '../game/state';
 
+function trialSE(values: number[]): number {
+  if (values.length < 2) return 0;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance / values.length);
+}
+
 interface Props {
   ind: Individual;
   /** Unused but kept for callers — phenotype rendering reads from ind directly. */
@@ -37,8 +44,8 @@ function formatTraitValue(key: string, value: number): string {
 }
 
 export function PlantCard({ ind, selected, onClick }: Props) {
-  // Grab the stable discovery reference — it only changes when a discovery is made
   const discovery = useGame((s) => s.discovery);
+  const trialData = useGame((s) => s.trialData);
   const color = ind.phenotype.get('color') ?? 0;
   const shape = ind.phenotype.get('shape') ?? 0;
   const yieldV = ind.phenotype.get('yield');
@@ -124,12 +131,19 @@ export function PlantCard({ ind, selected, onClick }: Props) {
                 const val = ind.phenotype.get(t.key);
                 const measured = val != null;
                 const cost = MEASURE_COST[t.key];
+                const trials = trialData.get(`${ind.id}:${t.key}`);
+                const reps = trials?.length ?? (measured ? 1 : 0);
+                const se = trials && trials.length >= 2 ? trialSE(trials) : 0;
                 return (
                   <tr key={t.key} className="border-t border-soil/10">
                     <td className="py-0.5 pr-1 text-muted">{t.label}</td>
                     <td className="py-0.5 text-right font-mono">
                       {measured ? (
-                        <span className="text-soil">{formatTraitValue(t.key, val)}</span>
+                        <span className="text-soil">
+                          {formatTraitValue(t.key, val)}
+                          {se > 0 && <span className="text-[9px] text-muted"> ±{se.toFixed(1)}</span>}
+                          {reps > 1 && <span className="text-[8px] text-muted"> n={reps}</span>}
+                        </span>
                       ) : cost != null ? (
                         <span className="text-muted italic">? <span className="text-[9px]">(${cost}/plant)</span></span>
                       ) : (

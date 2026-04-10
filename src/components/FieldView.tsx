@@ -131,7 +131,7 @@ function NurserySection({
   releaseHybrid: (a: string, b: string) => void;
   deleteNursery: (id: string) => void;
   canDelete: boolean;
-  measureTrait: (nurseryId: string, traitName: string) => void;
+  measureTrait: (nurseryId: string, traitName: string, reps?: number) => void;
   makeControlledCross: (a: string, b: string, count: number) => void;
   archive: Map<string, Individual>;
   traits: import('../engine').Trait[];
@@ -697,8 +697,9 @@ function PhenotypePanel({
   measureTrait,
 }: {
   nursery: Nursery;
-  measureTrait: (nurseryId: string, traitName: string) => void;
+  measureTrait: (nurseryId: string, traitName: string, reps?: number) => void;
 }) {
+  const trialData = useGame((s) => s.trialData);
   const TRAITS: { name: string; label: string }[] = [
     { name: 'yield', label: 'Yield' },
     { name: 'flavor', label: 'Flavor' },
@@ -709,22 +710,41 @@ function PhenotypePanel({
       <span className="text-muted">Phenotype:</span>
       {TRAITS.map((t) => {
         const unmeasured = nursery.plants.filter((p) => !p.phenotype.has(t.name)).length;
-        const cost = unmeasured * (MEASURE_COST[t.name] ?? 0);
+        const baseCost = MEASURE_COST[t.name] ?? 0;
+        const cost1 = unmeasured * baseCost;
         const fullyMeasured = unmeasured === 0;
+
+        // Check average reps across measured plants
+        const measuredPlants = nursery.plants.filter(p => p.phenotype.has(t.name));
+        const avgReps = measuredPlants.length > 0
+          ? measuredPlants.reduce((s, p) => s + (trialData.get(`${p.id}:${t.name}`)?.length ?? 1), 0) / measuredPlants.length
+          : 0;
+
+        const cost5 = nursery.plants.length * baseCost * 5;
+
         return (
-          <button
-            key={t.name}
-            onClick={() => measureTrait(nursery.id, t.name)}
-            disabled={fullyMeasured}
-            className={`rounded px-2 py-1 text-[11px] ${
-              fullyMeasured
-                ? 'bg-leaf/20 text-leaf cursor-default'
-                : 'bg-leaf text-white hover:bg-leaf/90'
-            }`}
-            title={fullyMeasured ? 'all plants measured' : `measure ${unmeasured} plants`}
-          >
-            {fullyMeasured ? `✓ ${t.label}` : `Measure ${t.label} ($${cost})`}
-          </button>
+          <span key={t.name} className="inline-flex items-center gap-1">
+            {!fullyMeasured ? (
+              <button
+                onClick={() => measureTrait(nursery.id, t.name, 1)}
+                className="rounded px-2 py-1 text-[11px] bg-leaf text-white hover:bg-leaf/90"
+                title={`Quick measure: 1 rep, ${unmeasured} plants`}
+              >
+                {t.label} (${ cost1})
+              </button>
+            ) : (
+              <span className="rounded px-2 py-1 text-[11px] bg-leaf/20 text-leaf">✓ {t.label}{avgReps > 1 ? ` (${avgReps.toFixed(0)} reps)` : ''}</span>
+            )}
+            {fullyMeasured && t.name !== 'disease' && (
+              <button
+                onClick={() => measureTrait(nursery.id, t.name, 5)}
+                className="rounded px-1.5 py-1 text-[10px] border border-leaf/40 text-leaf hover:bg-leaf/10"
+                title={`Run 5-rep replicated trial on all ${nursery.plants.length} plants for more accurate measurements`}
+              >
+                +5 reps (${ cost5})
+              </button>
+            )}
+          </span>
         );
       })}
       <span className="text-[10px] text-muted ml-auto">

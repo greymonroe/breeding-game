@@ -232,6 +232,10 @@ interface GameState {
   germplasm: Individual[];
   predictor: GenomicPredictor | null;
 
+  // ── Trials ──
+  /** Replicated trial data: key = "indId:traitName", value = array of phenotype values. */
+  trialData: Map<string, number[]>;
+
   // ── Discovery ──
   discovery: DiscoveryState;
 
@@ -272,7 +276,7 @@ interface GameState {
   unlockTech: (id: TechId) => boolean;
   genotypeAll: (nurseryId?: string) => void;
   runGwas: (traitName: string, nurseryId?: string) => void;
-  measureTrait: (nurseryId: string, traitName: string) => void;
+  measureTrait: (nurseryId: string, traitName: string, reps?: number) => void;
   makeControlledCross: (parentAId: string, parentBId: string, count: number) => void;
   acquireWildAccession: () => void;
   introducePlantFromBank: (id: string) => void;
@@ -404,6 +408,7 @@ function makeInitial(): Omit<GameState,
     markers: makeMarkerKnowledge(),
     germplasm: [],
     predictor: null,
+    trialData: new Map(),
     discovery: makeInitialDiscovery(),
     challengeCompletion: new Map(),
     activeChallenge: null,
@@ -1111,35 +1116,52 @@ export const useGame = create<GameState>((set, get) => ({
     });
   },
 
-  measureTrait: (nurseryId, traitName) => {
+  measureTrait: (nurseryId, traitName, reps = 1) => {
     const s = get();
     const traitObj = s.traits.find((t) => t.name === traitName);
     if (!traitObj) return;
     const target = s.nurseries.find((n) => n.id === nurseryId);
     if (!target) return;
-    const unmeasured = target.plants.filter((p) => !p.phenotype.has(traitName));
-    if (unmeasured.length === 0) {
+
+    // For reps > 1, we can re-measure already-measured plants (adding more reps)
+    const plantsToMeasure = reps === 1
+      ? target.plants.filter((p) => !p.phenotype.has(traitName))
+      : target.plants;
+    if (plantsToMeasure.length === 0) {
       set({ notices: [...s.notices, notice(`All ${traitName} values already measured in ${target.name}.`)] });
       return;
     }
-    const perPlant = MEASURE_COST[traitName] ?? 0;
-    const cost = unmeasured.length * perPlant;
+    const perPlant = (MEASURE_COST[traitName] ?? 0) * reps;
+    const cost = plantsToMeasure.length * perPlant;
     if (s.budget.cash < cost) {
-      set({ notices: [...s.notices, notice(`Need $${cost} to phenotype ${traitName} in ${target.name}.`)] });
+      set({ notices: [...s.notices, notice(`Need $${cost} for ${reps}-rep ${traitName} trial in ${target.name}.`)] });
       return;
     }
-    // Mutate phenotype maps in-place — they're owned by individuals already
-    // referenced by the archive, so we'd need to reconstruct anyway. Build new
-    // individual references to keep zustand happy.
+
+    const newTrialData = new Map(s.trialData);
+
     const updatedPlants = target.plants.map((p) => {
-      if (p.phenotype.has(traitName)) return p;
+      if (reps === 1 && p.phenotype.has(traitName)) return p;
+      const key = `${p.id}:${traitName}`;
+      // Take `reps` independent phenotype samples
+      const newValues: number[] = [];
+      for (let r = 0; r < reps; r++) {
+        newValues.push(computePhenotype(p, traitObj, s.rng));
+      }
+      // Merge with existing trial data
+      const existing = newTrialData.get(key) ?? [];
+      const allValues = [...existing, ...newValues];
+      newTrialData.set(key, allValues);
+      // Set the phenotype to the mean of all reps
+      const mean = allValues.reduce((a, b) => a + b, 0) / allValues.length;
       const newP: Individual = { ...p, phenotype: new Map(p.phenotype) };
-      newP.phenotype.set(traitName, computePhenotype(newP, traitObj, s.rng));
+      newP.phenotype.set(traitName, mean);
       return newP;
     });
+
     const archive = new Map(s.archive);
     for (const p of updatedPlants) archive.set(p.id, p);
-    // Update the history stat if we just measured yield on the active nursery
+
     const updatedHistory = traitName === 'yield' && nurseryId === s.activeNurseryId
       ? (() => {
           const newMean = meanPhenotype(updatedPlants, 'yield');
@@ -1150,14 +1172,16 @@ export const useGame = create<GameState>((set, get) => ({
         })()
       : s.history;
 
+    const label = reps > 1 ? `${reps}-rep trial` : 'phenotyped';
     set({
       nurseries: s.nurseries.map((n) => (n.id === nurseryId ? { ...n, plants: updatedPlants } : n)),
       archive,
+      trialData: newTrialData,
       history: updatedHistory,
       budget: spend(
         s.budget,
         cost,
-        `phenotyped ${unmeasured.length}× ${traitName} in ${target.name}`,
+        `${label} ${plantsToMeasure.length}× ${traitName} in ${target.name}`,
         s.season
       ),
     });
