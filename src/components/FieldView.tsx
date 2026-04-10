@@ -592,7 +592,7 @@ function FamilyGroupedGrid({
           >
             {header}
             {interpretPanel}
-            <div className="mt-2 grid grid-cols-5 gap-1.5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+            <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8">
               {members.map((ind) => (
                 <PlantCard
                   key={ind.id}

@@ -27,9 +27,9 @@ export function TechTreeView() {
         return (
           <section key={tier}>
             <div className="flex items-center gap-2 mb-2">
-              <div className="h-px flex-1 bg-soil/15" />
-              <h2 className="text-xs font-extrabold uppercase tracking-widest text-leaf px-2">Tier {tier}</h2>
-              <div className="h-px flex-1 bg-soil/15" />
+              <div className="h-px flex-1 bg-school-accent/30" />
+              <h2 className="text-xs font-extrabold uppercase tracking-widest text-school-accent px-2">Tier {tier}</h2>
+              <div className="h-px flex-1 bg-school-accent/30" />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {techs.map((t) => (
@@ -63,7 +63,7 @@ function TechCard({
           ? 'border-leaf/40 bg-gradient-to-br from-leaf/5 to-leaf/10 shadow-sm'
           : prereqsMet
           ? 'border-soil/20 bg-white shadow-sm hover:shadow-md'
-          : 'border-soil/10 bg-soil/5 opacity-50'
+          : 'border-soil/15 bg-white/70 opacity-65'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
