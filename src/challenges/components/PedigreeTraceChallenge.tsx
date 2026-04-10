@@ -2,22 +2,24 @@ import { useState } from 'react';
 import type { ChallengeChildProps } from './ChallengeShell';
 
 interface Individual {
-  id: string;
-  genotype: string;
   color: string;
   gen: number;
-  parents: [string, string] | null;
+  parents?: [string, string];
+  label?: string;
 }
 
 interface PedigreeData {
   pedigree: Record<string, Individual>;
   options: [string, string];
+  question: string;
   hint: string;
 }
 
 /**
  * Pedigree Trace challenge.
- * Player examines a 3-generation pedigree and identifies which individual is the carrier.
+ * Player examines a pedigree with offspring evidence and deduces which
+ * red-flowered individual is the carrier (Rr) vs homozygous (RR).
+ * Genotypes are NOT shown — the player reasons from phenotypes only.
  */
 export function PedigreeTraceChallenge({ instance, onSubmit, submitted }: ChallengeChildProps) {
   const data = instance.data as PedigreeData;
@@ -27,14 +29,18 @@ export function PedigreeTraceChallenge({ instance, onSubmit, submitted }: Challe
   const individuals = data.pedigree;
   const options = data.options;
 
-  // Layout positions for a 3-gen pedigree: A,B top; C,D middle; E,F bottom
+  // Layout positions for a 7-node pedigree:
+  // Gen 1: A, B (grandparents)
+  // Gen 2: C, D (candidates), E (test cross partner)
+  // Gen 3: F, G (offspring of candidate × E)
   const positions: Record<string, { x: number; y: number }> = {
     A: { x: 100, y: 40 },
     B: { x: 260, y: 40 },
     C: { x: 60, y: 140 },
     D: { x: 180, y: 140 },
-    E: { x: 100, y: 240 },
-    F: { x: 260, y: 240 },
+    E: { x: 310, y: 140 },
+    F: { x: 120, y: 260 },
+    G: { x: 250, y: 260 },
   };
 
   // Connector lines between parents and children
@@ -52,10 +58,13 @@ export function PedigreeTraceChallenge({ instance, onSubmit, submitted }: Challe
 
   return (
     <div className="space-y-4">
+      {/* Question */}
+      <p className="text-sm text-soil">{data.question}</p>
+
       {/* Pedigree diagram */}
       <div className="rounded-lg border border-soil/10 bg-white p-3">
         <p className="mb-2 text-xs font-semibold uppercase text-muted">Pedigree Diagram</p>
-        <svg viewBox="0 0 360 300" className="mx-auto w-full max-w-sm">
+        <svg viewBox="0 0 380 310" className="mx-auto w-full max-w-sm">
           {/* Connection lines */}
           {connections.map(({ from, to }, i) => {
             const p1 = positions[from[0]];
@@ -80,8 +89,9 @@ export function PedigreeTraceChallenge({ instance, onSubmit, submitted }: Challe
             if (!pos) return null;
             const isOption = options.includes(id);
             const isSelected = selected === id;
+            const phenotypeLabel = ind.color === 'white' ? 'white' : 'red';
             return (
-              <g key={id}>
+              <g key={id} className={isOption ? 'cursor-pointer' : ''} onClick={isOption && !submitted ? () => setSelected(id) : undefined}>
                 <circle
                   cx={pos.x}
                   cy={pos.y}
@@ -91,11 +101,12 @@ export function PedigreeTraceChallenge({ instance, onSubmit, submitted }: Challe
                   strokeWidth={isSelected ? 3 : isOption ? 2.5 : 1.5}
                   opacity={0.9}
                 />
-                <text x={pos.x} y={pos.y - 2} textAnchor="middle" fontSize={12} fontWeight="bold" fill="white">
+                <text x={pos.x} y={pos.y + 1} textAnchor="middle" fontSize={13} fontWeight="bold" fill="white">
                   {id}
                 </text>
-                <text x={pos.x} y={pos.y + 12} textAnchor="middle" fontSize={9} fill="white" opacity={0.85}>
-                  {ind.genotype}
+                {/* Phenotype label below the circle */}
+                <text x={pos.x} y={pos.y + 38} textAnchor="middle" fontSize={9} fill="#3d2c1f" opacity={0.7}>
+                  {phenotypeLabel}
                 </text>
               </g>
             );
@@ -104,11 +115,12 @@ export function PedigreeTraceChallenge({ instance, onSubmit, submitted }: Challe
       </div>
 
       {/* Legend */}
-      <div className="text-xs text-muted">
-        <span className="font-semibold text-leaf">Green-outlined</span> individuals are your choices. Pick the <strong>carrier</strong>.
+      <div className="text-xs text-muted space-y-1">
+        <div><span className="font-semibold text-leaf">Green-outlined</span> plants are your choices. Which one is the carrier?</div>
+        <div>Red = dominant phenotype (at least one R allele). White = recessive (rr).</div>
       </div>
 
-      {/* Option cards */}
+      {/* Option cards — phenotype only, NO genotype */}
       <div className="grid grid-cols-2 gap-3">
         {options.map((opt) => {
           const ind = individuals[opt];
@@ -123,12 +135,12 @@ export function PedigreeTraceChallenge({ instance, onSubmit, submitted }: Challe
                   : 'border-soil/15 bg-white hover:border-leaf/40'
               }`}
             >
-              <div className="text-lg font-bold text-soil">{opt}</div>
-              <div className="mt-1 font-mono text-sm text-muted">{ind?.genotype ?? '??'}</div>
+              <div className="text-lg font-bold text-soil">Plant {opt}</div>
               <div
-                className="mx-auto mt-2 h-4 w-4 rounded-full"
+                className="mx-auto mt-2 h-5 w-5 rounded-full border border-soil/20"
                 style={{ backgroundColor: ind?.color ?? '#ccc' }}
               />
+              <div className="mt-1 text-xs text-muted">Red flower</div>
             </button>
           );
         })}

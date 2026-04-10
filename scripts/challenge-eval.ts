@@ -64,47 +64,37 @@ test('Evaluate all tech challenges', async ({ page }) => {
   await page.waitForTimeout(1000);
   await screenshot(page, '00-tech-tree-overview');
 
-  // We need cash. Let's advance a few seasons and measure yield first
-  // to have plants with phenotype data (needed for GWAS challenges)
-  await page.locator('button:has-text("Field")').click();
-  await page.waitForTimeout(500);
-
-  // Select some parents
-  const plants = page.locator('[class*="plant-card"], [class*="cursor-pointer"]').filter({ has: page.locator('svg') });
-  const plantCount = await plants.count();
-  console.log(`Found ${plantCount} plant-like elements`);
-
-  // Click first 3 plants to select them
-  for (let i = 0; i < Math.min(3, plantCount); i++) {
-    try { await plants.nth(i).click({ timeout: 1000 }); } catch { break; }
-  }
-  await page.waitForTimeout(500);
-
-  // Measure yield if button exists
-  const measureBtn = page.locator('button:has-text("Measure")').first();
-  if (await measureBtn.isVisible().catch(() => false)) {
-    await measureBtn.click();
-    await page.waitForTimeout(500);
-  }
-
-  // Advance a season
-  const advanceBtn = page.locator('button:has-text("Advance Season")');
-  if (await advanceBtn.isVisible().catch(() => false)) {
-    await advanceBtn.click();
-    await page.waitForTimeout(1000);
-  }
-
-  // Measure again
-  if (await measureBtn.isVisible().catch(() => false)) {
-    await measureBtn.click();
-    await page.waitForTimeout(500);
+  // Helper: force-unlock a tech by injecting into store
+  async function forceUnlockTech(techId: string) {
+    await page.evaluate((id) => {
+      const store = (window as any).__GAME__;
+      if (!store) return;
+      const s = store.getState();
+      const next = new Set(s.unlocked);
+      next.add(id);
+      // Also mark any challenge as completed
+      const cc = new Set(s.challengeCompletion);
+      // Map tech to challenge IDs
+      const techChallengeMap: Record<string, string> = {
+        controlled_cross: 'punnett_square',
+        diversity_dashboard: 'bottleneck_sim',
+        pedigree: 'pedigree_trace',
+        marker_discovery: 'manhattan_plot',
+        mas: 'mas_ranking',
+        wild_germplasm: 'backcross_scheme',
+        hybrid_breeding: 'testcross_hybrid',
+        mutagenesis: 'mutant_screen',
+        gene_editing: 'guide_rna',
+        genomic_prediction: 'genomic_fit',
+      };
+      const challengeId = techChallengeMap[id];
+      if (challengeId) cc.add(challengeId);
+      store.setState({ unlocked: next, challengeCompletion: cc });
+    }, techId);
+    await page.waitForTimeout(300);
   }
 
-  await screenshot(page, '01-field-with-plants');
-
-  // Now go to tech tab and try unlocking challenges
-  await page.locator('button:has-text("Tech")').click();
-  await page.waitForTimeout(1000);
+  // Stay on tech tab — cash is injected, go straight to challenges
 
   const results: Array<{
     tech: string;
@@ -120,37 +110,54 @@ test('Evaluate all tech challenges', async ({ page }) => {
     const num = String(i + 2).padStart(2, '0');
     console.log(`\n=== ${tech.name} (${tech.id}) ===`);
 
-    // Find the unlock button by its cost label
-    // The button text is "$XX" (e.g. "$30")
-    const costButtons = page.locator(`button:has-text("$${tech.cost}")`);
-    const costCount = await costButtons.count();
-
-    if (costCount === 0) {
-      // Maybe already unlocked or can't afford
-      console.log(`  No $${tech.cost} button found — may be unlocked or prerequisites not met`);
-
-      // Check if it says "Done"
-      const doneLabels = page.locator('span:has-text("Done")');
-      const doneCount = await doneLabels.count();
-      console.log(`  Found ${doneCount} "Done" labels`);
-
-      results.push({
-        tech: tech.name,
-        challengeOpened: false,
-        modalContent: '',
-        interactionType: 'skipped — no button',
-        feedbackText: '',
-        screenshots: [],
-      });
-      continue;
+    // Force-unlock all prerequisites first
+    for (let j = 0; j < i; j++) {
+      await forceUnlockTech(TECH_ORDER[j].id);
     }
+    // Re-inject cash (unlocking spent some)
+    await page.evaluate(() => {
+      const store = (window as any).__GAME__;
+      if (store) {
+        const s = store.getState();
+        store.setState({ budget: { ...s.budget, cash: 50000 } });
+      }
+    });
+    await page.waitForTimeout(300);
 
-    // Click the first matching cost button
-    try {
-      await costButtons.first().click({ timeout: 3000 });
-    } catch (e) {
-      console.log(`  Could not click button: ${(e as Error).message}`);
-      continue;
+    // Scroll to ensure the button is visible
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(300);
+
+    // Find the tech card by name and click its cost button
+    const techCard = page.locator(`div:has(> div > div > .font-extrabold:has-text("${tech.name}"))`);
+    const costBtn = techCard.locator('button').filter({ hasText: `$${tech.cost}` }).first();
+
+    if (!(await costBtn.isVisible({ timeout: 2000 }).catch(() => false))) {
+      // Try broader search
+      const anyBtn = page.locator(`button:has-text("$${tech.cost}")`);
+      const count = await anyBtn.count();
+      console.log(`  Tech card button not found directly. Found ${count} "$${tech.cost}" buttons total`);
+      if (count === 0) {
+        results.push({ tech: tech.name, challengeOpened: false, modalContent: '', interactionType: 'no button found', feedbackText: '', screenshots: [] });
+        continue;
+      }
+      // Find the first enabled one
+      let clicked = false;
+      for (let b = 0; b < count; b++) {
+        if (await anyBtn.nth(b).isEnabled().catch(() => false)) {
+          await anyBtn.nth(b).click({ timeout: 2000 });
+          clicked = true;
+          break;
+        }
+      }
+      if (!clicked) {
+        // Force click even if disabled
+        await anyBtn.first().click({ force: true, timeout: 2000 }).catch(() => {});
+      }
+    } else {
+      await costBtn.click({ timeout: 3000 }).catch(() =>
+        costBtn.click({ force: true, timeout: 2000 })
+      );
     }
     await page.waitForTimeout(1500);
 

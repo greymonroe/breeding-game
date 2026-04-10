@@ -9,7 +9,6 @@ interface Seedling {
 
 interface MASData {
   seedlings: Seedling[];
-  hint: string;
 }
 
 const MARKER_LABELS: Record<number, string> = { 0: '-/-', 1: '+/-', 2: '+/+' };
@@ -26,7 +25,6 @@ const MARKER_COLORS: Record<number, string> = {
 export function MASRankingChallenge({ instance, onSubmit, submitted }: ChallengeChildProps) {
   const data = instance.data as MASData;
   const [selected, setSelected] = useState<string[]>([]);
-  const [showHint, setShowHint] = useState(false);
 
   function toggle(id: string) {
     if (submitted) return;
@@ -50,7 +48,7 @@ export function MASRankingChallenge({ instance, onSubmit, submitted }: Challenge
           Select the <strong>top 3</strong> seedlings using marker data.
         </p>
         <p className="mt-1 text-xs text-muted">
-          Each marker locus shows copies of the favorable (+) allele. More + alleles = higher expected yield.
+          Each + allele adds to yield. Count the total favorable alleles across all loci to rank the seedlings. Not all loci contribute equally — consider which markers have larger effects.
         </p>
       </div>
 
@@ -86,9 +84,6 @@ export function MASRankingChallenge({ instance, onSubmit, submitted }: Challenge
                   </div>
                 ))}
               </div>
-              <div className="mt-2 text-center text-xs text-muted">
-                Score: {s.markers.Y1 + s.markers.Y7 + s.markers.Y15}/6
-              </div>
             </button>
           );
         })}
@@ -99,18 +94,6 @@ export function MASRankingChallenge({ instance, onSubmit, submitted }: Challenge
         {selected.length}/3 selected
         {selected.length === 3 && <span className="ml-2 text-leaf font-semibold">Ready to submit</span>}
       </div>
-
-      {/* Hint */}
-      {!showHint && (
-        <button onClick={() => setShowHint(true)} className="text-xs text-sky underline">
-          Show hint
-        </button>
-      )}
-      {showHint && (
-        <p className="rounded border border-sky/20 bg-sky/5 p-2 text-xs text-soil">
-          {data.hint}
-        </p>
-      )}
 
       {/* Submit */}
       <button

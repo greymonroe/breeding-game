@@ -20,15 +20,6 @@ export function PunnettSquareChallenge({ instance, onSubmit }: ChallengeChildPro
 
   const alleles = data.alleles; // ['R', 'r']
 
-  function fillGrid() {
-    // Auto-fill based on Punnett logic: rows = parent1 gametes, cols = parent2 gametes
-    const filled = [
-      [`${alleles[0]}${alleles[0]}`, `${alleles[0]}${alleles[1]}`],
-      [`${alleles[1]}${alleles[0]}`, `${alleles[1]}${alleles[1]}`],
-    ];
-    setGrid(filled);
-  }
-
   function handleCellChange(r: number, c: number, val: string) {
     const next = grid.map((row) => [...row]);
     next[r][c] = val;
@@ -83,12 +74,6 @@ export function PunnettSquareChallenge({ instance, onSubmit }: ChallengeChildPro
             </div>
           ))}
         </div>
-        <button
-          onClick={fillGrid}
-          className="mt-2 text-xs text-accent underline"
-        >
-          Auto-fill grid
-        </button>
       </div>
 
       {/* Color key */}

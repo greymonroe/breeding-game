@@ -183,28 +183,35 @@ const pedigreeTrace: ChallengeDefinition = {
   description: 'Follow a recessive allele through 3 generations to find the hidden carrier.',
   difficulty: 1,
   generate(ctx) {
-    // Build a 3-generation pedigree where one grandparent is Rr and one grandchild is rr.
-    // Player must identify which parent is the carrier (Rr).
+    // Build a 3-generation pedigree. Genotypes are HIDDEN from the player.
+    // The player must deduce which red-flowered parent is heterozygous (Rr)
+    // based on offspring evidence: the carrier produced a white offspring
+    // when crossed with a known heterozygote, while the other did not.
     const rng = ctx.rng;
-    // Generation 1 (grandparents): A (RR) × B (Rr)
-    // Generation 2 (parents): C could be RR or Rr (50/50)
-    // Generation 3: if C is Rr and mates with Rr → can produce rr offspring
     const carrierParent = rng() < 0.5 ? 'C' : 'D';
-    const pedigree = {
-      A: { genotype: 'RR', color: 'red', gen: 1 },
-      B: { genotype: 'Rr', color: 'red', gen: 1 },
-      C: { genotype: carrierParent === 'C' ? 'Rr' : 'RR', color: 'red', gen: 2, parents: ['A', 'B'] },
-      D: { genotype: carrierParent === 'D' ? 'Rr' : 'RR', color: 'red', gen: 2, parents: ['A', 'B'] },
-      E: { genotype: 'Rr', color: 'red', gen: 2 }, // unrelated carrier
-      F: { genotype: 'rr', color: 'white', gen: 3, parents: [carrierParent, 'E'] },
+    const nonCarrier = carrierParent === 'C' ? 'D' : 'C';
+
+    // Generation 1: grandparents (one is Rr but player doesn't see genotypes)
+    // Generation 2: C and D are children of A×B; one inherited r, the other didn't
+    //               E is an unrelated heterozygote used as a test-cross partner
+    // Generation 3: F is offspring of carrier × E (white = rr, proves carrier is Rr)
+    //               G is offspring of non-carrier × E (red = has R, consistent with RR parent)
+    const pedigree: Record<string, { color: string; gen: number; parents?: [string, string]; label?: string }> = {
+      A: { color: 'red', gen: 1, label: 'Plant A' },
+      B: { color: 'red', gen: 1, label: 'Plant B' },
+      C: { color: 'red', gen: 2, parents: ['A', 'B'], label: 'Plant C' },
+      D: { color: 'red', gen: 2, parents: ['A', 'B'], label: 'Plant D' },
+      E: { color: 'red', gen: 2, label: 'Plant E (test cross partner)' },
+      F: { color: 'white', gen: 3, parents: [carrierParent, 'E'], label: 'Offspring of ' + carrierParent + ' × E' },
+      G: { color: 'red', gen: 3, parents: [nonCarrier, 'E'], label: 'Offspring of ' + nonCarrier + ' × E' },
     };
     return {
       definitionId: this.id,
       data: {
         pedigree,
-        question: 'A white (rr) offspring appeared in generation 3. Both parents look red. Which parent must be a carrier (Rr)?',
-        hint: 'For a white (rr) offspring, both parents must contribute an r allele. One parent (E) is known Rr. The other parent got r from grandparent B (who is Rr).',
-        options: ['C', 'D'],
+        question: 'Plants C and D both have red flowers (dominant phenotype). Each was crossed with Plant E. One cross produced a WHITE offspring. Which plant (C or D) must be a carrier of the recessive (r) allele?',
+        hint: 'A white flower (rr) needs an r from EACH parent. Plant E carries r. So the other parent must also carry r — that parent is the carrier (Rr).',
+        options: ['C', 'D'] as [string, string],
       },
       answer: { carrier: carrierParent },
     };
@@ -339,25 +346,36 @@ const backcrossScheme: ChallengeDefinition = {
   description: 'Design a scheme to introgress disease resistance from a wild relative while recovering elite yield.',
   difficulty: 2,
   generate() {
+    const targetPct = 87;
     return {
       definitionId: this.id,
       data: {
         question: 'You have an elite line (high yield, susceptible DR=r/r) and a wild accession (low yield, resistant DR=R/R). How many backcross generations to the elite parent do you need before selfing to recover >87% elite background?',
-        hint: 'Each backcross generation recovers ~50% of the remaining wild genome. After BC1: 75% elite. BC2: 87.5%. BC3: 93.75%.',
+        hint: 'After the F1, each backcross halves the wild-genome fraction. Wild fraction after BCn = (1/2)^(n+1).',
         options: [1, 2, 3, 4],
+        targetPct,
       },
-      answer: { generations: 2 },
+      answer: { generations: 2, recoveryPct: 87.5 },
     };
   },
   validate(_instance, playerAnswer) {
-    const ans = playerAnswer as { generations: number };
-    const correct = ans.generations === 2;
-    return {
-      correct,
-      explanation: correct
-        ? 'Correct! After 2 backcross generations (BC2), you recover ~87.5% of the elite genome. Then self the BC2F1 to fix the DR=R allele. This is the classic introgression pipeline — but watch out for linkage drag near DR!'
-        : 'After each backcross to the elite parent, you recover half the remaining wild genome. BC1 = 75% elite, BC2 = 87.5%, BC3 = 93.75%. Two backcrosses is the minimum for >87% recovery.',
-    };
+    const ans = playerAnswer as { generations: number; recoveryPct: number };
+    const correctGen = ans.generations === 2;
+    // Accept recovery percentage within ±1 of 87.5
+    const correctPct = Math.abs((ans.recoveryPct ?? 0) - 87.5) <= 1;
+    const correct = correctGen && correctPct;
+    let explanation: string;
+    if (correct) {
+      explanation =
+        'Correct! After BC2 the wild fraction is (1/2)^3 = 12.5%, so elite recovery is 87.5%. Then self the BC2F1 to fix the DR=R allele. This is the classic introgression pipeline — but watch out for linkage drag near DR!';
+    } else if (correctGen && !correctPct) {
+      explanation =
+        'Right generation, but the recovery percentage is off. After BCn, wild fraction = (1/2)^(n+1). So BC2: (1/2)^3 = 12.5% wild, meaning 87.5% elite.';
+    } else {
+      explanation =
+        'After the F1 (50/50), each backcross to the elite parent halves the remaining wild genome. Wild fraction after BCn = (1/2)^(n+1). BC1 = 75% elite, BC2 = 87.5%, BC3 = 93.75%. Two backcrosses is the minimum for >87% recovery.';
+    }
+    return { correct, explanation };
   },
 };
 
