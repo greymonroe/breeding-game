@@ -345,7 +345,7 @@ function makeInitial(): Omit<GameState,
   | 'setNurseryPopSize' | 'moveIndividual'
   | 'toggleSelect' | 'clearSelection' | 'autoSelectTopInActive'
   | 'advanceSeason' | 'release' | 'releaseHybrid' | 'unlockTech' | 'genotypeAll' | 'runGwas'
-  | 'interpretDominance' | 'interpretTestCross'
+  | 'interpretDominance' | 'interpretTestCross' | 'interpretLinkage'
   | 'acquireWildAccession' | 'introducePlantFromBank' | 'mutagenizeField'
   | 'editIndividual' | 'trainPredictor' | 'dismissNotice' | 'reset'
   | 'measureTrait' | 'makeControlledCross'
