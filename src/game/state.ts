@@ -110,6 +110,8 @@ export interface Objective {
   reward: number;
   /** Season it becomes visible. */
   availableAt: number;
+  /** IDs of objectives that must be completed before this one can complete. */
+  requires?: string[];
   completed: boolean;
   completedAt?: number;
 }
@@ -130,6 +132,7 @@ function makeObjectives(): Objective[] {
       description: 'Use a test cross to identify a homozygous red (RR) plant. Cross a red plant with a white plant and examine the offspring.',
       reward: 150,
       availableAt: 0,
+      requires: ['discover_color_dominance'],
       completed: false,
     },
     {
@@ -138,6 +141,7 @@ function makeObjectives(): Objective[] {
       description: 'Release a confirmed-homozygous red variety that won\'t segregate in farmer fields.',
       reward: 300,
       availableAt: 0,
+      requires: ['identify_homozygous_red'],
       completed: false,
     },
     {
@@ -162,6 +166,7 @@ function makeObjectives(): Objective[] {
       description: 'You\'ve noticed white plants always yield less than red ones. Grow a large segregating population (cross Rr × Rr) and examine whether color and yield are truly independent.',
       reward: 200,
       availableAt: 4,
+      requires: ['discover_color_dominance'],
       completed: false,
     },
     {
@@ -170,6 +175,7 @@ function makeObjectives(): Objective[] {
       description: 'Find a rare recombinant: release a white variety with yield above the market baseline. You\'ll need a large segregating population to find one.',
       reward: 400,
       availableAt: 6,
+      requires: ['discover_linkage'],
       completed: false,
     },
     {
@@ -178,6 +184,7 @@ function makeObjectives(): Objective[] {
       description: 'Disease outbreaks destroy susceptible varieties. Introgress disease resistance from wild germplasm and release a resistant variety with competitive yield — but watch out for linkage drag.',
       reward: 500,
       availableAt: 10,
+      requires: ['discover_color_dominance'],
       completed: false,
     },
     {
@@ -306,6 +313,12 @@ let _nurseryCounter = 0;
 function nurseryId(): string {
   _nurseryCounter += 1;
   return `nur_${_nurseryCounter}`;
+}
+
+/** Check if an objective's prerequisites are all completed. */
+function prereqsMet(obj: Objective, allObjectives: Objective[]): boolean {
+  if (!obj.requires || obj.requires.length === 0) return true;
+  return obj.requires.every(reqId => allObjectives.some(o => o.id === reqId && o.completed));
 }
 
 function archiveOf(inds: Individual[]): Map<string, Individual> {
@@ -803,6 +816,7 @@ export const useGame = create<GameState>((set, get) => ({
     const updatedObjectives = s.objectives.map((o) => {
       if (o.completed) return o;
       if (o.availableAt > s.season) return o;
+      if (!prereqsMet(o, s.objectives)) return o;
       if (o.id === 'release_red' && isRed && objectiveOk) {
         return { ...o, completed: true, completedAt: s.season };
       }
@@ -970,6 +984,7 @@ export const useGame = create<GameState>((set, get) => ({
     const updatedObjectives = s.objectives.map((o) => {
       if (o.completed) return o;
       if (o.availableAt > s.season) return o;
+      if (!prereqsMet(o, s.objectives)) return o;
       if (o.id === 'release_red' && isRed && objectiveOk) return { ...o, completed: true, completedAt: s.season };
       if (o.id === 'release_white' && isWhite && objectiveOk) return { ...o, completed: true, completedAt: s.season };
       if (o.id === 'release_hybrid' && objectiveOk) return { ...o, completed: true, completedAt: s.season };
@@ -1328,6 +1343,7 @@ export const useGame = create<GameState>((set, get) => ({
 
     const updatedObjectives = s.objectives.map(o => {
       if (o.completed) return o;
+      if (!prereqsMet(o, s.objectives)) return o;
       if (o.id === `discover_${traitName}_dominance`) return { ...o, completed: true, completedAt: s.season };
       return o;
     });
@@ -1387,6 +1403,7 @@ export const useGame = create<GameState>((set, get) => ({
 
     const updatedObjectives = s.objectives.map(o => {
       if (o.completed) return o;
+      if (!prereqsMet(o, s.objectives)) return o;
       if (o.id === 'identify_homozygous_red' && isHomozygous && traitName === 'color') {
         return { ...o, completed: true, completedAt: s.season };
       }
@@ -1434,6 +1451,7 @@ export const useGame = create<GameState>((set, get) => ({
 
     const updatedObjectives = s.objectives.map(o => {
       if (o.completed) return o;
+      if (!prereqsMet(o, s.objectives)) return o;
       if (o.id === 'discover_linkage') return { ...o, completed: true, completedAt: s.season };
       return o;
     });
