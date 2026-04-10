@@ -9,9 +9,12 @@ export function LabView() {
       <ExperimentLab />
 
       {/* DNA Lab — tech-gated tools */}
-      <div className="rounded-lg border border-soil/20 bg-white p-3">
-        <h3 className="text-sm font-semibold text-soil mb-1">DNA Lab</h3>
-        <p className="text-[11px] text-muted mb-3">
+      <div className="card-lab p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">{'\u{1F9EC}'}</span>
+          <h3 className="text-sm font-extrabold text-lab-accent">DNA Lab</h3>
+        </div>
+        <p className="text-[11px] text-muted mb-3 font-semibold">
           Molecular tools for marker analysis, mutagenesis, gene editing, and genomic prediction.
           Unlock these in the Tech tree.
         </p>

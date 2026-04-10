@@ -20,6 +20,7 @@ interface Props {
 }
 
 const colorFor = (v: number) => (v >= 0.5 ? '#c0392b' : '#f5f1e8');
+const colorStroke = (v: number) => (v >= 0.5 ? '#a02318' : '#c4b08a');
 const shapeFor = (v: number) => (v >= 1.5 ? 'M40 70 Q10 40 40 10 Q70 40 40 70 Z' : v >= 0.5 ? 'M40 75 Q15 40 40 5 Q65 40 40 75 Z' : 'M40 75 Q30 40 40 5 Q50 40 40 75 Z');
 
 function familyHue(familyId: string): number {
@@ -53,7 +54,10 @@ export function PlantCard({ ind, selected, onClick }: Props) {
   const disease = ind.phenotype.get('disease');
   // Visual height: known yield drives it; unknown shows a default seedling height.
   const height = yieldV != null ? 30 + yieldV * 0.6 : 45;
-  const familyStripe = ind.familyId ? `hsl(${familyHue(ind.familyId)} 60% 60%)` : null;
+  const familyStripe = ind.familyId ? `hsl(${familyHue(ind.familyId)} 55% 55%)` : null;
+
+  // Yield bar: normalize to 0-100 range (yield typically 30-70)
+  const yieldPct = yieldV != null ? Math.min(100, Math.max(0, ((yieldV - 20) / 60) * 100)) : 0;
 
   const [showTooltip, setShowTooltip] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,49 +84,84 @@ export function PlantCard({ ind, selected, onClick }: Props) {
         onClick={onClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`relative flex flex-col items-center rounded-md border p-1 transition-all w-full ${
-          selected ? 'border-accent bg-accent/10 ring-1 ring-accent' : 'border-soil/20 bg-white hover:border-leaf'
+        className={`relative flex flex-col items-center rounded-xl border-2 p-1.5 transition-all w-full ${
+          selected
+            ? 'plant-selected border-accent'
+            : 'border-soil/15 bg-gradient-to-b from-white to-wheat-light/30 hover:border-leaf hover:shadow-sm'
         }`}
       >
+        {/* Family stripe */}
         {familyStripe && (
           <div
-            className="absolute top-0 left-0 right-0 h-0.5 rounded-t"
+            className="absolute top-0 left-1 right-1 h-1 rounded-b"
             style={{ background: familyStripe }}
           />
         )}
+
+        {/* Disease shield badge */}
         {disease != null && disease >= 0.5 && (
-          <span className="absolute top-0 right-0.5 text-[8px]">&#x1f6e1;</span>
+          <span className="absolute top-0.5 right-1 text-[10px]">{'\u{1F6E1}'}</span>
         )}
-        <svg viewBox="0 0 80 110" width="36" height="50">
-          <line x1="40" y1="105" x2="40" y2={110 - height} stroke="#4a7c59" strokeWidth="3" />
-          <path d={shapeFor(shape)} transform={`translate(0 ${100 - height})`} fill="#7cb587" stroke="#4a7c59" strokeWidth="1" />
-          <circle cx="40" cy={108 - height} r="8" fill={colorFor(color)} stroke="#3d2c1f" strokeWidth="1" />
+
+        {/* Plant SVG — larger */}
+        <svg viewBox="0 0 80 110" width="48" height="68">
+          {/* Soil mound at base */}
+          <ellipse cx="40" cy="107" rx="22" ry="4" fill="#c4a882" opacity="0.4" />
+          {/* Stem */}
+          <line x1="40" y1="105" x2="40" y2={110 - height} stroke="#4a7c59" strokeWidth="3" strokeLinecap="round" />
+          {/* Leaves */}
+          <path d={shapeFor(shape)} transform={`translate(0 ${100 - height})`} fill="#7cb587" stroke="#4a7c59" strokeWidth="1.5" />
+          {/* Small side leaves */}
+          {height > 50 && (
+            <>
+              <path d="M40 85 Q30 78 35 72" fill="none" stroke="#7cb587" strokeWidth="2" strokeLinecap="round" />
+              <path d="M40 85 Q50 78 45 72" fill="none" stroke="#7cb587" strokeWidth="2" strokeLinecap="round" />
+            </>
+          )}
+          {/* Flower/Fruit circle */}
+          <circle cx="40" cy={108 - height} r="10" fill={colorFor(color)} stroke={colorStroke(color)} strokeWidth="1.5" />
+          {/* Highlight on fruit */}
+          <circle cx="37" cy={105 - height} r="2.5" fill="rgba(255,255,255,0.3)" />
         </svg>
-        <div className="text-[9px] font-mono text-muted leading-none mt-0.5">
+
+        {/* Yield bar */}
+        {yieldV != null && (
+          <div className="yield-bar w-full mt-1" style={{ maxWidth: '42px' }}>
+            <div
+              className="yield-bar-fill"
+              style={{ width: `${yieldPct}%` }}
+            />
+          </div>
+        )}
+
+        {/* Values */}
+        <div className="text-[10px] font-bold font-mono text-soil leading-tight mt-1">
           {yieldV != null ? yieldV.toFixed(0) : '?'}
-          {' / '}
+          <span className="text-muted font-normal"> / </span>
           {flavor != null ? flavor.toFixed(0) : '?'}
         </div>
+
         <GenotypeBar ind={ind} discovery={discovery} />
       </button>
 
       {showTooltip && (
         <div
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1 w-44 rounded-lg border border-soil/30 bg-white shadow-lg p-2 text-[11px] text-soil pointer-events-none"
-          style={{ minWidth: '11rem' }}
+          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 rounded-xl border-2 border-soil/20 bg-white shadow-game-lg p-3 text-[11px] text-soil pointer-events-none"
         >
-          <div className="font-semibold text-soil mb-1 font-mono text-[10px]">
+          <div className="font-extrabold text-soil mb-1 font-mono text-[10px]">
             {ind.id}
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-muted mb-1.5">
-            <span>Gen {ind.generation}</span>
+          <div className="flex items-center gap-2 text-[10px] text-muted mb-2">
+            <span className="bg-soil/10 rounded px-1.5 py-0.5 font-semibold">Gen {ind.generation}</span>
             {ind.familyId && (
-              <span
-                className="inline-block w-2 h-2 rounded-full"
-                style={{ background: `hsl(${familyHue(ind.familyId)} 60% 60%)` }}
-              />
+              <>
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-full border border-white shadow-sm"
+                  style={{ background: `hsl(${familyHue(ind.familyId)} 55% 55%)` }}
+                />
+                <span className="font-mono truncate max-w-[5rem]">{ind.familyId}</span>
+              </>
             )}
-            {ind.familyId && <span className="font-mono truncate max-w-[5rem]">{ind.familyId}</span>}
           </div>
 
           <table className="w-full">
@@ -136,13 +175,13 @@ export function PlantCard({ ind, selected, onClick }: Props) {
                 const se = trials && trials.length >= 2 ? trialSE(trials) : 0;
                 return (
                   <tr key={t.key} className="border-t border-soil/10">
-                    <td className="py-0.5 pr-1 text-muted">{t.label}</td>
+                    <td className="py-0.5 pr-1 text-muted font-semibold">{t.label}</td>
                     <td className="py-0.5 text-right font-mono">
                       {measured ? (
-                        <span className="text-soil">
+                        <span className="text-soil font-bold">
                           {formatTraitValue(t.key, val)}
-                          {se > 0 && <span className="text-[9px] text-muted"> ±{se.toFixed(1)}</span>}
-                          {reps > 1 && <span className="text-[8px] text-muted"> n={reps}</span>}
+                          {se > 0 && <span className="text-[9px] text-muted font-normal"> &plusmn;{se.toFixed(1)}</span>}
+                          {reps > 1 && <span className="text-[8px] text-muted font-normal"> n={reps}</span>}
                         </span>
                       ) : cost != null ? (
                         <span className="text-muted italic">? <span className="text-[9px]">(${cost}/plant)</span></span>
@@ -157,7 +196,7 @@ export function PlantCard({ ind, selected, onClick }: Props) {
           </table>
 
           {ind.parents && (
-            <div className="mt-1.5 pt-1 border-t border-soil/10 text-[9px] text-muted font-mono">
+            <div className="mt-2 pt-1.5 border-t border-soil/10 text-[9px] text-muted font-mono">
               Parents: {ind.parents[0] === ind.parents[1]
                 ? `self(${ind.parents[0]})`
                 : `${ind.parents[0]} x ${ind.parents[1]}`}
@@ -167,9 +206,9 @@ export function PlantCard({ ind, selected, onClick }: Props) {
           <div
             className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
             style={{
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: '5px solid white',
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderTop: '6px solid white',
             }}
           />
         </div>

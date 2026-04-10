@@ -43,32 +43,43 @@ export function FieldView() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-leaf/30 bg-leaf/5 p-3 text-xs text-soil flex items-center gap-3">
+      {/* Season status & advance button */}
+      <div className="card-farm p-4 flex items-center gap-4">
         <div className="flex-1">
-          <strong>Season {season}</strong> · {nurseries.length} {nurseries.length === 1 ? 'nursery' : 'nurseries'} ·
-          market yield baseline <span className="font-mono">{marketBaseline.toFixed(1)}</span>
-          {diseaseActive && <span className="ml-2 text-danger">🦠 outbreak active</span>}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-2xl">{'\u{2600}\u{FE0F}'}</span>
+            <span className="text-lg font-extrabold text-soil">Season {season}</span>
+          </div>
+          <div className="text-xs text-muted font-semibold">
+            {nurseries.length} {nurseries.length === 1 ? 'nursery' : 'nurseries'} &middot;
+            market baseline <span className="font-mono text-soil">{marketBaseline.toFixed(1)}</span>
+            {diseaseActive && <span className="ml-2 text-danger font-bold">{'\u{1F9A0}'} Outbreak!</span>}
+          </div>
         </div>
         <button
           onClick={advanceSeason}
           disabled={selectedIds.length === 0 || totalCost > budget.cash}
           title={selectedIds.length === 0 ? 'Select parents in at least one nursery first.' : ''}
-          className="rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-40"
+          className="rounded-xl bg-gradient-to-b from-leaf to-leaf-dark px-6 py-3 text-sm font-extrabold text-white shadow-game hover:shadow-game-lg disabled:opacity-40 disabled:shadow-none transition-all border-2 border-leaf-dark/50"
         >
-          ⏭ Advance season ({totalCost > 0 ? `−$${totalCost}` : 'no cost'})
+          {'\u{23ED}'} Advance Season
+          {totalCost > 0 && <span className="block text-[10px] font-semibold opacity-80">&minus;${totalCost}</span>}
         </button>
       </div>
 
       <Portfolio />
 
-      <div className="rounded-lg border border-soil/20 bg-white p-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-soil">Nurseries:</span>
+      {/* Nursery tabs */}
+      <div className="card-farm p-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-extrabold text-soil uppercase tracking-wide">{'\u{1F33E}'} Nurseries:</span>
         {nurseries.map((n) => (
           <button
             key={n.id}
             onClick={() => setActiveNursery(n.id)}
-            className={`rounded px-3 py-1 text-xs font-semibold ${
-              activeNurseryId === n.id ? 'bg-accent text-white' : 'bg-soil/5 text-soil hover:bg-soil/10'
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              activeNurseryId === n.id
+                ? 'bg-accent text-white shadow-sm'
+                : 'bg-soil/5 text-soil hover:bg-soil/10 border border-soil/15'
             }`}
           >
             {n.name} <span className="opacity-60">({n.plants.length})</span>
@@ -76,9 +87,9 @@ export function FieldView() {
         ))}
         <button
           onClick={() => createNursery(`Nursery ${nurseries.length + 1}`)}
-          className="rounded px-3 py-1 text-xs border border-soil/30 hover:bg-soil/5"
+          className="rounded-lg px-3 py-1.5 text-xs font-bold border-2 border-dashed border-soil/25 text-muted hover:bg-soil/5 hover:border-soil/40 transition-all"
         >
-          + New population (free)
+          + New Plot
         </button>
       </div>
 
@@ -148,15 +159,26 @@ function NurserySection({
   const otherNurseries = allNurseries.filter((n) => n.id !== nursery.id);
 
   return (
-    <section className={`rounded-lg border-2 p-3 ${isActive ? 'border-accent/50 bg-accent/5' : 'border-soil/20 bg-white'}`}>
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <h2 className="text-sm font-semibold text-leaf flex-1">
-          {nursery.name} <span className="text-muted font-normal">({nursery.plants.length} plants, {selectedHere.length} parents selected)</span>
+    <section className={`rounded-2xl border-2 p-4 transition-all ${
+      isActive
+        ? 'border-accent/40 bg-gradient-to-b from-white/90 to-wheat-light/40 shadow-game'
+        : 'border-soil/15 bg-white/80'
+    }`}>
+      {/* Nursery header */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <h2 className="text-sm font-extrabold text-soil flex-1">
+          {'\u{1F33F}'} {nursery.name}
+          <span className="text-muted font-semibold ml-2">
+            {nursery.plants.length} plants
+            {selectedHere.length > 0 && (
+              <span className="text-accent"> &middot; {selectedHere.length} selected</span>
+            )}
+          </span>
         </h2>
         {canDelete && nursery.plants.length === 0 && (
           <button
             onClick={() => deleteNursery(nursery.id)}
-            className="text-[10px] text-danger hover:underline"
+            className="text-[10px] text-danger font-bold hover:underline"
           >
             delete
           </button>
@@ -164,14 +186,14 @@ function NurserySection({
       </div>
 
       {nursery.plants.length === 0 ? (
-        <div className="text-xs text-muted italic p-4 text-center border border-dashed border-soil/20 rounded">
-          Empty nursery. Move plants in from another nursery (use the "Move to…" picker on a selected plant) or
-          plant from the seed bank in the Lab.
+        <div className="text-xs text-muted italic p-6 text-center border-2 border-dashed border-soil/15 rounded-xl bg-soil/5">
+          Empty plot. Move plants here from another nursery or plant from the seed bank in the Lab.
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
-            <label className="flex items-center gap-1">
+          {/* Controls bar */}
+          <div className="flex flex-wrap items-center gap-2 mb-3 text-xs bg-soil/5 rounded-xl px-3 py-2">
+            <label className="flex items-center gap-1 font-semibold text-soil">
               Next pop
               <input
                 type="number"
@@ -179,12 +201,12 @@ function NurserySection({
                 min={1}
                 max={300}
                 onChange={(e) => setNurseryPopSize(nursery.id, Math.max(1, Number(e.target.value) || 1))}
-                className="w-16 rounded border border-soil/30 px-2 py-1 font-mono"
+                className="w-16 rounded-lg border-2 border-soil/20 px-2 py-1 font-mono bg-white"
               />
             </label>
-            <span className="text-muted">cost ${nursery.popSize * Costs.perPlant}</span>
-            <span className="text-muted">· open pollination among selected parents (selfing allowed)</span>
-            <button onClick={clearSelection} className="ml-auto rounded border border-soil/30 px-2 py-1 hover:bg-soil/5">
+            <span className="text-muted font-semibold">${nursery.popSize * Costs.perPlant}</span>
+            <span className="text-muted">&middot; open pollination</span>
+            <button onClick={clearSelection} className="ml-auto rounded-lg border-2 border-soil/20 px-3 py-1 font-bold hover:bg-white transition-colors">
               Clear selection
             </button>
           </div>
@@ -201,36 +223,36 @@ function NurserySection({
             const meanRed = reds.reduce((s, p) => s + p.phenotype.get('yield')!, 0) / reds.length;
             const meanWhite = whites.reduce((s, p) => s + p.phenotype.get('yield')!, 0) / whites.length;
             const diff = meanRed - meanWhite;
-            if (diff < 2) return null; // not a strong enough signal
+            if (diff < 2) return null;
             return (
-              <div className="mb-2 rounded border border-purple-500/40 bg-purple-50 p-3 text-xs">
-                <div className="font-semibold text-soil mb-1">🔗 Population pattern: color and yield seem correlated</div>
-                <div className="flex gap-8 mb-2">
+              <div className="mb-3 rounded-xl border-2 border-purple-400/40 bg-purple-50 p-4 text-xs shadow-sm">
+                <div className="font-extrabold text-soil mb-2 text-sm">{'\u{1F517}'} Population pattern: color and yield seem correlated</div>
+                <div className="flex gap-8 mb-3">
                   <div className="text-center">
-                    <div className="text-lg font-bold text-soil">{meanRed.toFixed(1)}</div>
-                    <div className="text-[10px] text-muted">Mean yield — Red (n={reds.length})</div>
+                    <div className="text-2xl font-extrabold text-soil">{meanRed.toFixed(1)}</div>
+                    <div className="text-[10px] text-muted font-semibold">Mean yield &mdash; Red (n={reds.length})</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-soil">{meanWhite.toFixed(1)}</div>
-                    <div className="text-[10px] text-muted">Mean yield — White (n={whites.length})</div>
+                    <div className="text-2xl font-extrabold text-soil">{meanWhite.toFixed(1)}</div>
+                    <div className="text-[10px] text-muted font-semibold">Mean yield &mdash; White (n={whites.length})</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-accent">{diff > 0 ? '+' : ''}{diff.toFixed(1)}</div>
-                    <div className="text-[10px] text-muted">Difference</div>
+                    <div className="text-2xl font-extrabold text-accent">{diff > 0 ? '+' : ''}{diff.toFixed(1)}</div>
+                    <div className="text-[10px] text-muted font-semibold">Difference</div>
                   </div>
                 </div>
-                <p className="text-[11px] text-muted mb-2">Across your whole nursery, red plants consistently out-yield white plants. Why would flower color be associated with yield?</p>
+                <p className="text-[11px] text-muted mb-3">Across your whole nursery, red plants consistently out-yield white plants. Why?</p>
                 <div className="flex gap-2 flex-wrap">
                   <button onClick={() => interpretLinkage('pleiotropy')}
-                    className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                    className="rounded-lg border-2 border-soil/20 px-3 py-1.5 text-[11px] font-bold hover:bg-white transition-colors">
                     Pleiotropy (color gene directly affects yield)
                   </button>
                   <button onClick={() => interpretLinkage('linkage')}
-                    className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-purple-100">
-                    Linkage (color and yield genes are near each other on the chromosome)
+                    className="rounded-lg border-2 border-purple-400/40 px-3 py-1.5 text-[11px] font-bold hover:bg-purple-100 transition-colors text-purple-700">
+                    Linkage (nearby genes on same chromosome)
                   </button>
                   <button onClick={() => interpretLinkage('coincidence')}
-                    className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                    className="rounded-lg border-2 border-soil/20 px-3 py-1.5 text-[11px] font-bold hover:bg-white transition-colors">
                     Coincidence (random noise)
                   </button>
                 </div>
@@ -257,33 +279,33 @@ function NurserySection({
             />
           )}
           {selectedHere.length === 2 && !unlocked.has('controlled_cross') && (
-            <div className="mb-2 rounded border border-soil/20 bg-soil/5 px-2 py-1.5 text-[11px] text-muted">
+            <div className="mb-3 rounded-xl border-2 border-soil/15 bg-soil/5 px-3 py-2 text-[11px] text-muted">
               Research <strong>Controlled crosses</strong> in the Tech tree to make explicit F1 families from any two
               selected parents.
             </div>
           )}
 
           {focused && (
-            <div className="border-t border-soil/10 pt-2 mb-2 flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-muted">
-                {focused.id} — Y {focused.phenotype.has('yield') ? focused.phenotype.get('yield')!.toFixed(1) : '?'}, F{' '}
+            <div className="border-t-2 border-soil/10 pt-3 mb-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="bg-accent/10 rounded-lg px-2 py-1 font-bold text-soil">
+                {focused.id} &mdash; Y {focused.phenotype.has('yield') ? focused.phenotype.get('yield')!.toFixed(1) : '?'}, F{' '}
                 {focused.phenotype.has('flavor') ? focused.phenotype.get('flavor')!.toFixed(1) : '?'},{' '}
                 {(focused.phenotype.get('color') ?? 0) >= 0.5 ? 'red' : 'white'}
-                {focused.phenotype.has('disease') && (focused.phenotype.get('disease') ?? 0) >= 0.5 && ', 🛡'}
+                {focused.phenotype.has('disease') && (focused.phenotype.get('disease') ?? 0) >= 0.5 && ' \u{1F6E1}'}
               </span>
               <button
                 onClick={() => release(focused.id)}
-                className="rounded bg-accent px-3 py-1 text-xs font-bold text-white hover:bg-accent/90"
+                className="rounded-xl bg-gradient-to-b from-accent to-accent/90 px-4 py-1.5 text-xs font-extrabold text-white shadow-sm hover:shadow-md transition-all border border-accent/50"
               >
-                📦 Release ($20)
+                {'\u{1F4E6}'} Release ($20)
               </button>
               {otherNurseries.length > 0 && (
                 <select
                   value=""
                   onChange={(e) => e.target.value && moveIndividual(focused.id, e.target.value)}
-                  className="rounded border border-soil/30 px-2 py-1"
+                  className="rounded-lg border-2 border-soil/20 px-2 py-1 text-xs bg-white"
                 >
-                  <option value="">Move to nursery…</option>
+                  <option value="">Move to...</option>
                   {otherNurseries.map((n) => (
                     <option key={n.id} value={n.id}>{n.name}</option>
                   ))}
@@ -291,7 +313,7 @@ function NurserySection({
               )}
               {unlocked.has('pedigree') && (
                 <details className="text-[11px]">
-                  <summary className="cursor-pointer text-muted hover:text-soil">pedigree</summary>
+                  <summary className="cursor-pointer text-muted hover:text-soil font-bold">pedigree</summary>
                   <PedigreeGraph ind={focused} archive={archive} maxDepth={3} />
                 </details>
               )}
@@ -330,7 +352,6 @@ function FamilyGroupedGrid({
   interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
   interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
 }) {
-  // Group by familyId; collect ungrouped under null
   const groups = new Map<string | null, Individual[]>();
   for (const p of plants) {
     const key = p.familyId ?? null;
@@ -338,7 +359,6 @@ function FamilyGroupedGrid({
     arr.push(p);
     groups.set(key, arr);
   }
-  // Order: ungrouped first, then families by season descending
   const orderedKeys = [...groups.keys()].sort((a, b) => {
     if (a == null && b == null) return 0;
     if (a == null) return -1;
@@ -351,7 +371,7 @@ function FamilyGroupedGrid({
     return h;
   };
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {orderedKeys.map((key) => {
         const members = groups.get(key)!;
         const isUngrouped = key == null;
@@ -359,8 +379,8 @@ function FamilyGroupedGrid({
         let header: React.ReactNode;
         if (isUngrouped) {
           header = (
-            <div className="text-[10px] uppercase tracking-wide text-muted">
-              Ungrouped ({members.length})
+            <div className="text-[10px] uppercase tracking-wide text-muted font-bold">
+              Founders ({members.length})
             </div>
           );
         } else {
@@ -372,29 +392,29 @@ function FamilyGroupedGrid({
           header = (
             <div
               className="flex items-center gap-2 text-[11px]"
-              style={{ borderLeft: `3px solid hsl(${hue} 60% 55%)`, paddingLeft: 6 }}
+              style={{ borderLeft: `4px solid hsl(${hue} 55% 50%)`, paddingLeft: 8 }}
             >
-              <span className="font-semibold text-soil">
-                {isSelf ? '⊙ Self' : '✕ Cross'}
+              <span className="font-extrabold text-soil">
+                {isSelf ? '\u{229A} Self' : '\u{2715} Cross'}
               </span>
-              <span className="font-mono text-muted">
+              <span className="font-mono text-muted font-semibold">
                 {parents
                   ? isSelf
                     ? `of ${parents[0]}`
-                    : `${parents[0]} × ${parents[1]}`
+                    : `${parents[0]} \u00d7 ${parents[1]}`
                   : key}
               </span>
               {pA && (
-                <span className="text-[10px] text-muted">
+                <span className="text-[10px] text-muted bg-soil/5 rounded px-1.5 py-0.5">
                   P1 Y{(pA.phenotype.get('yield') ?? NaN).toFixed?.(0) || '?'}
                 </span>
               )}
               {!isSelf && pB && (
-                <span className="text-[10px] text-muted">
+                <span className="text-[10px] text-muted bg-soil/5 rounded px-1.5 py-0.5">
                   P2 Y{(pB.phenotype.get('yield') ?? NaN).toFixed?.(0) || '?'}
                 </span>
               )}
-              <span className="ml-auto text-muted">{members.length} sibs</span>
+              <span className="ml-auto text-muted font-bold">{members.length} sibs</span>
             </div>
           );
         }
@@ -409,40 +429,37 @@ function FamilyGroupedGrid({
             const pBColor = pB.phenotype.get('color') ?? 0;
             const parentsHaveDiffColor = (pAColor >= 0.5) !== (pBColor >= 0.5);
 
-            // Count offspring phenotypes for color
             const redCount = members.filter(p => (p.phenotype.get('color') ?? 0) >= 0.5).length;
             const whiteCount = members.filter(p => (p.phenotype.get('color') ?? 0) < 0.5).length;
 
             if (colorDisc.level === 'unknown' && parentsHaveDiffColor) {
-              // Dominance discovery opportunity
               interpretPanel = (
-                <div className="mt-1 rounded border border-sky/40 bg-sky/5 p-2 text-xs">
-                  <div className="font-semibold text-soil mb-1">🔬 You crossed a red plant with a white plant!</div>
-                  <div className="flex gap-4 mb-2">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-soil">{redCount}</div>
-                      <div className="text-[10px] text-muted">Red</div>
+                <div className="mt-2 rounded-xl border-2 border-sky/40 bg-gradient-to-r from-sky-light/20 to-sky/5 p-3 text-xs shadow-sm">
+                  <div className="font-extrabold text-soil mb-2 text-sm">{'\u{1F52C}'} You crossed a red plant with a white plant!</div>
+                  <div className="flex gap-6 mb-3">
+                    <div className="text-center bg-white/60 rounded-xl px-4 py-2">
+                      <div className="text-2xl font-extrabold text-danger">{redCount}</div>
+                      <div className="text-[10px] text-muted font-bold">Red</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-soil">{whiteCount}</div>
-                      <div className="text-[10px] text-muted">White</div>
+                    <div className="text-center bg-white/60 rounded-xl px-4 py-2">
+                      <div className="text-2xl font-extrabold text-soil">{whiteCount}</div>
+                      <div className="text-[10px] text-muted font-bold">White</div>
                     </div>
                   </div>
-                  <p className="text-[11px] text-muted mb-2">Based on these offspring, which allele is <strong>dominant</strong>?</p>
+                  <p className="text-[11px] text-muted mb-3 font-semibold">Which allele is <strong>dominant</strong>?</p>
                   <div className="flex gap-2">
                     <button onClick={() => interpretDominance('color', key!, 'R')}
-                      className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                      className="rounded-xl border-2 border-danger/30 px-4 py-2 text-[11px] font-bold hover:bg-danger/10 transition-colors">
                       R (Red is dominant)
                     </button>
                     <button onClick={() => interpretDominance('color', key!, 'r')}
-                      className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                      className="rounded-xl border-2 border-soil/20 px-4 py-2 text-[11px] font-bold hover:bg-soil/5 transition-colors">
                       r (White is dominant)
                     </button>
                   </div>
                 </div>
               );
             } else if (colorDisc.level !== 'unknown' && parentsHaveDiffColor) {
-              // Check if this is a test cross (one parent is dominant, one recessive)
               const domParent = pAColor >= 0.5 ? pA : pB;
               const recParent = pAColor >= 0.5 ? pB : pA;
               const recA0 = recParent.genotype.haplotypes[0].get('COLOR');
@@ -452,26 +469,26 @@ function FamilyGroupedGrid({
 
               if (isRecessiveHomozygous && !alreadyResolved && members.length >= 4) {
                 interpretPanel = (
-                  <div className="mt-1 rounded border border-leaf/40 bg-leaf/5 p-2 text-xs">
-                    <div className="font-semibold text-soil mb-1">🧪 Test cross result ({members.length} offspring): is {domParent.id} homozygous or heterozygous?</div>
-                    <div className="flex gap-4 mb-2">
-                      <div className="text-center">
-                        <div className="text-xl font-bold text-soil">{redCount}</div>
-                        <div className="text-[10px] text-muted">Red ({colorDisc.dominantAllele})</div>
+                  <div className="mt-2 rounded-xl border-2 border-leaf/40 bg-gradient-to-r from-leaf/10 to-leaf/5 p-3 text-xs shadow-sm">
+                    <div className="font-extrabold text-soil mb-2 text-sm">{'\u{1F9EA}'} Test cross result ({members.length} offspring): is {domParent.id} homozygous or heterozygous?</div>
+                    <div className="flex gap-6 mb-3">
+                      <div className="text-center bg-white/60 rounded-xl px-4 py-2">
+                        <div className="text-2xl font-extrabold text-danger">{redCount}</div>
+                        <div className="text-[10px] text-muted font-bold">Red ({colorDisc.dominantAllele})</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-xl font-bold text-soil">{whiteCount}</div>
-                        <div className="text-[10px] text-muted">White ({colorDisc.recessiveAllele}{colorDisc.recessiveAllele})</div>
+                      <div className="text-center bg-white/60 rounded-xl px-4 py-2">
+                        <div className="text-2xl font-extrabold text-soil">{whiteCount}</div>
+                        <div className="text-[10px] text-muted font-bold">White ({colorDisc.recessiveAllele}{colorDisc.recessiveAllele})</div>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => interpretTestCross('color', key!, domParent.id, 'homozygous')}
-                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                        Homozygous {colorDisc.dominantAllele}{colorDisc.dominantAllele} (all dominant offspring)
+                        className="rounded-xl border-2 border-leaf/30 px-4 py-2 text-[11px] font-bold hover:bg-leaf/10 transition-colors">
+                        Homozygous {colorDisc.dominantAllele}{colorDisc.dominantAllele}
                       </button>
                       <button onClick={() => interpretTestCross('color', key!, domParent.id, 'heterozygous')}
-                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                        Heterozygous {colorDisc.dominantAllele}{colorDisc.recessiveAllele} (segregating offspring)
+                        className="rounded-xl border-2 border-accent/30 px-4 py-2 text-[11px] font-bold hover:bg-accent/10 transition-colors">
+                        Heterozygous {colorDisc.dominantAllele}{colorDisc.recessiveAllele}
                       </button>
                     </div>
                   </div>
@@ -479,87 +496,83 @@ function FamilyGroupedGrid({
               }
             }
 
-            // ── Shape interpretation ──
+            // Shape interpretation
             if (!interpretPanel) {
               const shapeDisc = discovery.traitDiscoveries.shape;
               const pAShape = pA.phenotype.get('shape') ?? -1;
               const pBShape = pB.phenotype.get('shape') ?? -1;
-              // Parents must have different extreme phenotypes (Round vs Elongated)
               const parentShapesDiffer = (pAShape >= 1.5 && pBShape < 0.5) || (pAShape < 0.5 && pBShape >= 1.5);
 
-              // Count offspring by shape class
               const roundCount = members.filter(p => (p.phenotype.get('shape') ?? 0) >= 1.5).length;
               const ovalCount = members.filter(p => { const v = p.phenotype.get('shape') ?? 0; return v >= 0.5 && v < 1.5; }).length;
               const elongCount = members.filter(p => (p.phenotype.get('shape') ?? 0) < 0.5).length;
 
               if (shapeDisc.level === 'unknown' && parentShapesDiffer) {
                 interpretPanel = (
-                  <div className="mt-1 rounded border border-amber-500/40 bg-amber-50 p-2 text-xs">
-                    <div className="font-semibold text-soil mb-1">🔬 You crossed a round-leaved plant with an elongated-leaved plant!</div>
-                    <div className="flex gap-4 mb-2">
-                      <div className="text-center">
-                        <div className="text-xl font-bold text-soil">{roundCount}</div>
-                        <div className="text-[10px] text-muted">Round</div>
+                  <div className="mt-2 rounded-xl border-2 border-amber-400/40 bg-amber-50 p-3 text-xs shadow-sm">
+                    <div className="font-extrabold text-soil mb-2 text-sm">{'\u{1F52C}'} Round-leaved x Elongated-leaved cross!</div>
+                    <div className="flex gap-4 mb-3">
+                      <div className="text-center bg-white/60 rounded-xl px-3 py-2">
+                        <div className="text-xl font-extrabold text-soil">{roundCount}</div>
+                        <div className="text-[10px] text-muted font-bold">Round</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-xl font-bold text-soil">{ovalCount}</div>
-                        <div className="text-[10px] text-muted">Oval</div>
+                      <div className="text-center bg-white/60 rounded-xl px-3 py-2">
+                        <div className="text-xl font-extrabold text-soil">{ovalCount}</div>
+                        <div className="text-[10px] text-muted font-bold">Oval</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-xl font-bold text-soil">{elongCount}</div>
-                        <div className="text-[10px] text-muted">Elongated</div>
+                      <div className="text-center bg-white/60 rounded-xl px-3 py-2">
+                        <div className="text-xl font-extrabold text-soil">{elongCount}</div>
+                        <div className="text-[10px] text-muted font-bold">Elongated</div>
                       </div>
                     </div>
-                    <p className="text-[11px] text-muted mb-2">The offspring don't look like either parent — they're <strong>intermediate</strong>. What type of inheritance is this?</p>
+                    <p className="text-[11px] text-muted mb-3 font-semibold">The offspring are <strong>intermediate</strong>. What type of inheritance?</p>
                     <div className="flex gap-2">
                       <button onClick={() => interpretDominance('shape', key!, 'L')}
-                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                        Incomplete dominance (blending in heterozygotes)
+                        className="rounded-xl border-2 border-amber-400/40 px-4 py-2 text-[11px] font-bold hover:bg-amber-100 transition-colors">
+                        Incomplete dominance
                       </button>
                       <button onClick={() => interpretDominance('shape', key!, 'WRONG_complete')}
-                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                        Complete dominance (one trait hides the other)
+                        className="rounded-xl border-2 border-soil/20 px-4 py-2 text-[11px] font-bold hover:bg-soil/5 transition-colors">
+                        Complete dominance
                       </button>
                     </div>
                   </div>
                 );
               } else if (shapeDisc.level !== 'unknown' && parentShapesDiffer) {
-                // Shape test cross: round (L?) × elongated (ll)
                 const roundParent = pAShape >= 1.5 ? pA : pB;
                 const elongParent = pAShape >= 1.5 ? pB : pA;
                 const eA0 = elongParent.genotype.haplotypes[0].get('SHAPE');
                 const eA1 = elongParent.genotype.haplotypes[1].get('SHAPE');
                 const isElongHomozygous = eA0 === shapeDisc.recessiveAllele && eA1 === shapeDisc.recessiveAllele;
                 const alreadyResolved = discovery.resolvedGenotypes.SHAPE?.has(roundParent.id);
-                // Only offer test cross if the round parent is truly Round (LL or Ll with LL phenotype)
                 const roundParentIsRound = (roundParent.phenotype.get('shape') ?? 0) >= 1.5;
 
                 if (isElongHomozygous && !alreadyResolved && roundParentIsRound && members.length >= 4) {
                   interpretPanel = (
-                    <div className="mt-1 rounded border border-leaf/40 bg-leaf/5 p-2 text-xs">
-                      <div className="font-semibold text-soil mb-1">🧪 Test cross ({members.length} offspring): is {roundParent.id} homozygous or heterozygous for shape?</div>
-                      <div className="flex gap-4 mb-2">
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-soil">{roundCount}</div>
-                          <div className="text-[10px] text-muted">Round ({shapeDisc.dominantAllele}{shapeDisc.dominantAllele})</div>
+                    <div className="mt-2 rounded-xl border-2 border-leaf/40 bg-leaf/5 p-3 text-xs shadow-sm">
+                      <div className="font-extrabold text-soil mb-2 text-sm">{'\u{1F9EA}'} Shape test cross ({members.length} offspring)</div>
+                      <div className="flex gap-4 mb-3">
+                        <div className="text-center bg-white/60 rounded-xl px-3 py-2">
+                          <div className="text-xl font-extrabold text-soil">{roundCount}</div>
+                          <div className="text-[10px] text-muted font-bold">Round ({shapeDisc.dominantAllele}{shapeDisc.dominantAllele})</div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-soil">{ovalCount}</div>
-                          <div className="text-[10px] text-muted">Oval ({shapeDisc.dominantAllele}{shapeDisc.recessiveAllele})</div>
+                        <div className="text-center bg-white/60 rounded-xl px-3 py-2">
+                          <div className="text-xl font-extrabold text-soil">{ovalCount}</div>
+                          <div className="text-[10px] text-muted font-bold">Oval ({shapeDisc.dominantAllele}{shapeDisc.recessiveAllele})</div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-xl font-bold text-soil">{elongCount}</div>
-                          <div className="text-[10px] text-muted">Elongated ({shapeDisc.recessiveAllele}{shapeDisc.recessiveAllele})</div>
+                        <div className="text-center bg-white/60 rounded-xl px-3 py-2">
+                          <div className="text-xl font-extrabold text-soil">{elongCount}</div>
+                          <div className="text-[10px] text-muted font-bold">Elongated ({shapeDisc.recessiveAllele}{shapeDisc.recessiveAllele})</div>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => interpretTestCross('shape', key!, roundParent.id, 'homozygous')}
-                          className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                          Homozygous {shapeDisc.dominantAllele}{shapeDisc.dominantAllele} (all offspring round or oval)
+                          className="rounded-xl border-2 border-leaf/30 px-4 py-2 text-[11px] font-bold hover:bg-leaf/10 transition-colors">
+                          Homozygous {shapeDisc.dominantAllele}{shapeDisc.dominantAllele}
                         </button>
                         <button onClick={() => interpretTestCross('shape', key!, roundParent.id, 'heterozygous')}
-                          className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                          Heterozygous {shapeDisc.dominantAllele}{shapeDisc.recessiveAllele} (some elongated offspring)
+                          className="rounded-xl border-2 border-accent/30 px-4 py-2 text-[11px] font-bold hover:bg-accent/10 transition-colors">
+                          Heterozygous {shapeDisc.dominantAllele}{shapeDisc.recessiveAllele}
                         </button>
                       </div>
                     </div>
@@ -573,13 +586,13 @@ function FamilyGroupedGrid({
         return (
           <div
             key={key ?? 'ungrouped'}
-            className={`rounded border ${
-              isUngrouped ? 'border-soil/10 bg-soil/5' : 'border-soil/20 bg-white'
-            } p-2`}
+            className={`rounded-xl border-2 ${
+              isUngrouped ? 'border-soil/10 bg-dirt-row' : 'border-soil/15 bg-white/70'
+            } p-3`}
           >
             {header}
             {interpretPanel}
-            <div className="mt-1 grid grid-cols-6 gap-1 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-16">
+            <div className="mt-2 grid grid-cols-5 gap-1.5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
               {members.map((ind) => (
                 <PlantCard
                   key={ind.id}
@@ -603,15 +616,11 @@ function TraitRangeBar({
   label: string;
   stat: { n: number; min: number; max: number; mean: number; sd: number };
 }) {
-  // Determine visual scale — use a reasonable range for the trait
   const range = stat.max - stat.min;
   const cv = stat.mean > 0 ? stat.sd / stat.mean : 0;
-  // Color: tight distribution = green (uniform), wide = yellow (segregating)
   const barColor = cv < 0.08 ? 'bg-leaf' : cv < 0.15 ? 'bg-leaf/70' : cv < 0.25 ? 'bg-accent/70' : 'bg-accent';
   const barBg = cv < 0.08 ? 'bg-leaf/15' : cv < 0.15 ? 'bg-leaf/10' : cv < 0.25 ? 'bg-accent/10' : 'bg-accent/10';
 
-  // Normalize positions for the bar visualization
-  // Use a padded range so dots don't sit on edges
   const pad = range > 0 ? range * 0.1 : stat.mean * 0.05 || 1;
   const lo = stat.min - pad;
   const hi = stat.max + pad;
@@ -622,27 +631,23 @@ function TraitRangeBar({
 
   return (
     <div className="flex items-center gap-2 text-[11px]">
-      <span className="w-12 text-right text-muted shrink-0">{label}</span>
-      <span className="font-mono text-[10px] w-8 text-right text-soil shrink-0">{stat.min.toFixed(0)}</span>
-      <div className={`relative flex-1 h-3 rounded-full ${barBg} overflow-hidden`} style={{ minWidth: '4rem' }}>
-        {/* Range bar from min to max */}
+      <span className="w-12 text-right text-muted shrink-0 font-bold">{label}</span>
+      <span className="font-mono text-[10px] w-8 text-right text-soil shrink-0 font-bold">{stat.min.toFixed(0)}</span>
+      <div className={`relative flex-1 h-3.5 rounded-full ${barBg} overflow-hidden`} style={{ minWidth: '4rem' }}>
         <div
           className={`absolute top-0.5 bottom-0.5 rounded-full ${barColor} opacity-60`}
           style={{ left: `${minPct}%`, width: `${Math.max(maxPct - minPct, 1)}%` }}
         />
-        {/* Mean marker */}
         <div
           className="absolute top-0 bottom-0 w-0.5 bg-soil"
           style={{ left: `${meanPct}%` }}
         />
       </div>
-      <span className="font-mono text-[10px] w-8 text-soil shrink-0">{stat.max.toFixed(0)}</span>
-      <span className="text-[10px] text-muted shrink-0 w-24">
-        <span className="font-mono">{'\u03bc'}{stat.mean.toFixed(1)}</span>
-        {' '}
-        <span className="font-mono">{'\u03c3'}{stat.sd.toFixed(1)}</span>
+      <span className="font-mono text-[10px] w-8 text-soil shrink-0 font-bold">{stat.max.toFixed(0)}</span>
+      <span className="text-[10px] text-muted shrink-0 w-24 font-mono">
+        {'\u03bc'}{stat.mean.toFixed(1)} {'\u03c3'}{stat.sd.toFixed(1)}
       </span>
-      <span className="text-[9px] text-muted shrink-0">n={stat.n}</span>
+      <span className="text-[9px] text-muted shrink-0 font-bold">n={stat.n}</span>
     </div>
   );
 }
@@ -665,18 +670,18 @@ function NurseryStats({ nursery }: { nursery: Nursery }) {
   const families = new Set(nursery.plants.map((p) => p.familyId).filter(Boolean));
 
   return (
-    <div className="mb-2 rounded border border-soil/10 bg-white px-3 py-2 space-y-1.5">
+    <div className="mb-3 rounded-xl border border-soil/10 bg-white/60 px-3 py-2 space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wide text-muted font-semibold">Population statistics</span>
+        <span className="text-[10px] uppercase tracking-wide text-muted font-extrabold">{'\u{1F4CA}'} Population Stats</span>
         {families.size > 0 && (
-          <span className="text-[10px] text-muted">{families.size} famil{families.size > 1 ? 'ies' : 'y'}</span>
+          <span className="text-[10px] text-muted font-bold">{families.size} famil{families.size > 1 ? 'ies' : 'y'}</span>
         )}
       </div>
       {y ? (
         <TraitRangeBar label="Yield" stat={y} />
       ) : (
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="w-12 text-right text-muted">Yield</span>
+          <span className="w-12 text-right text-muted font-bold">Yield</span>
           <span className="italic text-muted">not measured</span>
         </div>
       )}
@@ -684,7 +689,7 @@ function NurseryStats({ nursery }: { nursery: Nursery }) {
         <TraitRangeBar label="Flavor" stat={f} />
       ) : (
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="w-12 text-right text-muted">Flavor</span>
+          <span className="w-12 text-right text-muted font-bold">Flavor</span>
           <span className="italic text-muted">not measured</span>
         </div>
       )}
@@ -706,15 +711,14 @@ function PhenotypePanel({
     { name: 'disease', label: 'Disease' },
   ];
   return (
-    <div className="mb-2 rounded border border-soil/10 bg-soil/5 px-2 py-1.5 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-muted">Phenotype:</span>
+    <div className="mb-3 rounded-xl border border-soil/10 bg-soil/5 px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-muted font-bold">{'\u{1F4CF}'} Measure:</span>
       {TRAITS.map((t) => {
         const unmeasured = nursery.plants.filter((p) => !p.phenotype.has(t.name)).length;
         const baseCost = MEASURE_COST[t.name] ?? 0;
         const cost1 = unmeasured * baseCost;
         const fullyMeasured = unmeasured === 0;
 
-        // Check average reps across measured plants
         const measuredPlants = nursery.plants.filter(p => p.phenotype.has(t.name));
         const avgReps = measuredPlants.length > 0
           ? measuredPlants.reduce((s, p) => s + (trialData.get(`${p.id}:${t.name}`)?.length ?? 1), 0) / measuredPlants.length
@@ -727,28 +731,30 @@ function PhenotypePanel({
             {!fullyMeasured ? (
               <button
                 onClick={() => measureTrait(nursery.id, t.name, 1)}
-                className="rounded px-2 py-1 text-[11px] bg-leaf text-white hover:bg-leaf/90"
+                className="rounded-lg px-3 py-1.5 text-[11px] font-bold bg-gradient-to-b from-leaf to-leaf-dark text-white shadow-sm hover:shadow-md transition-all"
                 title={`Quick measure: 1 rep, ${unmeasured} plants`}
               >
-                {t.label} (${ cost1})
+                {t.label} (${cost1})
               </button>
             ) : (
-              <span className="rounded px-2 py-1 text-[11px] bg-leaf/20 text-leaf">✓ {t.label}{avgReps > 1 ? ` (${avgReps.toFixed(0)} reps)` : ''}</span>
+              <span className="rounded-lg px-3 py-1.5 text-[11px] font-bold bg-leaf/15 text-leaf border border-leaf/20">
+                {'\u{2713}'} {t.label}{avgReps > 1 ? ` (${avgReps.toFixed(0)} reps)` : ''}
+              </span>
             )}
             {fullyMeasured && t.name !== 'disease' && (
               <button
                 onClick={() => measureTrait(nursery.id, t.name, 5)}
-                className="rounded px-1.5 py-1 text-[10px] border border-leaf/40 text-leaf hover:bg-leaf/10"
-                title={`Run 5-rep replicated trial on all ${nursery.plants.length} plants for more accurate measurements`}
+                className="rounded-lg px-2 py-1.5 text-[10px] font-bold border-2 border-leaf/30 text-leaf hover:bg-leaf/10 transition-colors"
+                title={`Run 5-rep replicated trial on all ${nursery.plants.length} plants`}
               >
-                +5 reps (${ cost5})
+                +5 reps (${cost5})
               </button>
             )}
           </span>
         );
       })}
-      <span className="text-[10px] text-muted ml-auto">
-        Color & shape are visible at germination — free.
+      <span className="text-[10px] text-muted ml-auto font-semibold">
+        Color & shape visible free
       </span>
     </div>
   );
@@ -764,9 +770,9 @@ function SelfPanel({
   const [count, setCount] = useState(12);
   const cost = Costs.controlledCrossFee + count * Costs.perPlant;
   return (
-    <div className="mb-2 rounded border border-leaf/40 bg-leaf/5 px-2 py-1.5 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-soil font-semibold">⊙ Self:</span>
-      <span className="font-mono text-soil">{parent.id}</span>
+    <div className="mb-3 rounded-xl border-2 border-leaf/30 bg-leaf/5 px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-soil font-extrabold">{'\u{229A}'} Self:</span>
+      <span className="font-mono text-soil font-bold">{parent.id}</span>
       <label className="flex items-center gap-1 ml-2">
         N
         <input
@@ -775,13 +781,13 @@ function SelfPanel({
           min={1}
           max={100}
           onChange={(e) => setCount(Math.max(1, Number(e.target.value) || 1))}
-          className="w-14 rounded border border-soil/30 px-2 py-0.5 font-mono"
+          className="w-14 rounded-lg border-2 border-soil/20 px-2 py-0.5 font-mono bg-white"
         />
       </label>
-      <span className="text-muted">cost ${cost}</span>
+      <span className="text-muted font-bold">${cost}</span>
       <button
         onClick={() => makeControlledCross(parent.id, parent.id, count)}
-        className="rounded bg-leaf px-3 py-1 text-[11px] font-bold text-white hover:bg-leaf/90 ml-auto"
+        className="rounded-xl bg-gradient-to-b from-leaf to-leaf-dark px-4 py-1.5 text-[11px] font-extrabold text-white shadow-sm hover:shadow-md ml-auto transition-all"
       >
         Make sib family
       </button>
@@ -801,11 +807,11 @@ function ControlledCrossPanel({
   const [count, setCount] = useState(12);
   const cost = Costs.controlledCrossFee + count * Costs.perPlant;
   return (
-    <div className="mb-2 rounded border border-accent/40 bg-accent/5 px-2 py-1.5 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-soil font-semibold">✕ Controlled cross:</span>
-      <span className="font-mono text-soil">{parentA.id}</span>
-      <span className="text-muted">×</span>
-      <span className="font-mono text-soil">{parentB.id}</span>
+    <div className="mb-3 rounded-xl border-2 border-accent/30 bg-accent/5 px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-soil font-extrabold">{'\u{2715}'} Cross:</span>
+      <span className="font-mono text-soil font-bold">{parentA.id}</span>
+      <span className="text-muted font-bold">&times;</span>
+      <span className="font-mono text-soil font-bold">{parentB.id}</span>
       <label className="flex items-center gap-1 ml-2">
         N
         <input
@@ -814,13 +820,13 @@ function ControlledCrossPanel({
           min={1}
           max={100}
           onChange={(e) => setCount(Math.max(1, Number(e.target.value) || 1))}
-          className="w-14 rounded border border-soil/30 px-2 py-0.5 font-mono"
+          className="w-14 rounded-lg border-2 border-soil/20 px-2 py-0.5 font-mono bg-white"
         />
       </label>
-      <span className="text-muted">cost ${cost}</span>
+      <span className="text-muted font-bold">${cost}</span>
       <button
         onClick={() => makeControlledCross(parentA.id, parentB.id, count)}
-        className="rounded bg-accent px-3 py-1 text-[11px] font-bold text-white hover:bg-accent/90 ml-auto"
+        className="rounded-xl bg-gradient-to-b from-accent to-accent/90 px-4 py-1.5 text-[11px] font-extrabold text-white shadow-sm hover:shadow-md ml-auto transition-all"
       >
         Make F1 family
       </button>
@@ -857,36 +863,36 @@ function HybridReleasePanel({
     : null;
 
   return (
-    <div className="mb-2 rounded border border-sky/40 bg-sky/5 px-2 py-1.5 text-xs">
+    <div className="mb-3 rounded-xl border-2 border-sky/40 bg-gradient-to-r from-sky-light/20 to-sky/5 px-3 py-2 text-xs shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-soil font-semibold">🌽 Release as F1 hybrid:</span>
-        <span className="font-mono text-soil">{parentA.id}</span>
-        <span className="text-muted">×</span>
-        <span className="font-mono text-soil">{parentB.id}</span>
+        <span className="text-soil font-extrabold">{'\u{1F33D}'} Release as F1 hybrid:</span>
+        <span className="font-mono text-soil font-bold">{parentA.id}</span>
+        <span className="text-muted font-bold">&times;</span>
+        <span className="font-mono text-soil font-bold">{parentB.id}</span>
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted">
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted">
         {predictedYield != null && (
-          <span>Predicted yield: <span className="font-mono font-semibold text-soil">{predictedYield.toFixed(1)}</span></span>
+          <span className="bg-white/60 rounded-lg px-2 py-1">Yield: <span className="font-mono font-extrabold text-soil">{predictedYield.toFixed(1)}</span></span>
         )}
         {predictedFlavor != null && (
-          <span>Flavor: <span className="font-mono font-semibold text-soil">{predictedFlavor.toFixed(1)}</span></span>
+          <span className="bg-white/60 rounded-lg px-2 py-1">Flavor: <span className="font-mono font-extrabold text-soil">{predictedFlavor.toFixed(1)}</span></span>
         )}
         {heterosis != null && (
-          <span className={heterosis > 0 ? 'text-leaf font-semibold' : 'text-danger'}>
+          <span className={`font-bold rounded-lg px-2 py-1 ${heterosis > 0 ? 'text-leaf bg-leaf/10' : 'text-danger bg-danger/10'}`}>
             Heterosis: {heterosis > 0 ? '+' : ''}{heterosis.toFixed(1)}%
           </span>
         )}
-        <span>Fee: ${Costs.hybridReleaseFee} + ${Costs.hybridMaintenanceCost}/season</span>
+        <span className="font-semibold">${Costs.hybridReleaseFee} + ${Costs.hybridMaintenanceCost}/season</span>
       </div>
-      <div className="mt-1.5 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2">
         <button
           onClick={() => releaseHybrid(parentA.id, parentB.id)}
-          className="rounded bg-sky px-3 py-1 text-[11px] font-bold text-white hover:bg-sky/90"
+          className="rounded-xl bg-gradient-to-b from-sky to-sky/80 px-4 py-1.5 text-[11px] font-extrabold text-white shadow-sm hover:shadow-md transition-all"
         >
-          🌽 Release hybrid (${Costs.hybridReleaseFee})
+          {'\u{1F33D}'} Release hybrid (${Costs.hybridReleaseFee})
         </button>
-        <span className="text-[10px] text-muted">
-          Tip: inbred parents produce uniform F1 seed. Heterozygous parents → variable seed lot.
+        <span className="text-[10px] text-muted font-semibold">
+          Inbred parents = uniform F1 seed
         </span>
       </div>
     </div>

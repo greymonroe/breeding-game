@@ -4,9 +4,7 @@ import { useGame } from '../game/state';
 interface HintConfig {
   id: string;
   text: string;
-  /** Return true to show this hint */
   condition: (state: ReturnType<typeof useGameSnapshot>) => boolean;
-  /** Higher priority hints show first (default 0). */
   priority?: number;
 }
 
@@ -23,7 +21,6 @@ function useGameSnapshot() {
 }
 
 const HINTS: HintConfig[] = [
-  // ── Season 0: Getting started ──
   {
     id: 'welcome',
     text: 'You have 10 founder plants with hidden genetics. Your goal: breed better varieties and release them to earn money. Start by clicking on 2\u20134 plants to select them as parents.',
@@ -42,15 +39,12 @@ const HINTS: HintConfig[] = [
     condition: (s) => {
       if (s.season !== 0) return false;
       if (s.selectedIds.length < 1) return false;
-      // Check if selected plants are all the same color
       const plants = s.nurseries.flatMap(n => n.plants);
       const selected = plants.filter(p => s.selectedIds.includes(p.id));
       const colors = selected.map(p => (p.phenotype.get('color') ?? 0) >= 0.5);
       return colors.length >= 2 && colors.every(c => c === colors[0]);
     },
   },
-
-  // ── Season 1+: Measure and observe ──
   {
     id: 'measure_yield',
     text: 'Use the "Measure Yield" button to see which plants perform best. Yield determines variety income \u2014 you need to know it before releasing.',
@@ -64,15 +58,13 @@ const HINTS: HintConfig[] = [
   },
   {
     id: 'look_at_families',
-    text: 'Your offspring are grouped by parent pair. Look at each family \u2014 do all siblings look the same, or are some red and some white? Scroll down to see interpretation panels on interesting families.',
+    text: 'Your offspring are grouped by parent pair. Look at each family \u2014 do all siblings look the same, or are some red and some white? Look for blue interpretation panels on interesting families.',
     condition: (s) => s.season === 1 && s.discovery.traitDiscoveries.color.level === 'unknown',
     priority: 3,
   },
-
-  // ── Discovery nudges ──
   {
     id: 'color_not_discovered',
-    text: 'You\'ve bred several generations but haven\'t discovered how color is inherited yet. Make sure to cross a red plant with a white plant \u2014 look for the blue interpretation panel on those families.',
+    text: 'You\'ve bred several generations but haven\'t discovered how color is inherited yet. Make sure to cross a red plant with a white plant \u2014 look for the blue interpretation panel.',
     condition: (s) => s.season >= 3 && s.discovery.traitDiscoveries.color.level === 'unknown',
   },
   {
@@ -80,8 +72,6 @@ const HINTS: HintConfig[] = [
     text: 'You haven\'t released any varieties yet! Select your best plant and click "Release ($20)" to start earning income. But watch out \u2014 releasing a plant that isn\'t true-breeding will hurt farmer trust.',
     condition: (s) => s.season >= 4 && s.releases.length === 0,
   },
-
-  // ── Economic hints ──
   {
     id: 'trust_drop',
     text: 'Your variety is segregating in farmers\u2019 fields \u2014 trust is dropping. Self a plant several generations before releasing to improve uniformity.',
@@ -127,7 +117,6 @@ export function ContextualHints() {
     }, 400);
   }, []);
 
-  // Re-evaluate when snapshot changes (reactive via render)
   void snapshot;
 
   const activeHints = HINTS.filter(
@@ -140,21 +129,21 @@ export function ContextualHints() {
   if (activeHints.length === 0 && fadingHints.length === 0) return null;
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {[...activeHints, ...fadingHints].slice(0, 2).map((hint) => (
         <div
           key={hint.id}
-          className={`flex items-start gap-2 rounded-lg border border-sky/40 bg-sky/10 px-3 py-2 text-xs text-soil transition-opacity duration-400 ${
+          className={`flex items-start gap-3 rounded-xl border-2 border-sky/30 bg-gradient-to-r from-sky-light/20 to-sky/5 px-4 py-3 text-xs text-soil transition-opacity duration-400 shadow-sm ${
             fading.has(hint.id) ? 'opacity-0' : 'opacity-100'
           }`}
         >
-          <span className="text-sky font-bold text-sm leading-none mt-0.5">i</span>
-          <span className="flex-1">{hint.text}</span>
+          <span className="text-sky font-extrabold text-base leading-none mt-0.5">{'\u{1F4A1}'}</span>
+          <span className="flex-1 font-semibold">{hint.text}</span>
           <button
             onClick={() => dismiss(hint.id)}
-            className="text-muted hover:text-soil text-sm leading-none"
+            className="text-muted hover:text-soil text-lg leading-none font-bold"
           >
-            x
+            &times;
           </button>
         </div>
       ))}
