@@ -192,6 +192,52 @@ function NurserySection({
           <NurseryStats nursery={nursery} />
           <PhenotypePanel nursery={nursery} measureTrait={measureTrait} />
 
+          {/* Nursery-level linkage observation */}
+          {discovery.traitDiscoveries.color.level !== 'unknown' && discovery.linkages.length === 0 && (() => {
+            const withYield = nursery.plants.filter(p => p.phenotype.has('yield'));
+            const reds = withYield.filter(p => (p.phenotype.get('color') ?? 0) >= 0.5);
+            const whites = withYield.filter(p => (p.phenotype.get('color') ?? 0) < 0.5);
+            if (reds.length < 5 || whites.length < 5) return null;
+            const meanRed = reds.reduce((s, p) => s + p.phenotype.get('yield')!, 0) / reds.length;
+            const meanWhite = whites.reduce((s, p) => s + p.phenotype.get('yield')!, 0) / whites.length;
+            const diff = meanRed - meanWhite;
+            if (diff < 2) return null; // not a strong enough signal
+            return (
+              <div className="mb-2 rounded border border-purple-500/40 bg-purple-50 p-3 text-xs">
+                <div className="font-semibold text-soil mb-1">🔗 Population pattern: color and yield seem correlated</div>
+                <div className="flex gap-8 mb-2">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-soil">{meanRed.toFixed(1)}</div>
+                    <div className="text-[10px] text-muted">Mean yield — Red (n={reds.length})</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-soil">{meanWhite.toFixed(1)}</div>
+                    <div className="text-[10px] text-muted">Mean yield — White (n={whites.length})</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-accent">{diff > 0 ? '+' : ''}{diff.toFixed(1)}</div>
+                    <div className="text-[10px] text-muted">Difference</div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted mb-2">Across your whole nursery, red plants consistently out-yield white plants. Why would flower color be associated with yield?</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => interpretLinkage('pleiotropy')}
+                    className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                    Pleiotropy (color gene directly affects yield)
+                  </button>
+                  <button onClick={() => interpretLinkage('linkage')}
+                    className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-purple-100">
+                    Linkage (color and yield genes are near each other on the chromosome)
+                  </button>
+                  <button onClick={() => interpretLinkage('coincidence')}
+                    className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
+                    Coincidence (random noise)
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {selectedHere.length === 1 && (
             <SelfPanel parent={selectedHere[0]} makeControlledCross={makeControlledCross} />
           )}
@@ -260,7 +306,6 @@ function NurserySection({
             discovery={discovery}
             interpretDominance={interpretDominance}
             interpretTestCross={interpretTestCross}
-            interpretLinkage={interpretLinkage}
           />
         </>
       )}
@@ -276,7 +321,6 @@ function FamilyGroupedGrid({
   discovery,
   interpretDominance,
   interpretTestCross,
-  interpretLinkage,
 }: {
   plants: Individual[];
   archive: Map<string, Individual>;
@@ -285,7 +329,6 @@ function FamilyGroupedGrid({
   discovery: import('../game/discovery').DiscoveryState;
   interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
   interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
-  interpretLinkage: (answer: 'linkage' | 'pleiotropy' | 'coincidence') => boolean;
 }) {
   // Group by familyId; collect ungrouped under null
   const groups = new Map<string | null, Individual[]>();
@@ -429,54 +472,6 @@ function FamilyGroupedGrid({
                       <button onClick={() => interpretTestCross('color', key!, domParent.id, 'heterozygous')}
                         className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
                         Heterozygous {colorDisc.dominantAllele}{colorDisc.recessiveAllele} (segregating offspring)
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-            }
-
-            // ── Linkage interpretation ──
-            // Show on segregating families (both parents Rr or both have same color)
-            // where color dominance is known but linkage is not yet discovered
-            if (!interpretPanel && colorDisc.level !== 'unknown' && discovery.linkages.length === 0) {
-              // Both parents must be Rr (het) so offspring segregate for color
-              const pADom = pAColor >= 0.5;
-              const pBDom = pBColor >= 0.5;
-              // Segregating family: both parents red (at least one Rr) and offspring have both red and white
-              if (pADom && pBDom && redCount > 0 && whiteCount > 0 && members.length >= 10) {
-                // Calculate mean yield by color class
-                const redPlants = members.filter(p => (p.phenotype.get('color') ?? 0) >= 0.5);
-                const whitePlants = members.filter(p => (p.phenotype.get('color') ?? 0) < 0.5);
-                const meanRedYield = redPlants.reduce((s, p) => s + (p.phenotype.get('yield') ?? 0), 0) / redPlants.length;
-                const meanWhiteYield = whitePlants.reduce((s, p) => s + (p.phenotype.get('yield') ?? 0), 0) / whitePlants.length;
-
-                interpretPanel = (
-                  <div className="mt-1 rounded border border-purple-500/40 bg-purple-50 p-2 text-xs">
-                    <div className="font-semibold text-soil mb-1">🔗 Strange pattern: color and yield seem correlated in this family</div>
-                    <div className="flex gap-6 mb-2">
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-soil">{meanRedYield.toFixed(1)}</div>
-                        <div className="text-[10px] text-muted">Mean yield (Red, n={redPlants.length})</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-soil">{meanWhiteYield.toFixed(1)}</div>
-                        <div className="text-[10px] text-muted">Mean yield (White, n={whitePlants.length})</div>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-muted mb-2">Red offspring yield more than white offspring. Why would flower color be associated with yield?</p>
-                    <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => interpretLinkage('pleiotropy')}
-                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                        Pleiotropy (color gene directly affects yield)
-                      </button>
-                      <button onClick={() => interpretLinkage('linkage')}
-                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                        Linkage (color and yield genes are near each other on the chromosome)
-                      </button>
-                      <button onClick={() => interpretLinkage('coincidence')}
-                        className="rounded border border-soil/30 px-3 py-1 text-[11px] hover:bg-soil/5">
-                        Coincidence (just random noise)
                       </button>
                     </div>
                   </div>
