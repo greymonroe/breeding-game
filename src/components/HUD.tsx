@@ -10,6 +10,11 @@ export function HUD() {
   const trustBg = trust >= 0.8 ? 'bg-leaf' : trust >= 0.5 ? 'bg-accent' : 'bg-danger';
   const cashColor = budget.cash < 50 ? 'text-danger' : 'text-soil';
 
+  // Show "?" if yield hasn't been measured (meanYield is 0 or very close)
+  const yieldMeasured = stat.meanYield > 1;
+  const yieldDisplay = yieldMeasured ? stat.meanYield.toFixed(1) : '?';
+  const yieldColor = !yieldMeasured ? 'text-accent' : undefined;
+
   return (
     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
       <HudStat icon={'\u{2600}'} label="Season" value={`${season}`} />
@@ -18,7 +23,8 @@ export function HUD() {
       <HudStat
         icon={'\u{1F4C8}'}
         label="Yield"
-        value={`${stat.meanYield.toFixed(1)}`}
+        value={yieldDisplay}
+        valueClass={yieldColor}
         sub={`mkt ${marketBaseline.toFixed(1)}`}
       />
       <div className="rounded-xl border border-soil/15 bg-white/80 px-3 py-1.5">

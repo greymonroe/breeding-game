@@ -710,6 +710,63 @@ function PhenotypePanel({
     { name: 'flavor', label: 'Flavor' },
     { name: 'disease', label: 'Disease' },
   ];
+
+  // Check if yield is unmeasured — show big CTA
+  const yieldUnmeasured = nursery.plants.some(p => !p.phenotype.has('yield'));
+  const yieldCost = nursery.plants.filter(p => !p.phenotype.has('yield')).length * (MEASURE_COST['yield'] ?? 0);
+
+  if (yieldUnmeasured && nursery.plants.length > 0) {
+    return (
+      <div className="mb-3 space-y-2">
+        {/* Big yield CTA */}
+        <div className="rounded-xl border-2 border-accent/50 bg-gradient-to-r from-accent/15 to-accent/5 px-4 py-3 animate-slide-up">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{'\u{1F4CF}'}</span>
+            <div className="flex-1">
+              <div className="font-extrabold text-soil text-sm">Measure your plants!</div>
+              <div className="text-[11px] text-muted font-semibold">
+                You need to know yield & flavor before you can select the best parents or release a variety.
+              </div>
+            </div>
+            <button
+              onClick={() => measureTrait(nursery.id, 'yield', 1)}
+              className="rounded-xl bg-gradient-to-b from-accent to-accent/90 px-5 py-2.5 text-sm font-extrabold text-white shadow-game hover:shadow-game-lg transition-all border border-accent/50 animate-pulse-glow"
+            >
+              {'\u{1F4CF}'} Measure Yield (${yieldCost})
+            </button>
+          </div>
+        </div>
+        {/* Secondary measure buttons */}
+        <div className="rounded-xl border border-soil/10 bg-soil/5 px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted font-bold">Also measure:</span>
+          {TRAITS.filter(t => t.name !== 'yield').map((t) => {
+            const unmeasured = nursery.plants.filter((p) => !p.phenotype.has(t.name)).length;
+            const baseCost = MEASURE_COST[t.name] ?? 0;
+            const cost1 = unmeasured * baseCost;
+            const fullyMeasured = unmeasured === 0;
+            return (
+              <span key={t.name} className="inline-flex items-center gap-1">
+                {!fullyMeasured ? (
+                  <button
+                    onClick={() => measureTrait(nursery.id, t.name, 1)}
+                    className="rounded-lg px-3 py-1.5 text-[11px] font-bold bg-gradient-to-b from-leaf to-leaf-dark text-white shadow-sm hover:shadow-md transition-all"
+                  >
+                    {t.label} (${cost1})
+                  </button>
+                ) : (
+                  <span className="rounded-lg px-3 py-1.5 text-[11px] font-bold bg-leaf/15 text-leaf border border-leaf/20">
+                    {'\u{2713}'} {t.label}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+          <span className="text-[10px] text-muted ml-auto font-semibold">Color & shape visible free</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-3 rounded-xl border border-soil/10 bg-soil/5 px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
       <span className="text-muted font-bold">{'\u{1F4CF}'} Measure:</span>
