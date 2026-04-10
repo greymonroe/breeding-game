@@ -450,10 +450,10 @@ function FamilyGroupedGrid({
               const isRecessiveHomozygous = recA0 === colorDisc.recessiveAllele && recA1 === colorDisc.recessiveAllele;
               const alreadyResolved = discovery.resolvedGenotypes.COLOR?.has(domParent.id);
 
-              if (isRecessiveHomozygous && !alreadyResolved) {
+              if (isRecessiveHomozygous && !alreadyResolved && members.length >= 6) {
                 interpretPanel = (
                   <div className="mt-1 rounded border border-leaf/40 bg-leaf/5 p-2 text-xs">
-                    <div className="font-semibold text-soil mb-1">🧪 Test cross result: is {domParent.id} homozygous or heterozygous?</div>
+                    <div className="font-semibold text-soil mb-1">🧪 Test cross result ({members.length} offspring): is {domParent.id} homozygous or heterozygous?</div>
                     <div className="flex gap-4 mb-2">
                       <div className="text-center">
                         <div className="text-xl font-bold text-soil">{redCount}</div>
@@ -534,10 +534,10 @@ function FamilyGroupedGrid({
                 // Only offer test cross if the round parent is truly Round (LL or Ll with LL phenotype)
                 const roundParentIsRound = (roundParent.phenotype.get('shape') ?? 0) >= 1.5;
 
-                if (isElongHomozygous && !alreadyResolved && roundParentIsRound) {
+                if (isElongHomozygous && !alreadyResolved && roundParentIsRound && members.length >= 6) {
                   interpretPanel = (
                     <div className="mt-1 rounded border border-leaf/40 bg-leaf/5 p-2 text-xs">
-                      <div className="font-semibold text-soil mb-1">🧪 Test cross: is {roundParent.id} homozygous or heterozygous for shape?</div>
+                      <div className="font-semibold text-soil mb-1">🧪 Test cross ({members.length} offspring): is {roundParent.id} homozygous or heterozygous for shape?</div>
                       <div className="flex gap-4 mb-2">
                         <div className="text-center">
                           <div className="text-xl font-bold text-soil">{roundCount}</div>
