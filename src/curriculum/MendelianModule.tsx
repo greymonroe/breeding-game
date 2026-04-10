@@ -3,209 +3,29 @@
  *
  * A self-contained learning experience where students discover
  * transmission genetics through hypothesis testing. Each experiment
- * builds on the last, from one gene → quantitative traits.
+ * builds on the last, from one gene to quantitative traits.
  *
  * Experiment flow:
- *  1. One Gene — cross red × white, observe 3:1, deduce dominance
+ *  1. One Gene — cross red x white, observe 3:1, deduce dominance
  *  2. Genotype Prediction — predict offspring from known genotypes
- *  3. Incomplete Dominance — red × white → pink, different from #1
+ *  3. Incomplete Dominance — red x white -> pink, different from #1
  *  4. Test Cross — determine if red is RR or Rr
  *  5. Two Genes — dihybrid cross, independent assortment, 9:3:3:1
  *  6. Epistasis — coat color, modified ratios (9:3:4)
- *  7. Polygenic → Quantitative — 1,2,5,10 genes → continuous distribution
+ *  7. Polygenic -> Quantitative — 1,2,5,10 genes -> continuous distribution
  */
 
 import { useState, useCallback, useMemo } from 'react';
 import {
-  cross, makeOrganism, getPhenotype, getPhenotypeLabel, getGenotypeLabel,
-  getAdditiveValue, getEpistasisPhenotype, makeAdditiveGene,
+  cross, makeOrganism, getAdditiveValue, makeAdditiveGene,
   FLOWER_COLOR, FLOWER_COLOR_INCOMPLETE, SEED_SHAPE,
   PIGMENT_GENE, AGOUTI_GENE,
-  type GeneDefinition, type Organism, type CrossResult,
+  type CrossResult,
 } from './genetics-engine';
-import { OrganismIcon } from '../shared/icons';
-
-// ── Shared Components ───────────────────────────────────────────────────
-
-function OrganismCard({
-  org, genes, label, size = 'md', showGenotype = false, epistasis = false,
-  onClick, selected = false,
-}: {
-  org: Organism; genes: GeneDefinition[]; label?: string; size?: 'sm' | 'md';
-  showGenotype?: boolean; epistasis?: boolean; onClick?: () => void; selected?: boolean;
-}) {
-  const pheno = getPhenotype(org, genes);
-  const mainGene = genes[0];
-  let displayColor = mainGene.colorMap[pheno[mainGene.id]] ?? '#ccc';
-  let displayLabel = getPhenotypeLabel(org, genes);
-
-  if (epistasis) {
-    const ep = getEpistasisPhenotype(org, PIGMENT_GENE, AGOUTI_GENE);
-    displayLabel = ep;
-    displayColor = ep === 'Albino' ? '#f5f0e0' : ep === 'Agouti' ? '#a08060' : '#3a2820';
-  }
-
-  const px = size === 'sm' ? 'p-1.5' : 'p-2';
-
-  return (
-    <div
-      onClick={onClick}
-      className={`inline-flex flex-col items-center gap-1 rounded-lg border-2 ${px} transition-all
-        ${selected ? 'border-amber-500 bg-amber-50 shadow-md' : 'border-stone-200 bg-white'}
-        ${onClick ? 'cursor-pointer hover:border-amber-300' : ''}`}
-    >
-      <OrganismIcon type={epistasis ? 'mouse' : 'plant'} color={displayColor} size={size} />
-      {genes.length > 1 && !epistasis && (
-        <div className="flex gap-0.5">
-          {genes.slice(1).map(g => (
-            <div key={g.id} className="w-4 h-4 rounded-sm border border-stone-200"
-              style={{ backgroundColor: g.colorMap[pheno[g.id]] ?? '#ccc' }} />
-          ))}
-        </div>
-      )}
-      <div className="text-[9px] text-stone-500 font-semibold text-center leading-tight">
-        {displayLabel}
-      </div>
-      {showGenotype && (
-        <div className="text-[10px] font-mono text-stone-600 bg-stone-100 rounded px-1">
-          {getGenotypeLabel(org, genes)}
-        </div>
-      )}
-      {label && <div className="text-[9px] text-stone-400">{label}</div>}
-    </div>
-  );
-}
-
-function RatioBar({ counts, colorMap, genes, epistasis = false }: {
-  counts: Record<string, number>; colorMap?: Record<string, string>;
-  genes?: GeneDefinition[]; epistasis?: boolean;
-}) {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  if (total === 0) return null;
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-
-  function getColor(label: string): string {
-    if (colorMap && colorMap[label]) return colorMap[label];
-    if (epistasis) {
-      if (label === 'Albino') return '#f5f0e0';
-      if (label === 'Agouti') return '#a08060';
-      if (label === 'Black') return '#3a2820';
-    }
-    if (genes && genes.length > 0) {
-      // Use first gene's color for simple cases
-      return genes[0].colorMap[label] ?? '#999';
-    }
-    return '#999';
-  }
-
-  return (
-    <div className="space-y-1">
-      <div className="flex h-6 rounded-full overflow-hidden border border-stone-200">
-        {entries.map(([label, count]) => (
-          <div key={label} style={{
-            width: `${(count / total) * 100}%`,
-            backgroundColor: getColor(label),
-          }} className="relative group" title={`${label}: ${count}`}>
-            {(count / total) > 0.1 && (
-              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-sm">
-                {count}
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-3 justify-center flex-wrap">
-        {entries.map(([label, count]) => (
-          <div key={label} className="flex items-center gap-1 text-[10px]">
-            <span className="w-2.5 h-2.5 rounded-sm border border-stone-200"
-              style={{ backgroundColor: getColor(label) }} />
-            <span className="text-stone-600 font-semibold">{label}: {count}</span>
-            <span className="text-stone-400">({((count / total) * 100).toFixed(0)}%)</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function QuestionPanel({ question, children, correct, feedback }: {
-  question: string; children: React.ReactNode;
-  correct?: boolean | null; feedback?: string;
-}) {
-  return (
-    <div className={`rounded-xl border-2 p-4 space-y-3 ${
-      correct === true ? 'border-emerald-400 bg-emerald-50' :
-      correct === false ? 'border-red-300 bg-red-50' :
-      'border-sky-300 bg-sky-50'
-    }`}>
-      <p className="text-sm font-semibold text-stone-700">{question}</p>
-      {children}
-      {feedback && (
-        <div className={`text-sm rounded-lg p-3 ${
-          correct ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-        }`}>
-          {feedback}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CrossWorkbench({
-  parentA, parentB, genes, onCross, crossResult, sampleSize = 100,
-  showGenotypes = false, epistasis = false, label,
-}: {
-  parentA: Organism; parentB: Organism; genes: GeneDefinition[];
-  onCross: (result: CrossResult) => void; crossResult: CrossResult | null;
-  sampleSize?: number; showGenotypes?: boolean; epistasis?: boolean; label?: string;
-}) {
-  const doCross = useCallback(() => {
-    const result = cross(parentA, parentB, genes, sampleSize);
-    onCross(result);
-  }, [parentA, parentB, genes, sampleSize, onCross]);
-
-  // For epistasis, recompute phenotype counts
-  let displayCounts = crossResult?.phenotypeCounts ?? {};
-  if (epistasis && crossResult) {
-    displayCounts = {};
-    for (const off of crossResult.offspring) {
-      const ep = getEpistasisPhenotype(off, PIGMENT_GENE, AGOUTI_GENE);
-      displayCounts[ep] = (displayCounts[ep] ?? 0) + 1;
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      {label && <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">{label}</div>}
-      <div className="flex items-center justify-center gap-4">
-        <OrganismCard org={parentA} genes={genes} label="Parent 1"
-          showGenotype={showGenotypes} epistasis={epistasis} />
-        <span className="text-2xl font-bold text-stone-400">&times;</span>
-        <OrganismCard org={parentB} genes={genes} label="Parent 2"
-          showGenotype={showGenotypes} epistasis={epistasis} />
-        <button onClick={doCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-emerald-600 transition-all">
-          Cross!
-        </button>
-      </div>
-      {crossResult && (
-        <div className="space-y-3">
-          <div className="text-xs text-stone-500 font-semibold text-center">
-            {crossResult.total} offspring produced
-          </div>
-          <RatioBar counts={displayCounts} genes={genes} epistasis={epistasis} />
-          {showGenotypes && (
-            <div className="text-xs text-stone-400 text-center font-mono">
-              Genotypes: {Object.entries(crossResult.genotypeCounts)
-                .sort((a, b) => b[1] - a[1])
-                .map(([g, c]) => `${g}:${c}`).join('  ')}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+import {
+  ModuleShell, QuestionPanel, CrossWorkbench, HistogramChart,
+  type ModuleDefinition,
+} from './components';
 
 // ── Experiments ──────────────────────────────────────────────────────────
 
@@ -746,26 +566,10 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
 
       {histogram && (
         <div className="space-y-3">
-          <div className="text-xs font-semibold text-stone-500 text-center">
-            F2 Distribution — Trait Value (sum of favorable alleles)
-          </div>
-          <div className="flex items-end gap-px h-40 px-2">
-            {histogram.map((count, i) => {
-              const maxCount = Math.max(...histogram);
-              const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
-              const intensity = i / (histogram.length - 1);
-              const color = `rgb(${Math.round(45 + 160 * (1 - intensity))}, ${Math.round(106 + 80 * intensity)}, ${Math.round(79 + 40 * intensity)})`;
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                  <div className="text-[8px] text-stone-400 font-mono">{count > 0 ? count : ''}</div>
-                  <div className="w-full rounded-t-sm" style={{
-                    height: `${height}%`, backgroundColor: color, minHeight: count > 0 ? 2 : 0,
-                  }} />
-                  <div className="text-[8px] text-stone-500 font-mono">{i}</div>
-                </div>
-              );
-            })}
-          </div>
+          <HistogramChart
+            bins={histogram}
+            title="F2 Distribution — Trait Value (sum of favorable alleles)"
+          />
           <div className="text-center text-xs text-stone-400">Trait value →</div>
 
           {nGenes >= 5 && (
@@ -793,7 +597,7 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// ── Main Module Component ───────────────────────────────────────────────
+// ── Module definition ───────────────────────────────────────────────────
 
 const EXPERIMENTS = [
   { id: 'one_gene', title: '1. One Gene', subtitle: 'Discover dominance and the 3:1 ratio', Component: Exp1_OneGene },
@@ -805,115 +609,15 @@ const EXPERIMENTS = [
   { id: 'quantitative', title: '7. Many Genes', subtitle: 'From Mendelian to quantitative', Component: Exp7_Quantitative },
 ];
 
+const MENDELIAN_MODULE: ModuleDefinition = {
+  id: 'mendelian',
+  title: 'Transmission Genetics',
+  subtitle: 'Project 1: Mendelian Inheritance',
+  color: 'emerald',
+  backLink: { href: '/breeding-game/', label: '← Back to Game' },
+  experiments: EXPERIMENTS,
+};
+
 export default function MendelianModule() {
-  const [currentExp, setCurrentExp] = useState(0);
-  const [completed, setCompleted] = useState<Set<number>>(() => new Set());
-
-  const handleComplete = useCallback(() => {
-    setCompleted(prev => new Set(prev).add(currentExp));
-    // Auto-advance after a delay
-    setTimeout(() => {
-      if (currentExp < EXPERIMENTS.length - 1) {
-        setCurrentExp(currentExp + 1);
-      }
-    }, 1000);
-  }, [currentExp]);
-
-  const exp = EXPERIMENTS[currentExp];
-
-  return (
-    <div className="min-h-screen bg-stone-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-emerald-800 to-emerald-700 text-white px-6 py-4 shadow-lg">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Transmission Genetics</h1>
-            <p className="text-emerald-200 text-xs mt-0.5">Project 1: Mendelian Inheritance</p>
-          </div>
-          <a href="/breeding-game/" className="text-emerald-200 text-xs hover:text-white underline">
-            ← Back to Game
-          </a>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 py-6 flex gap-6">
-        {/* Sidebar — experiment list */}
-        <nav className="w-52 shrink-0 hidden md:block">
-          <div className="sticky top-6 space-y-1">
-            {EXPERIMENTS.map((e, i) => {
-              const isCompleted = completed.has(i);
-              const isCurrent = i === currentExp;
-              const isLocked = i > 0 && !completed.has(i - 1) && !isCurrent;
-              return (
-                <button key={e.id}
-                  onClick={() => !isLocked && setCurrentExp(i)}
-                  disabled={isLocked}
-                  className={`w-full text-left rounded-lg px-3 py-2 text-xs transition-all ${
-                    isCurrent ? 'bg-emerald-100 border-2 border-emerald-400 font-bold text-emerald-800' :
-                    isCompleted ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' :
-                    isLocked ? 'text-stone-300 cursor-not-allowed' :
-                    'text-stone-500 hover:bg-stone-100'
-                  }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">
-                      {isCompleted ? '\u2705' : isLocked ? '\u{1F512}' : '\u{25CB}'}
-                    </span>
-                    <div>
-                      <div className="font-semibold">{e.title}</div>
-                      <div className="text-[10px] text-stone-400">{e.subtitle}</div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-
-        {/* Main content */}
-        <main className="flex-1 min-w-0">
-          {/* Mobile experiment selector */}
-          <div className="md:hidden flex gap-1 overflow-x-auto pb-3 mb-4">
-            {EXPERIMENTS.map((e, i) => {
-              const isCompleted = completed.has(i);
-              const isLocked = i > 0 && !completed.has(i - 1) && i !== currentExp;
-              return (
-                <button key={e.id}
-                  onClick={() => !isLocked && setCurrentExp(i)}
-                  disabled={isLocked}
-                  className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all ${
-                    i === currentExp ? 'bg-emerald-500 text-white' :
-                    isCompleted ? 'bg-emerald-100 text-emerald-700' :
-                    isLocked ? 'bg-stone-100 text-stone-300' :
-                    'bg-stone-100 text-stone-500'
-                  }`}>
-                  {isCompleted ? '\u2705' : ''} {e.title}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Experiment card */}
-          <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
-            <div className="mb-6">
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-bold text-stone-800">{exp.title}</h2>
-                {completed.has(currentExp) && (
-                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
-                    Complete
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-stone-500 mt-0.5">{exp.subtitle}</p>
-            </div>
-            <exp.Component key={exp.id} onComplete={handleComplete} />
-          </div>
-
-          {/* Progress */}
-          <div className="mt-6 text-center text-xs text-stone-400">
-            {completed.size} / {EXPERIMENTS.length} experiments completed
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+  return <ModuleShell module={MENDELIAN_MODULE} />;
 }
