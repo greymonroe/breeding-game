@@ -352,17 +352,32 @@ function FamilyGroupedGrid({
   interpretDominance: (traitName: string, familyId: string, dominantAllele: string) => boolean;
   interpretTestCross: (traitName: string, familyId: string, targetIndId: string, answer: 'homozygous' | 'heterozygous') => boolean;
 }) {
-  const groups = new Map<string | null, Individual[]>();
+  const rawGroups = new Map<string | null, Individual[]>();
   for (const p of plants) {
     const key = p.familyId ?? null;
-    const arr = groups.get(key) ?? [];
+    const arr = rawGroups.get(key) ?? [];
     arr.push(p);
-    groups.set(key, arr);
+    rawGroups.set(key, arr);
+  }
+  // Merge tiny families (<3 members) into a "mixed" group to reduce clutter
+  const groups = new Map<string | null, Individual[]>();
+  const MIXED_KEY = '__mixed__';
+  for (const [key, members] of rawGroups) {
+    if (key != null && members.length < 3) {
+      const mixed = groups.get(MIXED_KEY) ?? [];
+      mixed.push(...members);
+      groups.set(MIXED_KEY, mixed);
+    } else {
+      groups.set(key, members);
+    }
   }
   const orderedKeys = [...groups.keys()].sort((a, b) => {
     if (a == null && b == null) return 0;
     if (a == null) return -1;
     if (b == null) return 1;
+    // Put mixed group last
+    if (a === MIXED_KEY) return 1;
+    if (b === MIXED_KEY) return -1;
     return b.localeCompare(a);
   });
   const familyHue = (id: string) => {
@@ -375,12 +390,19 @@ function FamilyGroupedGrid({
       {orderedKeys.map((key) => {
         const members = groups.get(key)!;
         const isUngrouped = key == null;
+        const isMixed = key === MIXED_KEY;
         const sample = members[0];
         let header: React.ReactNode;
         if (isUngrouped) {
           header = (
             <div className="text-[10px] uppercase tracking-wide text-muted font-bold">
               Founders ({members.length})
+            </div>
+          );
+        } else if (isMixed) {
+          header = (
+            <div className="text-[10px] uppercase tracking-wide text-muted font-bold">
+              Mixed offspring ({members.length})
             </div>
           );
         } else {
@@ -420,7 +442,7 @@ function FamilyGroupedGrid({
         }
         // Detect if this cross family can be interpreted
         let interpretPanel: React.ReactNode = null;
-        if (!isUngrouped && sample.parents && sample.parents[0] !== sample.parents[1]) {
+        if (!isUngrouped && !isMixed && sample.parents && sample.parents[0] !== sample.parents[1]) {
           const pA = archive.get(sample.parents[0]);
           const pB = archive.get(sample.parents[1]);
           if (pA && pB) {
@@ -587,7 +609,7 @@ function FamilyGroupedGrid({
           <div
             key={key ?? 'ungrouped'}
             className={`rounded-xl border-2 ${
-              isUngrouped ? 'border-soil/10 bg-dirt-row' : 'border-soil/15 bg-white/70'
+              isUngrouped || isMixed ? 'border-soil/10 bg-dirt-row' : 'border-soil/15 bg-white/70'
             } p-3`}
           >
             {header}

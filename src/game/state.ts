@@ -559,18 +559,35 @@ export const useGame = create<GameState>((set, get) => ({
         newNurseries.push(nursery);
         continue;
       }
-      // Open pollination: each offspring is the result of one random pairing
-      // among the selected parents, drawn independently with replacement.
-      // Offspring are grouped into families by parent pair so the Field view
-      // can show interpretation panels for each cross.
+      // Open pollination with balanced family sizes.
+      // Instead of fully random pairing (which creates many tiny families),
+      // first select a limited set of cross combinations, then distribute
+      // offspring evenly so each family is large enough to interpret.
       const offspring: Individual[] = [];
       const N = nursery.popSize;
+
+      // Build all unique parent pairs (canonical order)
+      const allPairs: Array<[Individual, Individual]> = [];
+      for (let i = 0; i < parents.length; i++) {
+        for (let j = i; j < parents.length; j++) {
+          allPairs.push([parents[i], parents[j]]);
+        }
+      }
+      // Shuffle pairs, then pick enough so each family gets ≥4 offspring
+      for (let i = allPairs.length - 1; i > 0; i--) {
+        const j = Math.floor(s.rng() * (i + 1));
+        [allPairs[i], allPairs[j]] = [allPairs[j], allPairs[i]];
+      }
+      const maxFamilies = Math.max(1, Math.floor(N / 4));
+      const selectedPairs = allPairs.slice(0, maxFamilies);
+
+      // Distribute offspring evenly across selected pairs (round-robin)
       for (let i = 0; i < N; i++) {
-        const mom = parents[Math.floor(s.rng() * parents.length)];
-        const dad = parents[Math.floor(s.rng() * parents.length)];
+        const pair = selectedPairs[i % selectedPairs.length];
+        const mom = pair[0];
+        const dad = pair[1];
         const child = crossIndividuals(mom, dad, s.map, s.traits, s.rng, 1)[0];
         stripPaidPhenotypes(child);
-        // Assign family ID: canonical order so mom×dad = dad×mom
         const [p1, p2] = [mom.id, dad.id].sort();
         child.familyId = p1 === p2
           ? `self_${p1}_s${s.season + 1}`
