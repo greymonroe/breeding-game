@@ -23,6 +23,7 @@ import {
   PIGMENT_GENE, AGOUTI_GENE,
   type GeneDefinition, type Organism, type CrossResult,
 } from './genetics-engine';
+import { OrganismIcon } from '../shared/icons';
 
 // ── Shared Components ───────────────────────────────────────────────────
 
@@ -45,7 +46,6 @@ function OrganismCard({
   }
 
   const px = size === 'sm' ? 'p-1.5' : 'p-2';
-  const dim = size === 'sm' ? 'w-10 h-10' : 'w-14 h-14';
 
   return (
     <div
@@ -54,7 +54,7 @@ function OrganismCard({
         ${selected ? 'border-amber-500 bg-amber-50 shadow-md' : 'border-stone-200 bg-white'}
         ${onClick ? 'cursor-pointer hover:border-amber-300' : ''}`}
     >
-      <div className={`${dim} rounded-full border-2 border-stone-300`} style={{ backgroundColor: displayColor }} />
+      <OrganismIcon type={epistasis ? 'mouse' : 'plant'} color={displayColor} size={size} />
       {genes.length > 1 && !epistasis && (
         <div className="flex gap-0.5">
           {genes.slice(1).map(g => (

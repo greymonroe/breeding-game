@@ -3,6 +3,7 @@ import type { Individual, Trait } from '../engine';
 import { MEASURE_COST } from '../game/economy';
 import { GenotypeBar } from '../challenges/visualizations/GenotypeBar';
 import { useGame } from '../game/state';
+import { PlantIcon } from '../shared/icons';
 
 function trialSE(values: number[]): number {
   if (values.length < 2) return 0;
@@ -104,25 +105,7 @@ export function PlantCard({ ind, selected, onClick }: Props) {
         )}
 
         {/* Plant SVG — larger */}
-        <svg viewBox="0 0 80 110" width="48" height="68">
-          {/* Soil mound at base */}
-          <ellipse cx="40" cy="107" rx="22" ry="4" fill="#c4a882" opacity="0.4" />
-          {/* Stem */}
-          <line x1="40" y1="105" x2="40" y2={110 - height} stroke="#4a7c59" strokeWidth="3" strokeLinecap="round" />
-          {/* Leaves */}
-          <path d={shapeFor(shape)} transform={`translate(0 ${100 - height})`} fill="#7cb587" stroke="#4a7c59" strokeWidth="1.5" />
-          {/* Small side leaves */}
-          {height > 50 && (
-            <>
-              <path d="M40 85 Q30 78 35 72" fill="none" stroke="#7cb587" strokeWidth="2" strokeLinecap="round" />
-              <path d="M40 85 Q50 78 45 72" fill="none" stroke="#7cb587" strokeWidth="2" strokeLinecap="round" />
-            </>
-          )}
-          {/* Flower/Fruit circle */}
-          <circle cx="40" cy={108 - height} r="10" fill={colorFor(color)} stroke={colorStroke(color)} strokeWidth="1.5" />
-          {/* Highlight on fruit */}
-          <circle cx="37" cy={105 - height} r="2.5" fill="rgba(255,255,255,0.3)" />
-        </svg>
+        <PlantIcon color={colorFor(color)} strokeColor={colorStroke(color)} height={height} leafPath={shapeFor(shape)} />
 
         {/* Yield bar */}
         {yieldV != null && (
