@@ -76,6 +76,12 @@ export default function App() {
                   {'\u{1F4F0}'} <span className="hidden sm:inline">Market</span>
                 </button>
               </div>
+              <a
+                href="/breeding-game/modules.html"
+                className="rounded-lg border-2 border-soil/20 bg-white/60 px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold text-soil hover:bg-white/90 transition-all shadow-sm no-underline"
+              >
+                Learning Lab &rarr;
+              </a>
               <button
                 onClick={reset}
                 className="rounded-lg border-2 border-soil/20 bg-white/60 px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-bold text-soil hover:bg-white/90 transition-all shadow-sm"

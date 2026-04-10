@@ -614,7 +614,7 @@ const MENDELIAN_MODULE: ModuleDefinition = {
   title: 'Transmission Genetics',
   subtitle: 'Project 1: Mendelian Inheritance',
   color: 'emerald',
-  backLink: { href: '/breeding-game/', label: '← Back to Game' },
+  backLink: { href: '/breeding-game/modules.html', label: '\u2190 Back to Hub' },
   experiments: EXPERIMENTS,
 };
 
