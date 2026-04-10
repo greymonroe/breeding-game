@@ -531,18 +531,20 @@ export const useGame = create<GameState>((set, get) => ({
       }
       // Open pollination: each offspring is the result of one random pairing
       // among the selected parents, drawn independently with replacement.
-      // When only one parent is selected, every offspring is a self of that
-      // parent and they form a labeled sibling family.
+      // Offspring are grouped into families by parent pair so the Field view
+      // can show interpretation panels for each cross.
       const offspring: Individual[] = [];
       const N = nursery.popSize;
-      const selfingFamilyId =
-        parents.length === 1 ? `self_${parents[0].id}_s${s.season + 1}` : null;
       for (let i = 0; i < N; i++) {
         const mom = parents[Math.floor(s.rng() * parents.length)];
         const dad = parents[Math.floor(s.rng() * parents.length)];
         const child = crossIndividuals(mom, dad, s.map, s.traits, s.rng, 1)[0];
         stripPaidPhenotypes(child);
-        if (selfingFamilyId) child.familyId = selfingFamilyId;
+        // Assign family ID: canonical order so mom×dad = dad×mom
+        const [p1, p2] = [mom.id, dad.id].sort();
+        child.familyId = p1 === p2
+          ? `self_${p1}_s${s.season + 1}`
+          : `cross_${p1}_${p2}_s${s.season + 1}`;
         offspring.push(child);
       }
       for (const o of offspring) archive.set(o.id, o);
