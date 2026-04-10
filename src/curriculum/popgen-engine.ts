@@ -1,0 +1,241 @@
+/**
+ * Population Genetics Simulation Engine
+ *
+ * Simulates allele frequency dynamics under drift, selection,
+ * migration, and mutation. All simulations use Wright-Fisher
+ * sampling for finite-population drift.
+ */
+
+export interface PopGenConfig {
+  popSize: number;
+  initialFreqA: number;
+  generations: number;
+  fitnessAA?: number;
+  fitnessAa?: number;
+  fitnessaa?: number;
+  migrationRate?: number;
+  migrantFreqA?: number;
+  mutationRate?: number;
+  backMutationRate?: number;
+}
+
+export interface PopGenResult {
+  freqHistory: number[];
+  genotypeHistory: { AA: number; Aa: number; aa: number }[];
+  finalFreqA: number;
+  fixedAllele: 'A' | 'a' | null;
+}
+
+/** Draw from binomial(n, p) using direct sampling */
+function binomial(n: number, p: number): number {
+  let successes = 0;
+  for (let i = 0; i < n; i++) {
+    if (Math.random() < p) successes++;
+  }
+  return successes;
+}
+
+/** Generate genotype counts from allele frequency using HW proportions + multinomial sampling */
+function sampleGenotypes(n: number, p: number): { AA: number; Aa: number; aa: number } {
+  const q = 1 - p;
+  const pAA = p * p;
+  const pAa = 2 * p * q;
+  // multinomial draw
+  let AA = 0;
+  let Aa = 0;
+  let aa = 0;
+  for (let i = 0; i < n; i++) {
+    const r = Math.random();
+    if (r < pAA) AA++;
+    else if (r < pAA + pAa) Aa++;
+    else aa++;
+  }
+  return { AA, Aa, aa };
+}
+
+/** Run one population genetics simulation */
+export function simulate(config: PopGenConfig): PopGenResult {
+  const {
+    popSize,
+    initialFreqA,
+    generations,
+    fitnessAA = 1.0,
+    fitnessAa = 1.0,
+    fitnessaa = 1.0,
+    migrationRate = 0,
+    migrantFreqA = 0,
+    mutationRate = 0,
+    backMutationRate = 0,
+  } = config;
+
+  const freqHistory: number[] = [];
+  const genotypeHistory: { AA: number; Aa: number; aa: number }[] = [];
+
+  // Initialize population
+  let geno = sampleGenotypes(popSize, initialFreqA);
+  let p = (2 * geno.AA + geno.Aa) / (2 * popSize);
+
+  freqHistory.push(p);
+  genotypeHistory.push({ ...geno });
+
+  for (let gen = 0; gen < generations; gen++) {
+    // 1. Selection — compute post-selection allele frequency
+    const nAA = geno.AA;
+    const nAa = geno.Aa;
+    const naa = geno.aa;
+    const wBar = nAA * fitnessAA + nAa * fitnessAa + naa * fitnessaa;
+    if (wBar > 0) {
+      const pAfterSel =
+        (nAA * fitnessAA * 2 + nAa * fitnessAa) / (2 * wBar);
+      p = pAfterSel;
+    }
+
+    // 2. Mutation
+    if (mutationRate > 0 || backMutationRate > 0) {
+      p = p * (1 - mutationRate) + (1 - p) * backMutationRate;
+    }
+
+    // 3. Migration
+    if (migrationRate > 0) {
+      p = (1 - migrationRate) * p + migrationRate * migrantFreqA;
+    }
+
+    // Clamp
+    p = Math.max(0, Math.min(1, p));
+
+    // 4. Drift — Wright-Fisher sampling of 2N alleles
+    const nA = binomial(2 * popSize, p);
+    p = nA / (2 * popSize);
+
+    // Reconstruct genotypes from new allele freq
+    geno = sampleGenotypes(popSize, p);
+    // Correct allele freq to match actual genotype counts
+    p = (2 * geno.AA + geno.Aa) / (2 * popSize);
+
+    freqHistory.push(p);
+    genotypeHistory.push({ ...geno });
+
+    // Check fixation
+    if (p === 0 || p === 1) {
+      // Fill remaining generations
+      const fixed = p === 1 ? 1 : 0;
+      const fixedGeno = fixed === 1
+        ? { AA: popSize, Aa: 0, aa: 0 }
+        : { AA: 0, Aa: 0, aa: popSize };
+      for (let r = gen + 1; r < generations; r++) {
+        freqHistory.push(fixed);
+        genotypeHistory.push({ ...fixedGeno });
+      }
+      break;
+    }
+  }
+
+  const finalFreqA = freqHistory[freqHistory.length - 1];
+  const fixedAllele = finalFreqA === 1 ? 'A' : finalFreqA === 0 ? 'a' : null;
+
+  return { freqHistory, genotypeHistory, finalFreqA, fixedAllele };
+}
+
+/** Run multiple independent replicates */
+export function simulateReplicates(config: PopGenConfig, nReps: number): PopGenResult[] {
+  const results: PopGenResult[] = [];
+  for (let i = 0; i < nReps; i++) {
+    results.push(simulate(config));
+  }
+  return results;
+}
+
+/** Hardy-Weinberg expected genotype frequencies given allele frequency p */
+export function hardyWeinberg(p: number): { AA: number; Aa: number; aa: number } {
+  const q = 1 - p;
+  return {
+    AA: p * p,
+    Aa: 2 * p * q,
+    aa: q * q,
+  };
+}
+
+/** Chi-square goodness-of-fit test for Hardy-Weinberg equilibrium */
+export function testHWE(observed: { AA: number; Aa: number; aa: number }): {
+  expected: { AA: number; Aa: number; aa: number };
+  chiSquare: number;
+  pValue: number;
+  inEquilibrium: boolean;
+} {
+  const total = observed.AA + observed.Aa + observed.aa;
+  const p = (2 * observed.AA + observed.Aa) / (2 * total);
+  const hw = hardyWeinberg(p);
+
+  const expected = {
+    AA: hw.AA * total,
+    Aa: hw.Aa * total,
+    aa: hw.aa * total,
+  };
+
+  let chiSquare = 0;
+  for (const key of ['AA', 'Aa', 'aa'] as const) {
+    if (expected[key] > 0) {
+      chiSquare += (observed[key] - expected[key]) ** 2 / expected[key];
+    }
+  }
+
+  // 1 degree of freedom for HWE test
+  // Approximate p-value using chi-square CDF with 1 df
+  const pValue = 1 - chiSquareCDF(chiSquare, 1);
+  const inEquilibrium = pValue > 0.05;
+
+  return { expected, chiSquare, pValue, inEquilibrium };
+}
+
+/** Approximate chi-square CDF using the regularized lower incomplete gamma function */
+function chiSquareCDF(x: number, k: number): number {
+  if (x <= 0) return 0;
+  // For k=1: CDF = erf(sqrt(x/2))
+  if (k === 1) {
+    return erf(Math.sqrt(x / 2));
+  }
+  // General case using series expansion of lower incomplete gamma
+  const a = k / 2;
+  const z = x / 2;
+  return lowerIncompleteGammaRatio(a, z);
+}
+
+function erf(x: number): number {
+  // Abramowitz and Stegun approximation
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const poly =
+    t *
+    (0.254829592 +
+      t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  const result = 1 - poly * Math.exp(-x * x);
+  return x >= 0 ? result : -result;
+}
+
+function lowerIncompleteGammaRatio(a: number, z: number): number {
+  // Series expansion: P(a,z) = e^(-z) * z^a * sum(z^n / gamma(a+n+1))
+  let sum = 0;
+  let term = 1 / a;
+  sum = term;
+  for (let n = 1; n < 200; n++) {
+    term *= z / (a + n);
+    sum += term;
+    if (Math.abs(term) < 1e-12) break;
+  }
+  return sum * Math.exp(-z + a * Math.log(z) - logGamma(a));
+}
+
+function logGamma(x: number): number {
+  // Lanczos approximation
+  const g = 7;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+  ];
+  const t = x + g - 0.5;
+  let sum = c[0];
+  for (let i = 1; i < g + 2; i++) {
+    sum += c[i] / (x + i - 1);
+  }
+  return 0.5 * Math.log(2 * Math.PI) + (x - 0.5) * Math.log(t) - t + Math.log(sum);
+}
