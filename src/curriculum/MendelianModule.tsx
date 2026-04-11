@@ -15,7 +15,7 @@
  *  7. Polygenic -> Quantitative — 1,2,5,10 genes -> continuous distribution
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   cross, makeOrganism, getAdditiveValue, makeAdditiveGene,
   FLOWER_COLOR, FLOWER_COLOR_INCOMPLETE, SEED_SHAPE,
@@ -157,9 +157,9 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
         question="Before crossing — predict the offspring ratio:"
         correct={correct}
         feedback={correct === true
-          ? "Correct! Rr × rr → Rr (red) and rr (white) in equal proportions. This is a test cross — one of the most powerful tools in genetics."
+          ? "Correct! Rr × rr produces Rr (red) and rr (white) in equal proportions. Crossing against a homozygous recessive tester is one of the most powerful tools in genetics — you'll meet it again by name in Experiment 4."
           : correct === false
-          ? "Think about what gametes each parent can produce. Rr makes R and r gametes. rr makes only r gametes."
+          ? "Think about what gametes each parent can produce. Rr makes R and r gametes; rr makes only r gametes."
           : undefined}
       >
         <div className="flex gap-2 flex-wrap">
@@ -201,6 +201,8 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   const [f2Result, setF2Result] = useState<CrossResult | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [f2Answer, setF2Answer] = useState('');
+  const [f2Correct, setF2Correct] = useState<boolean | null>(null);
 
   const parentRR = useMemo(() => makeOrganism({ color_inc: ['R', 'R'] }, 'RR'), []);
   const parentrr = useMemo(() => makeOrganism({ color_inc: ['r', 'r'] }, 'rr'), []);
@@ -210,14 +212,19 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Here's a <em>different species</em> of flower. Cross a red with a white and see what happens.
+        Here's a <em>different species</em> of flower — the <strong>snapdragon</strong> (<em>Antirrhinum majus</em>),
+        where flower color shows a different inheritance pattern. Cross a red with a white and see what happens.
         Is the result the same as before?
       </p>
+
+      <div className="text-[10px] font-semibold tracking-wider text-stone-400 text-center uppercase">
+        Snapdragon (Antirrhinum majus)
+      </div>
 
       <CrossWorkbench
         parentA={parentRR} parentB={parentrr} genes={[FLOWER_COLOR_INCOMPLETE]}
         onCross={(r) => { setF1Result(r); setStep(1); }} crossResult={f1Result}
-        sampleSize={20} label="P Cross: Red × White (new species)"
+        sampleSize={20} label="P Cross: Red × White (snapdragon)"
       />
 
       {step >= 1 && (
@@ -225,7 +232,7 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
           question="The F1 are PINK — not red! How is this different from complete dominance?"
           correct={correct}
           feedback={correct === true
-            ? "Exactly! This is incomplete dominance. The heterozygote (Rr) shows an intermediate phenotype. Neither allele fully masks the other."
+            ? "Exactly! This is incomplete dominance. The heterozygote Rr shows an intermediate phenotype. Neither allele fully masks the other."
             : correct === false
             ? "In complete dominance, Rr looks like RR. Here, Rr looks different from both parents..."
             : undefined}
@@ -257,21 +264,45 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
       {step >= 2 && f1Child && (
         <>
           <p className="text-sm text-stone-600">
-            Cross two F1 (pink) plants. What ratio do you predict now?
+            Cross two F1 (pink) plants and count the three phenotypic classes that appear in the F2.
           </p>
           <CrossWorkbench
             parentA={f1Child} parentB={f1Result!.offspring[1] ?? f1Child}
             genes={[FLOWER_COLOR_INCOMPLETE]}
-            onCross={(r) => { setF2Result(r); setTimeout(onComplete, 2000); }} crossResult={f2Result}
+            onCross={(r) => { setF2Result(r); setStep(3); }} crossResult={f2Result}
             sampleSize={100} label="F2: Pink × Pink" showGenotypes
           />
-          {f2Result && (
-            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
-              <strong>1 Red : 2 Pink : 1 White</strong> — With incomplete dominance, you can read the genotype
-              directly from the phenotype. Every genotype looks different!
-            </div>
-          )}
         </>
+      )}
+
+      {step >= 3 && f2Result && (
+        <QuestionPanel
+          question="Count the three phenotypic classes in the F2. What ratio do you observe?"
+          correct={f2Correct}
+          feedback={f2Correct === true
+            ? "The 1:2:1 ratio. With incomplete dominance, every genotype has a distinct phenotype: 1 RR (red) : 2 Rr (pink) : 1 rr (white). Allele dose maps directly onto phenotype frequency, so you can read the genotype straight off the flower color."
+            : f2Correct === false
+            ? "Look at the bar: roughly a quarter red, half pink, a quarter white. Which ratio does that match?"
+            : undefined}
+        >
+          <div className="flex gap-2 flex-wrap">
+            {['3:1', '1:2:1', '9:3:4', '1:1:1'].map(opt => (
+              <button key={opt} onClick={() => {
+                setF2Answer(opt);
+                const isCorrect = opt === '1:2:1';
+                setF2Correct(isCorrect);
+                if (isCorrect) setTimeout(onComplete, 1500);
+              }}
+                className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
+                  f2Answer === opt
+                    ? f2Correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                    : 'border-stone-200 bg-white hover:border-stone-300'
+                }`}>
+                {opt}
+              </button>
+            ))}
+          </div>
+        </QuestionPanel>
       )}
     </div>
   );
@@ -283,31 +314,49 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
 
-  // Mystery plant — could be RR or Rr (we'll make it Rr)
-  const mystery = useMemo(() => makeOrganism({ color: ['R', 'r'] }, 'mystery'), []);
+  // Mystery plant — randomized once at mount, could be RR (homozygous) or Rr (heterozygous).
+  // useState lazy initializer guarantees this runs exactly once for the lifetime of the component.
+  const [mystery] = useState(() => {
+    const isHomozygous = Math.random() < 0.5;
+    return makeOrganism(
+      { color: isHomozygous ? ['R', 'R'] : ['R', 'r'] },
+      'mystery',
+    );
+  });
   const tester = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'tester'), []);
+
+  // Auto-advance after the cross has been displayed long enough to read.
+  useEffect(() => {
+    if (step >= 2 && crossResult) {
+      const t = setTimeout(() => onComplete(), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [step, crossResult, onComplete]);
+
+  const whiteCount = crossResult?.phenotypeCounts?.['White'] ?? 0;
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
         You have a red-flowered plant but don't know if it's <strong>RR</strong> (homozygous) or <strong>Rr</strong> (heterozygous).
-        Both look red! How can you find out?
+        Both look red! How can you find out? (You've actually done a cross like this before, in Experiment 2 — now we'll
+        use it on an unknown genotype, where it's called <em>the test cross</em>.)
       </p>
 
       <QuestionPanel
         question="What cross would reveal the mystery plant's genotype?"
         correct={correct}
         feedback={correct === true
-          ? "Yes! Crossing with rr (white) is a test cross. If the mystery plant is RR, all offspring will be red (Rr). If it's Rr, you'll get ~50% red and ~50% white."
+          ? "Yes — crossing the unknown red against a white (rr) tester is the test cross. If the mystery plant is RR, all offspring will be red (Rr). If it's Rr, you'll get roughly half red and half white."
           : correct === false
           ? "Think about which cross would give different results depending on the unknown genotype..."
           : undefined}
       >
         <div className="flex gap-2 flex-wrap">
-          {['Cross it with a white (rr) plant', 'Cross it with another red plant', 'Self-pollinate it'].map(opt => (
+          {['Cross it with a white plant', 'Cross it with another red plant', 'Self-pollinate it'].map(opt => (
             <button key={opt} onClick={() => {
               setAnswer(opt);
-              const isCorrect = opt.includes('white');
+              const isCorrect = opt === 'Cross it with a white plant';
               setCorrect(isCorrect);
               if (isCorrect) setStep(1);
             }}
@@ -337,10 +386,31 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
 
       {step >= 2 && crossResult && (
         <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800 space-y-2">
-          <p><strong>White offspring appeared!</strong> This means the mystery plant must be <strong>Rr</strong>.</p>
-          <p>If it were RR, it could only contribute R alleles — no rr offspring possible.
-          Since we see rr offspring, the mystery parent must have contributed an r allele. It's heterozygous.</p>
-          {setTimeout(() => onComplete(), 2000) && null}
+          {whiteCount > 0 ? (
+            <>
+              <p>
+                <strong>White offspring appeared</strong> ({whiteCount} of {crossResult.total}).
+                Only an Rr plant crossed with rr can produce rr (white) offspring, so the mystery plant
+                must be <strong>Rr</strong> — heterozygous.
+              </p>
+              <p>
+                If it were RR, it could only contribute R alleles, so every offspring would be Rr (red).
+                Since we see rr offspring, the mystery parent must have contributed an r allele.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                <strong>No white offspring appeared.</strong> If the mystery plant were Rr, about half of the
+                {' '}{crossResult.total} offspring would be white (rr). Since all of them are red, the mystery
+                plant must be <strong>RR</strong> — homozygous dominant.
+              </p>
+              <p>
+                An RR parent can only contribute R alleles, so every offspring is Rr and red. The absence of
+                any white offspring is the evidence.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -363,6 +433,7 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
         Now we track <strong>two genes at once</strong>: flower color (R/r) and seed shape (S/s, where S = Round is dominant).
+        We'll write the dihybrid genotype with a space — <strong>Rr Ss</strong> — to keep the two genes visually distinct.
         Cross a <strong>Red/Round</strong> plant with a <strong>White/Wrinkled</strong> plant.
       </p>
 
@@ -426,41 +497,54 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
-  // AaCc × AaCc (dihybrid F1)
-  const f1 = useMemo(() => makeOrganism({ pigment: ['C', 'c'], agouti: ['A', 'a'] }, 'F1'), []);
+  // F1 dihybrid for maize aleurone color: Cc Rr × Cc Rr.
+  // Use the gene objects' id fields directly so this stays consistent if the engine renames them.
+  const f1 = useMemo(
+    () => makeOrganism(
+      {
+        [PIGMENT_GENE.id]: [PIGMENT_GENE.alleles[0], PIGMENT_GENE.alleles[1]],
+        [AGOUTI_GENE.id]: [AGOUTI_GENE.alleles[0], AGOUTI_GENE.alleles[1]],
+      },
+      'F1',
+    ),
+    [],
+  );
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        In mice, coat color involves <strong>two genes</strong>:
+        In maize kernels, the color of the <strong>aleurone</strong> (the outer pigmented layer of the seed) depends on
+        <strong> two interacting genes</strong>:
       </p>
       <ul className="text-sm text-stone-600 list-disc ml-5 space-y-1">
-        <li><strong>Gene C</strong>: makes pigment (C = pigment, c = no pigment → albino)</li>
-        <li><strong>Gene A</strong>: determines color pattern (A = agouti/brown, a = solid black)</li>
+        <li><strong>Gene C</strong>: controls whether <em>any</em> pigment is deposited at all (C = colored, c = colorless).</li>
+        <li><strong>Gene R</strong>: controls <em>which</em> pigment forms when C is present (R = purple anthocyanin, r = red).</li>
       </ul>
       <p className="text-sm text-stone-600">
-        But here's the twist: <em>if a mouse has no pigment (cc), the pattern gene doesn't matter!</em>
-        This is <strong>epistasis</strong> — one gene masks the effect of another.
+        Here's the catch: a <strong>cc</strong> kernel is always colorless, regardless of the R gene — without C
+        there is no precursor for R to act on. This is <strong>epistasis</strong>: the recessive cc genotype
+        <em> masks</em> whatever the R gene would otherwise produce.
       </p>
 
       <p className="text-sm text-stone-600">
-        Cross two F1 mice (both CcAa). You'd expect 9:3:3:1 from a dihybrid... but that's NOT what you'll see.
+        Cross two F1 kernels (both <strong>Cc Rr</strong>). A vanilla dihybrid would give 9:3:3:1, but with cc masking R
+        the ratio is modified. Count the classes and decide what you see.
       </p>
 
       <CrossWorkbench
         parentA={f1} parentB={f1} genes={[PIGMENT_GENE, AGOUTI_GENE]}
         onCross={(r) => { setF2Result(r); setStep(1); }} crossResult={f2Result}
-        sampleSize={200} label="F2: CcAa × CcAa" epistasis
+        sampleSize={800} label="F2: Cc Rr × Cc Rr" epistasis
       />
 
       {step >= 1 && f2Result && (
         <QuestionPanel
-          question="The ratio isn't 9:3:3:1. What modified ratio do you see?"
+          question="Count the phenotypic classes on the bar. Which ratio fits the observed counts?"
           correct={correct}
           feedback={correct === true
-            ? "9 Agouti : 3 Black : 4 Albino. The 3+1=4 albino class combines what WOULD have been two separate classes (3 C_aa + 1 ccaa + some ccA_). Gene C is epistatic to gene A — without pigment, the pattern gene is invisible. This is recessive epistasis."
+            ? "9 purple : 3 red : 4 colorless. The colorless class (4) absorbs what would have been two separate classes in a normal dihybrid (3 ccR_ + 1 ccrr), because cc is epistatic to R. Without the C-encoded precursor, the R gene's effect is invisible. This is recessive epistasis."
             : correct === false
-            ? "Count the three classes: Agouti, Black, and Albino. The albino class is larger than expected..."
+            ? "Three classes appear: purple, red, and colorless. The colorless class is bigger than you'd expect from a vanilla dihybrid — what ratio does that point to?"
             : undefined}
         >
           <div className="flex gap-2 flex-wrap">
@@ -489,6 +573,8 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
 function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
   const [nGenes, setNGenes] = useState(1);
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
+  const [classAnswer, setClassAnswer] = useState('');
+  const [classCorrect, setClassCorrect] = useState<boolean | null>(null);
 
   const genes = useMemo(() =>
     Array.from({ length: nGenes }, (_, i) => makeAdditiveGene(`qtl${i}`, i)),
@@ -586,10 +672,33 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
           )}
 
           {nGenes >= 8 && (
-            <button onClick={() => onComplete()}
-              className="w-full rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 py-3 text-sm font-bold text-white shadow-md">
-              Complete Module
-            </button>
+            <QuestionPanel
+              question="How many phenotypic classes do you see for a trait controlled by n genes with additive effects (each contributing 0, 1, or 2 favorable alleles)?"
+              correct={classCorrect}
+              feedback={classCorrect === true
+                ? "Right — 2n + 1. Each of the n loci contributes 0, 1, or 2 favorable alleles, so the total dose ranges from 0 to 2n. That gives 2n + 1 possible additive values, and as n grows, the binomial distribution over those classes approaches a Gaussian — the foundation of quantitative genetics."
+                : classCorrect === false
+                ? "Each gene contributes 0, 1, or 2 favorable alleles. What's the range of possible totals across n genes — and how many integer values does that range cover?"
+                : undefined}
+            >
+              <div className="flex gap-2 flex-wrap">
+                {['n', '2n', '2n + 1', 'infinitely many'].map(opt => (
+                  <button key={opt} onClick={() => {
+                    setClassAnswer(opt);
+                    const isCorrect = opt === '2n + 1';
+                    setClassCorrect(isCorrect);
+                    if (isCorrect) setTimeout(onComplete, 2000);
+                  }}
+                    className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
+                      classAnswer === opt
+                        ? classCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                        : 'border-stone-200 bg-white hover:border-stone-300'
+                    }`}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </QuestionPanel>
           )}
         </div>
       )}
