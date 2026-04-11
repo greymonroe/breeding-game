@@ -35,21 +35,33 @@ function binomial(n: number, p: number): number {
   return successes;
 }
 
-/** Generate genotype counts from allele frequency using HW proportions + multinomial sampling */
-function sampleGenotypes(n: number, p: number): { AA: number; Aa: number; aa: number } {
+/**
+ * Sample N diploid zygotes via random mating at allele frequency p.
+ *
+ * Under random mating, each zygote independently draws two alleles from the
+ * gamete pool of frequency p, so (N_AA, N_Aa, N_aa) ~ Multinomial(N, [p², 2pq, q²]).
+ * This is the CORRECT sampling distribution for genotype counts given p.
+ *
+ * It is also the distribution against which the standard HWE chi-square test
+ * is valid — the test statistic follows chi-square(1) under the null precisely
+ * because the counts are a multinomial draw, not a deterministic rounding of
+ * N·p², N·2pq, N·q².
+ */
+function sampleZygotes(n: number, p: number): { AA: number; Aa: number; aa: number } {
   const q = 1 - p;
   const pAA = p * p;
   const pAa = 2 * p * q;
-  // multinomial draw
-  let AA = 0;
-  let Aa = 0;
-  let aa = 0;
-  for (let i = 0; i < n; i++) {
-    const r = Math.random();
-    if (r < pAA) AA++;
-    else if (r < pAA + pAa) Aa++;
-    else aa++;
-  }
+  // Sequential binomial formulation of the multinomial draw:
+  //   N_AA ~ Binomial(N, p²)
+  //   N_Aa | N_AA ~ Binomial(N - N_AA, 2pq / (2pq + q²))
+  //   N_aa = N - N_AA - N_Aa
+  // This is more efficient than per-zygote categorical sampling and preserves
+  // N_AA + N_Aa + N_aa === N exactly.
+  const AA = binomial(n, pAA);
+  const remaining = n - AA;
+  const condAa = pAA < 1 ? pAa / (1 - pAA) : 0;
+  const Aa = binomial(remaining, condAa);
+  const aa = remaining - Aa;
   return { AA, Aa, aa };
 }
 
@@ -71,23 +83,35 @@ export function simulate(config: PopGenConfig): PopGenResult {
   const freqHistory: number[] = [];
   const genotypeHistory: { AA: number; Aa: number; aa: number }[] = [];
 
-  // Initialize population
-  let geno = sampleGenotypes(popSize, initialFreqA);
-  let p = (2 * geno.AA + geno.Aa) / (2 * popSize);
+  // Initialize population: multinomial sample of N zygotes from the
+  // ideal gamete pool at frequency initialFreqA.
+  let p = initialFreqA;
+  let geno = sampleZygotes(popSize, p);
+  // Recompute p from the realized sample so that observed allele frequency
+  // and observed genotype counts are internally consistent.
+  p = (2 * geno.AA + geno.Aa) / (2 * popSize);
 
   freqHistory.push(p);
   genotypeHistory.push({ ...geno });
 
   for (let gen = 0; gen < generations; gen++) {
-    // 1. Selection — compute post-selection allele frequency
-    const nAA = geno.AA;
-    const nAa = geno.Aa;
-    const naa = geno.aa;
-    const wBar = nAA * fitnessAA + nAa * fitnessAa + naa * fitnessaa;
+    // 1. Selection — closed-form post-selection allele frequency.
+    //
+    // Under random mating at frequency p, the expected genotype frequencies
+    // are (p², 2pq, q²), and the post-selection allele frequency is
+    //
+    //   p' = (p² wAA + pq wAa) / (p² wAA + 2pq wAa + q² waa)
+    //
+    // We compute p' from p directly, rather than from the previous
+    // generation's realized genotype counts, so that the selection recursion
+    // is the textbook closed form (no added noise from genotype sampling in
+    // the PARENTS; selection acts on expected genotype frequencies given p).
+    // The Wright-Fisher step below still draws finite-population drift, and
+    // the zygote sample below still draws real random-mating variance.
+    const q = 1 - p;
+    const wBar = p * p * fitnessAA + 2 * p * q * fitnessAa + q * q * fitnessaa;
     if (wBar > 0) {
-      const pAfterSel =
-        (nAA * fitnessAA * 2 + nAa * fitnessAa) / (2 * wBar);
-      p = pAfterSel;
+      p = (p * p * fitnessAA + p * q * fitnessAa) / wBar;
     }
 
     // 2. Mutation
@@ -103,26 +127,28 @@ export function simulate(config: PopGenConfig): PopGenResult {
     // Clamp
     p = Math.max(0, Math.min(1, p));
 
-    // 4. Drift — Wright-Fisher sampling of 2N alleles (this IS the drift step)
+    // 4. Drift — Wright-Fisher sampling of 2N alleles. This is the finite-
+    // population drift step and is a function of p alone, not of genotype
+    // counts.
     const nA = binomial(2 * popSize, p);
     p = nA / (2 * popSize);
 
-    // Deterministic HW genotype reconstruction from post-drift p.
-    // Do NOT redraw genotypes here — that would add a second round of
-    // sampling noise on top of Wright-Fisher drift and force HWE on output.
-    const q = 1 - p;
-    const AA = Math.round(popSize * p * p);
-    const aa = Math.round(popSize * q * q);
-    // Absorb any rounding residual into Aa so AA+Aa+aa === popSize exactly.
-    const Aa = popSize - AA - aa;
-    geno = { AA, Aa, aa };
+    // 5. Random mating: draw N diploid zygotes from the gamete pool of the
+    // post-drift frequency p. Under the null (HWE), the resulting counts are
+    // a Multinomial(N, [p², 2pq, q²]) sample — NOT a deterministic rounding
+    // of N·p², N·2pq, N·q². That deterministic round-trip (used previously)
+    // made Exp 2's chi-square test a tautology: observed would equal expected
+    // by construction, so X² would be ≈ 0 regardless of any biological
+    // process. With a real multinomial draw, X² follows chi-square(1) under
+    // the null and the test measures genuine deviations.
+    geno = sampleZygotes(popSize, p);
 
     freqHistory.push(p);
     genotypeHistory.push({ ...geno });
 
-    // Check fixation
+    // Check fixation — once an allele is lost from the gamete pool it cannot
+    // return (assuming no mutation), so fill remaining generations.
     if (p === 0 || p === 1) {
-      // Fill remaining generations
       const fixed = p === 1 ? 1 : 0;
       const fixedGeno = fixed === 1
         ? { AA: popSize, Aa: 0, aa: 0 }
