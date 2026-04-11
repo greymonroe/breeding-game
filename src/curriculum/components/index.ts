@@ -5,5 +5,6 @@ export { QuestionPanel } from './QuestionPanel';
 export { CrossWorkbench } from './CrossWorkbench';
 export { RatioBar } from './RatioBar';
 export { OrganismCard } from './OrganismCard';
+export { GameteVisualizer } from './GameteVisualizer';
 export { HistogramChart } from './HistogramChart';
 export type { HistogramChartProps } from './HistogramChart';
