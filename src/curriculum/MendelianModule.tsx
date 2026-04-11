@@ -86,6 +86,309 @@ function GameteToggle({
 
 // ── Experiments ──────────────────────────────────────────────────────────
 
+// Historical framing prequel (Phase 3 item 3.2 of MENDELIAN_V2_PLAN.md).
+//
+// Stages the 1865 intellectual debate between blending and particulate
+// inheritance as a discovery beat. The student commits to a prediction BEFORE
+// running the cross, then Mendel's canonical P→F1→F2 with red/white peas
+// surprises (or confirms) them. The exit question hooks into Exp 1 (which
+// now covers "why 1/4?" at the gamete level).
+//
+// Pedagogical contract:
+//  - Real engine crosses (cross() twice), never hardcoded arrays.
+//  - No option in either QuestionPanel is styled, labeled, or ordered to
+//    telegraph the answer. Every option reads as plausible to a student
+//    who doesn't already know genetics.
+//  - Every prediction in Beat 2 is accepted as a valid hypothesis — this
+//    is not a graded quiz, it's a commitment to a worldview so the result
+//    can update their model.
+//  - F2 sample size N=40 keeps the 3:1 visually unambiguous: expected
+//    30 red / 10 white, binomial SD ≈ 2.74, so a typical run lands near
+//    25–35 red, clearly more than 50% and clearly not 75% exactly.
+function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) {
+  // P generation: homozygous red x homozygous white (Mendel's actual setup).
+  const parentRed = useMemo(() => makeOrganism({ color: ['R', 'R'] }, 'p_red'), []);
+  const parentWhite = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'p_white'), []);
+
+  const [step, setStep] = useState(0);
+  const [prediction, setPrediction] = useState<string | null>(null);
+  const [f1Result, setF1Result] = useState<CrossResult | null>(null);
+  const [f2Result, setF2Result] = useState<CrossResult | null>(null);
+  const [exitAnswer, setExitAnswer] = useState<string | null>(null);
+  const [exitCorrect, setExitCorrect] = useState<boolean | null>(null);
+
+  // Use the first two F1 siblings as the F1 × F1 cross. Both are Rr by
+  // construction (RR × rr → every offspring is Rr), so this is a genuine
+  // Rr × Rr cross driven by the engine, not a hardcoded heterozygote.
+  const f1ParentA = f1Result?.offspring[0] ?? null;
+  const f1ParentB = f1Result?.offspring[1] ?? f1ParentA;
+
+  // Exit-question options. `correct: true` means "get emerald success and
+  // advance". (c) is the mechanistic answer; (d) is an honest "I want to
+  // learn more" that hooks into Exp 1 — both are accepted per spec.
+  const EXIT_OPTIONS = [
+    {
+      key: 'chance',
+      label: 'By chance — 1/4 is just a round number.',
+      correct: false,
+      feedback:
+        "Chance alone doesn't explain a consistent 3:1 across every replicate. Flip a coin 40 times and you won't always get exactly 20 heads, but you will always get roughly half. The 3:1 ratio is reproducible because there's a mechanism generating it — not because 1/4 is a convenient fraction.",
+    },
+    {
+      key: 'law',
+      label: 'Because of the 3:1 ratio, which is a universal law.',
+      correct: false,
+      feedback:
+        "The 3:1 ratio is a consequence, not a cause. Something about how the F1 parents make gametes produces 1/4 white offspring — and the 3:1 ratio is the observable shadow of that mechanism. The real answer is about what each F1 parent carries and transmits.",
+    },
+    {
+      key: 'gametes',
+      label:
+        'Because each F1 parent carries one hidden r allele, and 1/4 of the time both parents pass r to the offspring.',
+      correct: true,
+      feedback:
+        "Exactly — and this is the Law of Segregation stated mechanistically. Every F1 parent is Rr. When it makes gametes, half carry R and half carry r. When two F1 plants cross, the probability that both contribute r is 1/2 × 1/2 = 1/4. That's the 1/4 white. Coming up in Experiment 1: you'll work this out at the gamete level and see it animate.",
+    },
+    {
+      key: 'hook',
+      label: "I want to learn how — take me to Experiment 1.",
+      correct: true,
+      feedback:
+        "Perfect — that's the right instinct. You've observed the pattern (3:1), and now you want the mechanism that generates it. Experiment 1 builds on exactly this moment: every F1 parent (Rr) makes two kinds of gametes, half R and half r, and 1/2 × 1/2 = 1/4 is where the 1/4 white comes from. That's the Law of Segregation.",
+    },
+  ] as const;
+
+  // Handoff: once the student picks a correct (or hook) exit answer, advance
+  // after a short read-through delay. useEffect, not setTimeout-from-render.
+  useEffect(() => {
+    if (exitCorrect === true) {
+      const t = setTimeout(() => onComplete(), 2200);
+      return () => clearTimeout(t);
+    }
+  }, [exitCorrect, onComplete]);
+
+  return (
+    <div className="space-y-6">
+      {/* Beat 1 — Historical framing. Stone card, Patrick Hand header for
+          lab-notebook feel. Factually neutral on specifics we're not sure of. */}
+      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm space-y-3">
+        <div
+          className="text-xs font-semibold tracking-wider text-stone-500 uppercase"
+          style={{ fontFamily: '"Patrick Hand", cursive' }}
+        >
+          Mendel's garden, Brno — 1865
+        </div>
+        <p
+          className="text-lg leading-snug text-stone-800"
+          style={{ fontFamily: '"Patrick Hand", cursive' }}
+        >
+          It's 1865. You're Gregor Mendel, a monk in a monastery garden in Brno, Moravia,
+          growing pea plants. You have hundreds of them, neatly labeled, and you're about
+          to run the experiment that founds genetics.
+        </p>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          Most scientists of your era believe in <strong>blending inheritance</strong>:
+          when you cross two plants with different traits, the offspring should be an
+          intermediate <em>blend</em> that breeds true forever. Mix red paint and white
+          paint, you get pink paint, and pink paint stays pink.
+        </p>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          But you have a different hypothesis: <strong>particulate inheritance</strong>.
+          You think traits are carried by discrete factors that stay distinct across
+          generations, even when they seem to disappear. The two pictures of the world
+          make very different predictions — and you have a garden full of peas to settle
+          the question.
+        </p>
+      </div>
+
+      {/* Beat 2 — Prediction panel. Commit BEFORE the cross. Accepts any
+          answer. No option is annotated, styled, or ordered to signal
+          correctness — each must read as plausible to a 1865 student. */}
+      <div className="rounded-2xl border border-violet-200 bg-violet-50 p-6 shadow-sm space-y-3">
+        <p className="text-sm font-bold text-violet-900">
+          Before you run the cross — what do you predict?
+        </p>
+        <p className="text-sm text-violet-800 leading-relaxed">
+          You're about to cross a <strong>red-flowered pea plant</strong> with a{' '}
+          <strong>white-flowered pea plant</strong>, then take the offspring (F1) and
+          cross them with each other to get a second generation (F2). Which of these
+          do you think will happen?
+        </p>
+        <div className="space-y-2">
+          {[
+            {
+              key: 'blending',
+              label:
+                'Blending: F1 offspring are all pink. F2 offspring are all pink too — pink breeds true.',
+            },
+            {
+              key: 'particulate',
+              label:
+                'Particulate: F1 offspring are all red (or all white). In F2, red and white both reappear unchanged in a fixed ratio.',
+            },
+            {
+              key: 'mixed',
+              label:
+                'Mixed: F1 is a mix of red, white, and pink in roughly equal proportions.',
+            },
+            {
+              key: 'extinction',
+              label:
+                'Extinction: The white color is destroyed in the cross — all descendants are red forever.',
+            },
+          ].map(opt => {
+            const picked = prediction === opt.key;
+            return (
+              <button
+                key={opt.key}
+                onClick={() => {
+                  setPrediction(opt.key);
+                  if (step < 1) setStep(1);
+                }}
+                className={`w-full text-left rounded-lg border-2 px-4 py-3 text-sm transition-all ${
+                  picked
+                    ? 'border-violet-500 bg-white text-violet-900 shadow-sm'
+                    : 'border-violet-200 bg-white text-stone-700 hover:border-violet-400'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {prediction && (
+          <p className="text-xs text-violet-700 italic">
+            Prediction recorded. Now run the cross and see what the peas do.
+          </p>
+        )}
+      </div>
+
+      {/* Beat 3 — P cross. Engine-driven red x white. Small sample (12) so
+          the all-red F1 reads as obvious at a glance. */}
+      {step >= 1 && (
+        <CrossWorkbench
+          parentA={parentRed}
+          parentB={parentWhite}
+          genes={[FLOWER_COLOR]}
+          onCross={r => {
+            setF1Result(r);
+            if (step < 2) setStep(2);
+          }}
+          crossResult={f1Result}
+          sampleSize={12}
+          label="P Cross: Red × White"
+        />
+      )}
+
+      {/* Observation after F1 appears. Leaves the resolution open — we have
+          to run the F2 to find out whether white was destroyed or hidden. */}
+      {step >= 2 && f1Result && (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm">
+          <p className="text-sm font-bold text-stone-800 mb-2">
+            Wait — every F1 plant is red.
+          </p>
+          <p className="text-sm text-stone-700 leading-relaxed">
+            The white is gone. The blending hypothesis predicted pink F1, but you see
+            pure red. Was the white <em>destroyed</em>? Or is it <em>hiding</em>?
+            You can't tell yet from the F1 alone. Take two of these F1 plants and cross
+            them with each other — if white was destroyed, every F2 should still be red.
+            If white was hidden, it should reappear.
+          </p>
+        </div>
+      )}
+
+      {/* Beat 4 — F1 x F1. Uses two distinct F1 siblings from the engine's
+          output (both Rr), so this is a genuine Rr x Rr cross. N=40 offspring
+          makes the 3:1 visually unambiguous without being overwhelming.
+          Expected: 30 red / 10 white, SD ≈ 2.74 per bucket. */}
+      {step >= 2 && f1Result && f1ParentA && f1ParentB && (
+        <CrossWorkbench
+          parentA={f1ParentA}
+          parentB={f1ParentB}
+          genes={[FLOWER_COLOR]}
+          onCross={r => {
+            setF2Result(r);
+            if (step < 3) setStep(3);
+          }}
+          crossResult={f2Result}
+          sampleSize={40}
+          label="F2 Cross: F1 × F1"
+        />
+      )}
+
+      {/* Discovery callout after F2. Branches the congratulations/correction
+          on which prediction the student committed to in Beat 2. */}
+      {step >= 3 && f2Result && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm space-y-3">
+          <p className="text-sm font-bold text-emerald-900">Look at that.</p>
+          <p className="text-sm text-emerald-900 leading-relaxed">
+            Roughly <strong>3 red : 1 white</strong>. The white is back — pure white,
+            unchanged, exactly like the original grandparent plant. It wasn't destroyed
+            in the F1, it was <strong>hidden</strong>. It reappeared in about one
+            quarter of the F2 offspring.
+          </p>
+          <p className="text-sm text-emerald-900 leading-relaxed">
+            This is <strong>particulate inheritance</strong>: traits are carried by
+            discrete factors that stay distinct even when they're invisible. Blending
+            inheritance is wrong. This is the founding observation of genetics, and
+            it's what Mendel saw in his own garden in the 1860s.
+          </p>
+          {prediction === 'particulate' && (
+            <p className="text-sm font-semibold text-emerald-900">
+              You predicted this.
+            </p>
+          )}
+          {prediction && prediction !== 'particulate' && (
+            <p className="text-sm text-emerald-800 italic">
+              Your prediction was wrong — and so was the consensus of every biologist
+              in 1865. That's okay. Science works by predicting, observing, and updating.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Beat 5 — Exit question. Hooks into Exp 1. Both the mechanistic
+          answer (c) and the honest "take me to Exp 1" hook (d) are accepted;
+          (a) and (b) each get specific teaching feedback. */}
+      {step >= 3 && f2Result && (
+        <QuestionPanel
+          question="Why does white reappear in roughly 1/4 of the F2 offspring?"
+          correct={exitCorrect}
+          feedback={
+            exitAnswer
+              ? EXIT_OPTIONS.find(o => o.key === exitAnswer)?.feedback
+              : undefined
+          }
+        >
+          <div className="space-y-2">
+            {EXIT_OPTIONS.map(opt => {
+              const picked = exitAnswer === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => {
+                    setExitAnswer(opt.key);
+                    setExitCorrect(opt.correct);
+                  }}
+                  className={`w-full text-left rounded-lg border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                    picked
+                      ? opt.correct
+                        ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
+                        : 'border-red-300 bg-red-50 text-red-900'
+                      : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </QuestionPanel>
+      )}
+    </div>
+  );
+}
+
 function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
   const parentRR = useMemo(() => makeOrganism({ color: ['R', 'R'] }, 'p1'), []);
   const parentrr = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'p2'), []);
@@ -1201,13 +1504,14 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
 // ── Module definition ───────────────────────────────────────────────────
 
 const EXPERIMENTS = [
-  { id: 'one_gene', title: '1. One Gene', subtitle: 'Discover dominance and the 3:1 ratio', Component: Exp1_OneGene },
-  { id: 'prediction', title: '2. Predict Offspring', subtitle: 'Use genotypes to predict ratios', Component: Exp2_GenotypePrediction },
-  { id: 'incomplete', title: '3. Incomplete Dominance', subtitle: 'When the heterozygote looks different', Component: Exp3_IncompleteDominance },
-  { id: 'test_cross', title: '4. The Test Cross', subtitle: 'Unmask hidden genotypes', Component: Exp4_TestCross },
-  { id: 'two_genes', title: '5. Two Genes', subtitle: 'Independent assortment and 9:3:3:1', Component: Exp5_TwoGenes },
-  { id: 'epistasis', title: '6. Epistasis', subtitle: 'When one gene masks another', Component: Exp6_Epistasis },
-  { id: 'quantitative', title: '7. Many Genes', subtitle: 'From Mendelian to quantitative', Component: Exp7_Quantitative },
+  { id: 'particulate-vs-blending', title: "1. Mendel's Insight — 1865", subtitle: 'Particulate vs blending inheritance', Component: Exp0_ParticulateVsBlending },
+  { id: 'one_gene', title: '2. One Gene', subtitle: 'Discover dominance and the 3:1 ratio', Component: Exp1_OneGene },
+  { id: 'prediction', title: '3. Predict Offspring', subtitle: 'Use genotypes to predict ratios', Component: Exp2_GenotypePrediction },
+  { id: 'incomplete', title: '4. Incomplete Dominance', subtitle: 'When the heterozygote looks different', Component: Exp3_IncompleteDominance },
+  { id: 'test_cross', title: '5. The Test Cross', subtitle: 'Unmask hidden genotypes', Component: Exp4_TestCross },
+  { id: 'two_genes', title: '6. Two Genes', subtitle: 'Independent assortment and 9:3:3:1', Component: Exp5_TwoGenes },
+  { id: 'epistasis', title: '7. Epistasis', subtitle: 'When one gene masks another', Component: Exp6_Epistasis },
+  { id: 'quantitative', title: '8. Many Genes', subtitle: 'From Mendelian to quantitative', Component: Exp7_Quantitative },
 ];
 
 const MENDELIAN_MODULE: ModuleDefinition = {
