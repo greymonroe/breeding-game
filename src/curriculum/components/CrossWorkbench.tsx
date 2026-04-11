@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { OrganismCard } from './OrganismCard';
 import { RatioBar } from './RatioBar';
 import {
-  cross, getEpistasisPhenotype, PIGMENT_GENE, AGOUTI_GENE,
+  cross, getEpistasisPhenotype, ALEURONE_C_GENE, ALEURONE_PR_GENE,
   type GeneDefinition, type Organism, type CrossResult,
 } from '../genetics-engine';
 
@@ -25,7 +25,7 @@ export function CrossWorkbench({
   if (epistasis && crossResult) {
     displayCounts = {};
     for (const off of crossResult.offspring) {
-      const ep = getEpistasisPhenotype(off, PIGMENT_GENE, AGOUTI_GENE);
+      const ep = getEpistasisPhenotype(off, ALEURONE_C_GENE, ALEURONE_PR_GENE);
       displayCounts[ep] = (displayCounts[ep] ?? 0) + 1;
     }
   }

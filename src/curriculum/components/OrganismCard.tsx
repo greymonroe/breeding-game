@@ -1,7 +1,7 @@
 import { OrganismIcon } from '../../shared/icons';
 import {
   getPhenotype, getPhenotypeLabel, getGenotypeLabel,
-  getEpistasisPhenotype, PIGMENT_GENE, AGOUTI_GENE,
+  getEpistasisPhenotype, ALEURONE_C_GENE, ALEURONE_PR_GENE,
   type GeneDefinition, type Organism,
 } from '../genetics-engine';
 import { epistasisColors } from './colors';
@@ -19,7 +19,7 @@ export function OrganismCard({
   let displayLabel = getPhenotypeLabel(org, genes);
 
   if (epistasis) {
-    const ep = getEpistasisPhenotype(org, PIGMENT_GENE, AGOUTI_GENE);
+    const ep = getEpistasisPhenotype(org, ALEURONE_C_GENE, ALEURONE_PR_GENE);
     displayLabel = ep;
     // Maize aleurone palette — single source of truth in ./colors.ts.
     displayColor = epistasisColors(ep) ?? '#ccc';

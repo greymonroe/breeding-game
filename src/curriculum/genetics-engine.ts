@@ -96,10 +96,16 @@ export const PLANT_HEIGHT: GeneDefinition = {
   colorMap: { 'Tall': '#4a8a5a', 'Short': '#8ab47a' },
 };
 
-// Epistasis example: maize aleurone color (C colored-vs-colorless + R purple-vs-red).
-// cc kernels are colorless regardless of R; C_ R_ → Purple, C_ rr → Red.
-// Variable names kept (PIGMENT_GENE / AGOUTI_GENE) for backward compatibility with importers.
-export const PIGMENT_GENE: GeneDefinition = {
+// Epistasis example: maize aleurone color — two interacting loci.
+//   - C1 (colored vs colorless): controls whether any pigment is deposited.
+//     cc kernels are always colorless regardless of the pigment-type gene.
+//   - Pr1 (Purple aleurone1): controls which pigment forms when C is present.
+//     Pr_ → purple anthocyanin; prpr → red (pelargonidin, lacks the 3'-
+//     hydroxylation that makes the purple cyanidin-based pigment).
+// The real maize hydroxylation locus is *pr1*, not R — R1/B1 control whether
+// pigment deposits at all (that's the role our C-gene plays here). The 9:3:4
+// epistatic math is unchanged; only the gene names are corrected.
+export const ALEURONE_C_GENE: GeneDefinition = {
   id: 'aleurone_c',
   name: 'Aleurone Color (C)',
   alleles: ['C', 'c'],
@@ -108,12 +114,12 @@ export const PIGMENT_GENE: GeneDefinition = {
   colorMap: { 'Colored': '#6b21a8', 'Colorless': '#fef3c7' },
 };
 
-export const AGOUTI_GENE: GeneDefinition = {
-  id: 'aleurone_r',
-  name: 'Aleurone Pigment (R)',
-  alleles: ['R', 'r'],
+export const ALEURONE_PR_GENE: GeneDefinition = {
+  id: 'aleurone_pr',
+  name: 'Aleurone Pigment Type (Pr1)',
+  alleles: ['Pr', 'pr'],
   dominance: 'complete',
-  phenotypeMap: { 'RR': 'Purple', 'Rr': 'Purple', 'rr': 'Red' },
+  phenotypeMap: { 'PrPr': 'Purple', 'Prpr': 'Purple', 'prpr': 'Red' },
   colorMap: { 'Purple': '#6b21a8', 'Red': '#c2410c' },
 };
 
@@ -179,17 +185,17 @@ export function getGenotypeLabel(org: Organism, genes: GeneDefinition[]): string
 }
 
 /** Epistasis phenotype: maize aleurone color (recessive epistasis, 9:3:4).
- *  cc is epistatic and masks the R gene → Colorless.
- *  Otherwise R_ → Purple, rr → Red. */
+ *  cc is epistatic and masks the Pr gene → Colorless.
+ *  Otherwise Pr_ → Purple, prpr → Red. */
 export function getEpistasisPhenotype(
   org: Organism,
-  pigmentGene: GeneDefinition,
-  agoutiGene: GeneDefinition
+  cGene: GeneDefinition,
+  prGene: GeneDefinition
 ): string {
-  const pigment = getPhenotype(org, [pigmentGene])[pigmentGene.id];
-  if (pigment === 'Colorless') return 'Colorless'; // cc is epistatic — masks R
-  const r = getPhenotype(org, [agoutiGene])[agoutiGene.id];
-  return r === 'Purple' ? 'Purple' : 'Red';
+  const pigment = getPhenotype(org, [cGene])[cGene.id];
+  if (pigment === 'Colorless') return 'Colorless'; // cc is epistatic — masks Pr
+  const pr = getPhenotype(org, [prGene])[prGene.id];
+  return pr === 'Purple' ? 'Purple' : 'Red';
 }
 
 /** Compute additive genetic value from multiple QTL genes */

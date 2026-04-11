@@ -11,7 +11,7 @@
  *  3. Incomplete Dominance — red x white -> pink, different from #1
  *  4. Test Cross — determine if red is RR or Rr
  *  5. Two Genes — dihybrid cross, independent assortment, 9:3:3:1
- *  6. Epistasis — coat color, modified ratios (9:3:4)
+ *  6. Epistasis — maize aleurone color, modified ratios (9:3:4)
  *  7. Polygenic -> Quantitative — 1,2,5,10 genes -> continuous distribution
  */
 
@@ -19,7 +19,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   cross, makeOrganism, getAdditiveValue, makeAdditiveGene,
   FLOWER_COLOR, FLOWER_COLOR_INCOMPLETE, SEED_SHAPE,
-  PIGMENT_GENE, AGOUTI_GENE,
+  ALEURONE_C_GENE, ALEURONE_PR_GENE,
   type CrossResult, type Organism, type GeneDefinition,
 } from './genetics-engine';
 import {
@@ -265,6 +265,11 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
           <strong>white-flowered pea plant</strong>, then take the offspring (F1) and
           cross them with each other to get a second generation (F2). Which of these
           do you think will happen?
+        </p>
+        <p className="text-[11px] italic text-violet-700 leading-relaxed">
+          (Historical note: Mendel's actual cross used <strong>purple</strong>-flowered
+          peas &times; white-flowered peas. We've rendered the purple parent as red here
+          for screen legibility — the genetics is identical.)
         </p>
         <div className="space-y-2">
           {[
@@ -635,16 +640,21 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
         </QuestionPanel>
       )}
 
-      {/* Dominance molecular callout — kill the "stronger allele" misconception. */}
+      {/* Dominance molecular callout — kill the "stronger allele" misconception.
+          Pea flower color is controlled by a bHLH transcription factor (the
+          A locus, a regulator of anthocyanin biosynthesis), not an enzyme —
+          so the callout says "working protein" rather than "working enzyme."
+          The pedagogical point ("one working copy is enough") is unchanged. */}
       {step >= 2 && (
         <div className="rounded-2xl border border-violet-200 bg-violet-50 p-6 shadow-sm">
           <p className="text-sm font-bold text-violet-900 mb-2">Why is R dominant over r?</p>
           <p className="text-sm text-violet-800 leading-relaxed">
-            The <strong>R</strong> allele codes for a working enzyme that makes red pigment.
-            The <strong>r</strong> allele is a broken version — it can't make pigment.
-            A plant with even one R allele (Rr) makes <em>enough</em> pigment to look red.
-            Dominance isn't about which allele is "stronger" or "wins" — it's about whether
-            one working copy is enough to produce the phenotype.
+            The <strong>R</strong> allele codes for a working protein that turns on the
+            red pigment pathway. The <strong>r</strong> allele is a broken version — it
+            can't switch on the pathway. A plant with even one R allele (Rr) makes{' '}
+            <em>enough</em> pigment to look red. Dominance isn't about which allele is
+            "stronger" or "wins" — it's about whether one working copy is enough to
+            produce the phenotype.
           </p>
         </div>
       )}
@@ -1282,7 +1292,7 @@ const EXP4_BACKWARD_OPTIONS_ALLRED = [
     label: 'RR (homozygous dominant)',
     correct: true,
     feedback:
-      'Correct. If the mystery plant were Rr, an Rr × rr cross would produce roughly 50% white offspring. With 40 offspring and zero white, the probability that an Rr parent gave you that result by chance is 0.5^40 ≈ 10^-12 — vanishingly small. The mystery plant must be RR.',
+      'Correct. If the mystery plant were Rr, an Rr × rr cross would produce roughly 50% white offspring. With 40 offspring and zero white, the probability that an Rr parent gave you that result by chance is 0.5^40 ≈ 10^-13 — roughly one in a trillion, vanishingly small. The mystery plant must be RR.',
   },
   {
     key: 'Rr',
@@ -1693,6 +1703,11 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
         <strong>dihybrid</strong> ("di-" = two). Cross a <strong>Red/Round</strong> plant
         with a <strong>White/Wrinkled</strong> plant.
       </p>
+      <p className="text-[11px] italic text-stone-500 leading-relaxed">
+        (Notation note: Mendel's original symbol for the seed-shape gene was{' '}
+        <em>R/r</em>. We're using <em>S/s</em> here so it doesn't collide with the
+        flower-color letters we've already been using — the biology is the same.)
+      </p>
 
       <CrossWorkbench
         parentA={parentAABB} parentB={parentaabb} genes={[FLOWER_COLOR, SEED_SHAPE]}
@@ -1931,7 +1946,17 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
         </QuestionPanel>
       )}
 
-      {/* Law of Independent Assortment — named callout + warning that the law can break. */}
+      {/* Law of Independent Assortment — named callout + warning that the
+          law can break. F-005: the old framing said "Mendel's seven traits
+          were all on different chromosomes, so he got lucky," which is a
+          textbook myth. Of Mendel's seven gene pairs, only about four are on
+          truly different chromosomes — three loci (V, Fa, Le) all sit on
+          pea chromosome 4 (Reid & Ross 2011; Blixt 1975). The reason his
+          published dihybrid ratios looked clean is that the specific pairs
+          he crossed were either on different chromosomes or far enough
+          apart on the same chromosome to behave as effectively unlinked.
+          Mendel didn't know about chromosomes at all — he just happened to
+          pick pairs whose gametes assorted independently. */}
       {forwardEverCorrect && (
         <>
           <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm space-y-3">
@@ -1941,6 +1966,16 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             <p className="text-sm text-stone-700 leading-relaxed">
               When two (or more) genes are on <em>different chromosomes</em>, their alleles segregate
               into gametes independently. This is why dihybrid crosses give 9:3:3:1 instead of 3:1.
+            </p>
+            <p className="text-[11px] italic text-stone-500 leading-relaxed">
+              Historical note: Mendel didn't know about chromosomes. He worked out this law by
+              counting phenotypes. In fact, some of his seven pea loci sit on the <em>same</em>{' '}
+              chromosome — three of them (<em>V</em>, <em>Fa</em>, <em>Le</em>) are all on
+              chromosome 4. The dihybrid pairs he actually published simply happened to be either
+              on different chromosomes or far enough apart on the same chromosome to behave as
+              effectively unlinked. The framing "Mendel got lucky because all seven traits are on
+              different chromosomes" is a textbook myth — <em>some</em> of his pairs were lucky,
+              not all seven traits.
             </p>
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
               <p className="text-sm text-amber-900">
@@ -1972,6 +2007,13 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
               Wonder prompt: what do you think would happen if the color gene and the shape gene
               were right next to each other on the same chromosome? Pick whichever option feels
               most likely to you — you'll find out for sure in the Linkage module.
+            </p>
+            <p className="text-[11px] italic text-violet-800 leading-relaxed">
+              (Mendel never ran into this. The dihybrid pairs he published — yellow vs green
+              seed color with round vs wrinkled seed shape, for example — happened to be on
+              different chromosomes or far enough apart to assort as if unlinked. Not all of
+              his seven loci are actually on different chromosomes, but the specific pairs he
+              crossed were. Close-linked pairs break the 9:3:3:1 ratio completely.)
             </p>
 
             {/* F-009: 7:1:1:7 vs 1:1:1:1 linkage preview. Closes Success
@@ -2118,7 +2160,7 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
 
 // Backwards options for Exp 6 — given 9:3:4, what does it tell you about
 // gene interaction? Uses the maize aleurone labels the forward experiment
-// teaches: Purple (R_C_) / Red (rrC_) / Colorless (anything cc).
+// teaches: Purple (Pr_C_) / Red (prprC_) / Colorless (anything cc).
 // F-015: correct option used to be a ~22-word textbook definition while
 // distractors were 3-6 words. A student could pick by length alone.
 // Correct option is now ~6 words; distractors are padded to match so
@@ -2126,21 +2168,21 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
 const EXP6_BACKWARD_OPTIONS = [
   {
     key: 'recessive_epistasis',
-    label: 'Recessive epistasis — cc masks the R-gene.',
+    label: 'Recessive epistasis — cc masks the Pr-gene.',
     correct: true,
     feedback:
-      'Correct. The 9:3:4 ratio is the signature of recessive epistasis. Without the C-gene\u2019s product (when cc), the R-gene can\u2019t produce its colored pigment — so all cc offspring (3+1 of the 16 = 4) are colorless regardless of R/r genotype. Purple = R_C_ (9), red = rrC_ (3), colorless = anything-cc (4).',
+      'Correct. The 9:3:4 ratio is the signature of recessive epistasis. Without the C-gene\u2019s product (when cc), the Pr-gene can\u2019t produce its colored pigment — so all cc offspring (3+1 of the 16 = 4) are colorless regardless of Pr/pr genotype. Purple = Pr_C_ (9), red = prprC_ (3), colorless = anything-cc (4).',
   },
   {
     key: 'linked',
-    label: 'Tight linkage between C and R — parental combinations dominate the brood.',
+    label: 'Tight linkage between C and Pr — parental combinations dominate the brood.',
     correct: false,
     feedback:
-      'Linkage would distort the ratio away from a clean 16-part split. The 9:3:4 still adds to 16, so it\u2019s still independent assortment — what changed is that two of the four phenotype classes (colorless from R_cc and rrcc) collapsed into one because of recessive epistasis.',
+      'Linkage would distort the ratio away from a clean 16-part split. The 9:3:4 still adds to 16, so it\u2019s still independent assortment — what changed is that two of the four phenotype classes (colorless from Pr_cc and prprcc) collapsed into one because of recessive epistasis.',
   },
   {
     key: 'incomplete',
-    label: 'Incomplete dominance at the R locus making heterozygotes colorless.',
+    label: 'Incomplete dominance at the Pr locus making heterozygotes colorless.',
     correct: false,
     feedback:
       'Incomplete dominance affects a single gene\u2019s heterozygotes — it would create a third intermediate phenotype (like pink) with a 1:2:1 ratio, not a 9:3:4. Epistasis is one gene masking another, which is what 9:3:4 tells you.',
@@ -2181,13 +2223,13 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
     }
   }, [backCorrect, onComplete]);
 
-  // F1 dihybrid for maize aleurone color: Cc Rr × Cc Rr.
+  // F1 dihybrid for maize aleurone color: Cc Pr/pr × Cc Pr/pr.
   // Use the gene objects' id fields directly so this stays consistent if the engine renames them.
   const f1 = useMemo(
     () => makeOrganism(
       {
-        [PIGMENT_GENE.id]: [PIGMENT_GENE.alleles[0], PIGMENT_GENE.alleles[1]],
-        [AGOUTI_GENE.id]: [AGOUTI_GENE.alleles[0], AGOUTI_GENE.alleles[1]],
+        [ALEURONE_C_GENE.id]: [ALEURONE_C_GENE.alleles[0], ALEURONE_C_GENE.alleles[1]],
+        [ALEURONE_PR_GENE.id]: [ALEURONE_PR_GENE.alleles[0], ALEURONE_PR_GENE.alleles[1]],
       },
       'F1',
     ),
@@ -2206,44 +2248,48 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
           <em>any</em> pigment is deposited at all (<em>C</em> = colored, <em>c</em> = colorless).
         </li>
         <li>
-          The <strong>R-gene</strong> (alleles <em>R</em> and <em>r</em>): controls{' '}
-          <em>which</em> pigment forms when C is present (<em>R</em> = purple anthocyanin,{' '}
-          <em>r</em> = red).
+          The <strong>Pr-gene</strong> (<em>pr1</em>, alleles <em>Pr</em> and <em>pr</em>):
+          controls <em>which</em> pigment forms when C is present. <em>Pr</em> adds a
+          3'-hydroxyl group to the precursor, producing the purple anthocyanin{' '}
+          <em>cyanidin</em>; <em>prpr</em> kernels lack that hydroxylation step and
+          accumulate the red pigment <em>pelargonidin</em> instead.
         </li>
       </ul>
       <p className="text-sm text-stone-600">
         Here's the catch: a <strong>cc</strong> kernel is always colorless, regardless of the
-        R-gene genotype — without a functional C product there is no pigment precursor for R
+        Pr-gene genotype — without a functional C product there is no pigment precursor for Pr
         to act on. This is <strong>epistasis</strong>: the recessive cc genotype{' '}
-        <em>masks</em> whatever the R-gene would otherwise produce.
+        <em>masks</em> whatever the Pr-gene would otherwise produce.
       </p>
 
       {/* Notation primer for the underscore-wildcard convention. The forward
-          and backward feedback in this experiment both use `R_C_`, `rrC_`, etc.
-          to describe epistatic genotype classes — this is the first time the
-          student sees that notation in the module, so define it before they
-          encounter it in graded feedback. (F-006 CRITICAL) */}
+          and backward feedback in this experiment both use `Pr_C_`, `prprC_`,
+          etc. to describe epistatic genotype classes — this is the first time
+          the student sees that notation in the module, so define it before
+          they encounter it in graded feedback. (F-006 CRITICAL) */}
       <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
         <p className="text-sm font-bold text-violet-900 mb-1">A note on notation</p>
         <p className="text-sm text-violet-800 leading-relaxed">
-          We'll write <strong>R_</strong> as shorthand for "any genotype carrying at least one
-          R allele" — so <strong>R_</strong> groups <em>RR</em> and <em>Rr</em> together. By the
-          same convention, <strong>R_C_</strong> means "has at least one R <em>and</em> at least
-          one C" (dominant for both), and <strong>rrC_</strong> means "homozygous rr but carrying
-          at least one C." The underscore is a wildcard for "either allele." This shorthand makes
-          epistatic ratios easier to read when phenotype classes collapse several genotypes.
+          We'll write <strong>Pr_</strong> as shorthand for "any genotype carrying at least one
+          Pr allele" — so <strong>Pr_</strong> groups <em>PrPr</em> and <em>Prpr</em> together.
+          By the same convention, <strong>Pr_C_</strong> means "has at least one Pr <em>and</em>{' '}
+          at least one C" (dominant for both), and <strong>prprC_</strong> means "homozygous
+          <em> prpr</em> but carrying at least one C." The underscore is a wildcard for
+          "either allele." This shorthand makes epistatic ratios easier to read when
+          phenotype classes collapse several genotypes.
         </p>
       </div>
 
       <p className="text-sm text-stone-600">
-        Cross two F1 kernels (both <strong>Cc Rr</strong>). A vanilla dihybrid would give 9:3:3:1,
-        but with cc masking R the ratio is modified. Count the classes and decide what you see.
+        Cross two F1 kernels (both <strong>Cc Pr/pr</strong>). A vanilla dihybrid would give
+        9:3:3:1, but with cc masking Pr the ratio is modified. Count the classes and decide
+        what you see.
       </p>
 
       <CrossWorkbench
-        parentA={f1} parentB={f1} genes={[PIGMENT_GENE, AGOUTI_GENE]}
+        parentA={f1} parentB={f1} genes={[ALEURONE_C_GENE, ALEURONE_PR_GENE]}
         onCross={(r) => { setF2Result(r); setStep(1); }} crossResult={f2Result}
-        sampleSize={800} label="F2: Cc Rr × Cc Rr" epistasis
+        sampleSize={800} label="F2: Cc Pr/pr × Cc Pr/pr" epistasis
       />
 
       {step >= 1 && f2Result && (
@@ -2251,7 +2297,7 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
           question="Count the phenotypic classes on the bar. Which ratio fits the observed counts?"
           correct={correct}
           feedback={correct === true
-            ? "9 purple : 3 red : 4 colorless. The colorless class (4) absorbs what would have been two separate classes in a normal dihybrid (3 ccR_ + 1 ccrr), because cc is epistatic to R. Without the C-encoded precursor, the R-gene's effect is invisible. This is recessive epistasis."
+            ? "9 purple : 3 red : 4 colorless. The colorless class (4) absorbs what would have been two separate classes in a normal dihybrid (3 ccPr_ + 1 ccprpr), because cc is epistatic to Pr. Without the C-encoded precursor, the Pr-gene's effect is invisible. This is recessive epistasis."
             : correct === false
             ? "Three classes appear: purple, red, and colorless. The colorless class is bigger than you'd expect from a vanilla dihybrid — what ratio does that point to?"
             : undefined}
@@ -2428,8 +2474,9 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
         Mendel's 3:1 and 9:3:3:1 ratios work beautifully for traits with a handful of discrete classes — flower color, seed shape, kernel color.
         But most of the traits a plant breeder actually cares about — <strong>tomato fruit weight</strong>, maize kernel number, wheat yield — vary
         <em> continuously</em>. A tomato can weigh anywhere from under a gram (wild ancestors) to more than a kilogram (modern cultivars), with every value in between.
-        Yule (1902) first argued that continuous variation was perfectly compatible with Mendel's laws if many genes each contributed a small additive effect.
-        We now know tomato fruit weight is controlled by ~30 quantitative trait loci (QTLs), each adding a little to the total.
+        Yule (1902) first argued <em>theoretically</em> that continuous variation was perfectly compatible with Mendel's laws if many genes each contributed a small additive effect.
+        Nilsson-Ehle (1908) confirmed the idea <em>experimentally</em> with wheat kernel color — crossing red-kerneled and white-kerneled lines and watching the F2 fall into a smooth bell of intermediate shades, exactly as predicted for a three-gene additive model.
+        Modern QTL mapping has since shown that tomato fruit weight is controlled by ~30 quantitative trait loci, each adding a little to the total.
       </p>
       <p className="text-sm text-stone-600">
         Let's test Yule's idea. Cross a <strong>large-fruited</strong> parent (all favorable alleles) with a <strong>small-fruited</strong> parent (all unfavorable alleles),
