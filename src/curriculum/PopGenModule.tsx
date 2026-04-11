@@ -23,12 +23,13 @@ import {
 // ── Shared visualization components ─────────────────────────────────────
 
 /** SVG line chart showing allele frequency trajectories */
-function FrequencyChart({ trajectories, generations, height = 200, colors, labels }: {
+function FrequencyChart({ trajectories, generations, height = 200, colors, labels, yLabel = 'Freq(A)' }: {
   trajectories: number[][];
   generations: number;
   height?: number;
   colors?: string[];
   labels?: string[];
+  yLabel?: string;
 }) {
   const width = 500;
   const pad = { top: 20, right: 20, bottom: 30, left: 40 };
@@ -64,7 +65,7 @@ function FrequencyChart({ trajectories, generations, height = 200, colors, label
         {/* Y-axis label */}
         <text x={12} y={pad.top + plotH / 2} textAnchor="middle"
           fontSize="9" fill="#78716c" transform={`rotate(-90, 12, ${pad.top + plotH / 2})`}>
-          Freq(A)
+          {yLabel}
         </text>
 
         {/* Trajectories */}
@@ -182,8 +183,9 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
       <PopulationGrid genotypes={pop} />
 
       <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
-        <strong>Count the genotypes:</strong> {pop.AA} AA, {pop.Aa} Aa, {pop.aa} aa
-        <br />Total individuals: {pop.AA + pop.Aa + pop.aa} | Total alleles: {totalAlleles}
+        <strong>Your task:</strong> Count the genotypes directly from the grid above.
+        There are <strong>{pop.AA + pop.Aa + pop.aa}</strong> diploid individuals,
+        so <strong>{totalAlleles}</strong> alleles total. Then compute p and q.
       </div>
 
       <QuestionPanel
@@ -192,7 +194,7 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
         feedback={correct === true
           ? `Correct! p(A) = ${trueP.toFixed(3)}, q(a) = ${trueQ.toFixed(3)}. Allele frequency is the proportion of a specific allele in the population. Note p + q = 1.`
           : correct === false
-          ? `Not quite. Count A alleles: each AA contributes 2, each Aa contributes 1. Total A = 2(${pop.AA}) + ${pop.Aa} = ${countA}. Then p = ${countA}/${totalAlleles} = ${trueP.toFixed(3)}.`
+          ? `Not quite. Look carefully at the grid and count how many dark (AA), medium (Aa), and light (aa) circles you see. Then use p = (2·AA + Aa) / (2N). Each AA contributes 2 A alleles; each Aa contributes 1.`
           : undefined}
       >
         <div className="flex gap-3 items-end flex-wrap">
@@ -222,7 +224,7 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
 
 function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
-  const [p] = useState(0.4);
+  const [p] = useState(0.6);
   const [predAA, setPredAA] = useState('');
   const [predAa, setPredAa] = useState('');
   const [predaa, setPredaa] = useState('');
@@ -262,13 +264,25 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
         p^2 (AA), 2pq (Aa), q^2 (aa) after one generation of random mating.
       </div>
 
+      <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
+        <strong className="text-stone-800">HWE assumes all five of the following:</strong>
+        <ol className="list-decimal ml-5 mt-1 space-y-0.5">
+          <li>Large population (no genetic drift)</li>
+          <li>Random mating (no assortative mating or inbreeding)</li>
+          <li>No selection (all genotypes equally fit)</li>
+          <li>No mutation (no new alleles)</li>
+          <li>No migration (a closed population)</li>
+        </ol>
+        <div className="mt-1 italic">When any of these break, the population departs from HWE.</div>
+      </div>
+
       <QuestionPanel
         question={`With p = ${p}, predict the genotype frequencies (to 2 decimal places):`}
         correct={predCorrect}
         feedback={predCorrect === true
           ? `Correct! AA = p^2 = ${hw.AA.toFixed(2)}, Aa = 2pq = ${hw.Aa.toFixed(2)}, aa = q^2 = ${hw.aa.toFixed(2)}. These sum to 1.`
           : predCorrect === false
-          ? `Remember: AA = p^2 = ${p}^2, Aa = 2pq = 2(${p})(${1 - p}), aa = q^2 = ${1 - p}^2.`
+          ? `Remember: AA = p^2 = ${p}^2, Aa = 2pq = 2(${p})(${(1 - p).toFixed(2)}), aa = q^2 = ${(1 - p).toFixed(2)}^2.`
           : undefined}
       >
         <div className="flex gap-3 items-end flex-wrap">
@@ -351,12 +365,18 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
+  // Quantitative prediction: how many of nReps (N=20, p0=0.5) fix the A allele?
+  const [fixAPred, setFixAPred] = useState('');
+  const [fixAPredCorrect, setFixAPredCorrect] = useState<boolean | null>(null);
+  const [predictionLocked, setPredictionLocked] = useState(false);
+
   const nReps = 10;
   const gens = 50;
+  const initialFreq = 0.5;
 
   const runSim = useCallback(() => {
-    const small = simulateReplicates({ popSize: 20, initialFreqA: 0.5, generations: gens }, nReps);
-    const large = simulateReplicates({ popSize: 500, initialFreqA: 0.5, generations: gens }, nReps);
+    const small = simulateReplicates({ popSize: 20, initialFreqA: initialFreq, generations: gens }, nReps);
+    const large = simulateReplicates({ popSize: 500, initialFreqA: initialFreq, generations: gens }, nReps);
     setSmallResults(small.map(r => r.freqHistory));
     setLargeResults(large.map(r => r.freqHistory));
     setHasRun(true);
@@ -365,16 +385,51 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
   const smallFinal = smallResults?.map(h => h[h.length - 1]) ?? [];
   const largeFinal = largeResults?.map(h => h[h.length - 1]) ?? [];
   const smallFixed = smallFinal.filter(f => f === 0 || f === 1).length;
+  const smallFixedA = smallFinal.filter(f => f === 1).length;
+
+  const checkFixAPred = () => {
+    const guess = parseInt(fixAPred, 10);
+    if (Number.isNaN(guess)) { setFixAPredCorrect(false); return; }
+    // Neutral fixation probability = p0 = 0.5, so expected count ≈ 5/10.
+    // Accept ±2 (i.e. 3..7) since stochastic.
+    const ok = guess >= 3 && guess <= 7;
+    setFixAPredCorrect(ok);
+    if (ok) setPredictionLocked(true);
+  };
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
         Does population size matter for allele frequency change? Let's compare <strong>small (N=20)</strong>
-        vs <strong>large (N=500)</strong> populations, both starting at p = 0.5, with no selection.
+        {' '}vs <strong>large (N=500)</strong> populations, both starting at p = {initialFreq}, with no selection.
       </p>
 
-      <button onClick={runSim}
-        className="rounded-xl bg-gradient-to-b from-violet-500 to-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg">
+      <QuestionPanel
+        question={`Before running the simulation, make a prediction: out of ${nReps} independent small (N=20) replicates that start at p=${initialFreq} and run for ${gens} generations, how many do you expect to FIX the A allele (reach p=1)?`}
+        correct={fixAPredCorrect}
+        feedback={fixAPredCorrect === true
+          ? `Good prediction. For a neutral allele, the probability of eventual fixation equals its starting frequency. So with p0 = ${initialFreq}, you expect roughly ${(initialFreq * nReps).toFixed(0)} out of ${nReps} replicates to fix A (the rest fix a). Any answer in the range 3–7 is within reasonable sampling variation.`
+          : fixAPredCorrect === false
+          ? `Hint: for a neutral allele, the probability that it eventually reaches fixation equals its starting frequency. With p0 = ${initialFreq}, what do you predict out of ${nReps} replicates?`
+          : undefined}
+      >
+        <div className="flex gap-3 items-end flex-wrap">
+          <div>
+            <label className="block text-xs text-stone-500 mb-1">Reps that fix A (0–{nReps})</label>
+            <input type="number" step="1" min="0" max={nReps} value={fixAPred}
+              disabled={predictionLocked}
+              onChange={e => setFixAPred(e.target.value)}
+              className="w-24 rounded-lg border-2 border-stone-200 px-2 py-1.5 text-sm focus:border-violet-400 outline-none disabled:bg-stone-100" />
+          </div>
+          <button onClick={checkFixAPred} disabled={predictionLocked}
+            className="rounded-xl bg-gradient-to-b from-violet-500 to-violet-600 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg disabled:opacity-50">
+            Lock in prediction
+          </button>
+        </div>
+      </QuestionPanel>
+
+      <button onClick={runSim} disabled={!predictionLocked}
+        className="rounded-xl bg-gradient-to-b from-violet-500 to-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
         {hasRun ? 'Run Again' : 'Run 10 Replicates Each'}
       </button>
 
@@ -385,7 +440,9 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
               <h3 className="text-sm font-bold text-stone-700 text-center">Small Population (N=20)</h3>
               <FrequencyChart trajectories={smallResults} generations={gens} height={180} />
               <div className="text-xs text-center text-stone-500">
-                Fixed: {smallFixed}/{nReps} replicates
+                Fixed (either allele): {smallFixed}/{nReps} &middot;
+                {' '}<span className="text-violet-700 font-semibold">Fixed A: {smallFixedA}/{nReps}</span>
+                {' '}(predicted {fixAPred || '—'})
               </div>
             </div>
             <div className="space-y-2">
@@ -437,7 +494,7 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
 // ── Experiment 4: Natural Selection ─────────────────────────────────────
 
 function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
-  const [selCoeff, setSelCoeff] = useState(0.1);
+  const [selCoeff, setSelCoeff] = useState(0.25);
   const [results, setResults] = useState<number[][] | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
@@ -468,6 +525,13 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
         Individuals with genotype <strong>aa</strong> have reduced fitness (survival disadvantage).
         Starting with p(A) = 0.2, watch how selection increases the favorable allele.
       </p>
+
+      <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 text-xs text-violet-800">
+        <strong>Try it:</strong> drag the slider to small values (s ≈ 0.02) and large values (s ≈ 0.4).
+        Pay attention to the <em>early</em> generations when q = freq(a) is high. Does A rise immediately,
+        or is there a slow-start phase? Recessive deleterious alleles hide in heterozygotes, so selection
+        against aa is weak while q is large — and accelerates as A becomes common.
+      </div>
 
       <div className="flex items-center gap-4 flex-wrap">
         <label className="text-sm font-semibold text-stone-600">
@@ -540,24 +604,37 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
   const gens = 80;
 
   const runSim = useCallback(() => {
-    // Pop 1 starts at p=0.1, receives migrants from pop with p=0.9
-    const pop1 = simulate({
-      popSize: 500, initialFreqA: 0.1, generations: gens,
-      migrationRate: migRate, migrantFreqA: 0.9,
-    });
-    // Pop 2 starts at p=0.9, receives migrants from pop with p=0.1
-    const pop2 = simulate({
-      popSize: 500, initialFreqA: 0.9, generations: gens,
-      migrationRate: migRate, migrantFreqA: 0.1,
-    });
-    setResults([pop1.freqHistory, pop2.freqHistory]);
+    // Two-island migration model.
+    // Each generation, both populations exchange a fraction m of individuals with
+    // each other (deterministic, no drift — cleaner pedagogy):
+    //   p1' = (1 - m) * p1 + m * p2
+    //   p2' = (1 - m) * p2 + m * p1
+    // In this symmetric exchange, both populations converge to the average
+    // (p1_0 + p2_0) / 2 = 0.5 as t → ∞.
+    const m = migRate;
+    const p1Init = 0.1;
+    const p2Init = 0.9;
+    let p1 = p1Init;
+    let p2 = p2Init;
+    const history1: number[] = [p1];
+    const history2: number[] = [p2];
+    for (let t = 0; t < gens; t++) {
+      const newP1 = (1 - m) * p1 + m * p2;
+      const newP2 = (1 - m) * p2 + m * p1;
+      p1 = newP1;
+      p2 = newP2;
+      history1.push(p1);
+      history2.push(p2);
+    }
+    setResults([history1, history2]);
   }, [migRate]);
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
         Two populations start with very different allele frequencies: <strong>Population 1</strong> has p = 0.1,
-        <strong> Population 2</strong> has p = 0.9. Each generation, a fraction of individuals migrate between them.
+        <strong> Population 2</strong> has p = 0.9. Each generation, a fraction <em>m</em> of each population's
+        individuals is replaced by migrants from the <em>other</em> population — true two-way gene flow.
       </p>
 
       <div className="flex items-center gap-4 flex-wrap">
@@ -676,10 +753,8 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
             trajectories={[result]}
             generations={gens}
             colors={['#7c3aed']}
+            yLabel="Freq(a) — deleterious"
           />
-          <div className="text-xs text-center text-stone-500">
-            Y-axis: frequency of deleterious allele (a)
-          </div>
 
           <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
             <strong>Expected equilibrium:</strong> q {'\u2248'} {'\u221A'}({'\u03BC'}/s) = {'\u221A'}({mu}/{s}) {'\u2248'} {expectedEq.toFixed(4)}
@@ -729,6 +804,8 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
 function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
   const [founderSize, setFounderSize] = useState(10);
   const [founderFreqs, setFounderFreqs] = useState<number[] | null>(null);
+  const [answer, setAnswer] = useState('');
+  const [correct, setCorrect] = useState<boolean | null>(null);
 
   const sourceP = 0.5;
   const nTrials = 20;
@@ -791,6 +868,8 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
             bins={histBins}
             labels={histLabels}
             title={`Allele frequencies in ${nTrials} founded populations (N=${founderSize})`}
+            referenceX={sourceP}
+            referenceLabel={`source p=${sourceP}`}
             colorFn={(i) => {
               const dist = Math.abs(i / 10 - sourceP);
               const r = Math.round(124 + 100 * dist);
@@ -819,10 +898,38 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
             allele frequencies — it's drift acting at the moment of founding.
           </div>
 
-          <button onClick={() => onComplete()}
-            className="w-full rounded-xl bg-gradient-to-b from-violet-500 to-violet-600 py-3 text-sm font-bold text-white shadow-md">
-            Complete Module
-          </button>
+          <QuestionPanel
+            question="Try different founder sizes above. If you halve the founder population size, how does the spread of founder allele frequencies change? (Hint: standard deviation scales as 1/√N.)"
+            correct={correct}
+            feedback={correct === true
+              ? 'Correct. Since σ ∝ 1/√(2N), halving N multiplies the spread by √2 ≈ 1.41 — so the spread increases substantially (roughly doubles in a qualitative sense). Smaller founding groups deviate from the source more dramatically; this is why founder effects are strongest for the smallest colonizing groups.'
+              : correct === false
+              ? 'Compare N=20 vs N=5 in the simulator above. Does the histogram get wider or narrower when N shrinks?'
+              : undefined}
+          >
+            <div className="flex gap-2 flex-wrap">
+              {[
+                'Spread roughly doubles (increases)',
+                'Spread stays the same',
+                'Spread is cut in half',
+                'No predictable change',
+              ].map(opt => (
+                <button key={opt} onClick={() => {
+                  setAnswer(opt);
+                  const isCorrect = opt.startsWith('Spread roughly doubles');
+                  setCorrect(isCorrect);
+                  if (isCorrect) setTimeout(onComplete, 1500);
+                }}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                    answer === opt
+                      ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </QuestionPanel>
         </>
       )}
     </div>
