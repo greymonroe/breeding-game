@@ -369,54 +369,32 @@ export function threePointAnalysis(
       return isDominant(a1) ? '+' : '-';
     }).join('');
 
-    // Determine the parental pattern in new order
+    // Determine the parental pattern in new order. We only need one parental
+    // reference: the reciprocal parental gives the opposite booleans below,
+    // which still satisfy the "all three equal" parental test.
     const pPattern = orderedGenes.map(g => {
-      return isDominant(parentalClasses[0][0].charAt(genes.indexOf(g))) ? '+' : '-';
-    }).join('');
-    const pPattern2 = orderedGenes.map(g => {
-      return isDominant(parentalClasses[1][0].charAt(genes.indexOf(g))) ? '+' : '-';
+      return parentalClasses[0][0].charAt(genes.indexOf(g));
     }).join('');
 
-    const isParental = pattern === pPattern || pattern === pPattern2;
+    // Classify by comparing each gene to one parental reference (pPattern).
+    // m0/m1/m2 = does this offspring's allele at gene i match parental class 1?
+    // - All three equal (all true OR all false) → parental (matches one of the two
+    //   reciprocal parental gametes).
+    // - Flanks agree but middle flips → DCO (m0===m2, m0!==m1).
+    // - Break between gene 0 and gene 1 → singleI (m0!==m1, m1===m2).
+    // - Break between gene 1 and gene 2 → singleII (m0===m1, m1!==m2).
+    const m0 = pattern[0] === pPattern[0];
+    const m1 = pattern[1] === pPattern[1];
+    const m2 = pattern[2] === pPattern[2];
 
-    // DCO pattern in new order
-    const dcoP1 = orderedGenes.map((_g, idx) => {
-      if (idx === 1) {
-        // middle gene flips
-        const parentChar = pPattern.charAt(idx);
-        return parentChar === '+' ? '-' : '+';
-      }
-      return pPattern.charAt(idx);
-    }).join('');
-    const dcoP2 = orderedGenes.map((_g, idx) => {
-      if (idx === 1) {
-        const parentChar = pPattern2.charAt(idx);
-        return parentChar === '+' ? '-' : '+';
-      }
-      return pPattern2.charAt(idx);
-    }).join('');
-    const isDCO = pattern === dcoP1 || pattern === dcoP2;
-
-    if (!isParental && !isDCO) {
-      // Single crossover: determine region
-      // Region I crossover: genes 0 and 1 switch relative to parental
-      const matchesP1Gene0 = pattern[0] === pPattern[0];
-      const matchesP1Gene2 = pattern[2] === pPattern[2];
-      if (matchesP1Gene0 !== (pattern[1] === pPattern[1])) {
-        // Crossover between genes 0 and 1 (region I) — gene 2 stays with gene 0's parental
-        if (matchesP1Gene2 === matchesP1Gene0) {
-          singleI++;
-        } else {
-          singleII++;
-        }
-      } else {
-        // Classify based on which end matches parental
-        if (matchesP1Gene0) {
-          singleII++;
-        } else {
-          singleI++;
-        }
-      }
+    if (m0 === m1 && m1 === m2) {
+      // parental — counted via parentalCount above; nothing to do here
+    } else if (m0 === m2 && m0 !== m1) {
+      // DCO — counted via dcoCount above; nothing to do here
+    } else if (m0 !== m1 && m1 === m2) {
+      singleI++;
+    } else if (m0 === m1 && m1 !== m2) {
+      singleII++;
     }
   }
 
@@ -451,7 +429,14 @@ export function classifyThreePoint(
   offspring: LinkedOrganism[],
   genes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition],
 ): Record<string, number> {
+  // Pre-seed all 2^3 = 8 possible class patterns to 0 so that classes with
+  // zero observations (e.g. the rare DCO classes in a low-interference cross)
+  // still appear in the output.
   const counts: Record<string, number> = {};
+  for (let i = 0; i < 8; i++) {
+    const key = [0, 1, 2].map(bit => ((i >> (2 - bit)) & 1) ? '+' : '-').join('');
+    counts[key] = 0;
+  }
   for (const off of offspring) {
     const key = genes.map(g => {
       const a1 = off.chromosome1[g.id];
