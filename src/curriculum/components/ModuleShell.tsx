@@ -1,4 +1,11 @@
-import { useState, useCallback, type ComponentType } from 'react';
+import {
+  useState,
+  useCallback,
+  useContext,
+  createContext,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -16,6 +23,44 @@ export interface ModuleDefinition {
   color: 'emerald' | 'cyan' | 'violet';
   backLink?: { href: string; label: string };
   experiments: ExperimentDefinition[];
+  /**
+   * Optional practice-mode tab. If provided, the shell renders a "Practice"
+   * section below the experiments list in the sidebar; selecting it replaces
+   * the main experiment pane with this ReactNode.
+   *
+   * Kept optional so Linkage and PopGen modules (which don't have a practice
+   * tab) don't need changes. Can be injected directly on the module
+   * definition OR at runtime via `<ModuleShellPracticeProvider>` \u2014 the
+   * latter is how `lab.html` adds practice mode to the Mendelian module
+   * without touching `MendelianModule.tsx`.
+   */
+  practiceMode?: ReactNode;
+}
+
+// ── Practice-mode context override ─────────────────────────────────────
+//
+// The Mendelian module is rendered by `MendelianModule.tsx` which this
+// agent must NOT modify (a parallel agent is editing it). To inject the
+// practice tab from outside (specifically from `src/curriculum/main.tsx`),
+// we expose a React context: any ancestor that wraps the module in
+// `<ModuleShellPracticeProvider practice={<PracticeMode />}>` gets the
+// practice tab added to the sidebar. This keeps the public API additive
+// and MendelianModule.tsx untouched.
+
+const PracticeContext = createContext<ReactNode | null>(null);
+
+export function ModuleShellPracticeProvider({
+  practice,
+  children,
+}: {
+  practice: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <PracticeContext.Provider value={practice}>
+      {children}
+    </PracticeContext.Provider>
+  );
 }
 
 // ── Color theme mapping ─────────────────────────────────────────────────
@@ -49,12 +94,23 @@ const THEME = {
 
 // ── Shell component ─────────────────────────────────────────────────────
 
+type View = 'experiment' | 'practice';
+
 export function ModuleShell({ module }: { module: ModuleDefinition }) {
   const [currentExp, setCurrentExp] = useState(0);
   const [completed, setCompleted] = useState<Set<number>>(() => new Set());
+  const [view, setView] = useState<View>('experiment');
 
   const theme = THEME[module.color];
   const experiments = module.experiments;
+
+  // Practice mode comes from either the module definition directly OR the
+  // optional `ModuleShellPracticeProvider` context override. Context wins
+  // when both are set so `main.tsx` can inject practice mode without
+  // modifying the module file.
+  const contextPractice = useContext(PracticeContext);
+  const practiceMode: ReactNode = contextPractice ?? module.practiceMode ?? null;
+  const hasPractice = practiceMode != null;
 
   const handleComplete = useCallback(() => {
     setCompleted(prev => new Set(prev).add(currentExp));
@@ -63,6 +119,13 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
       setCurrentExp(cur => (cur < experiments.length - 1 ? cur + 1 : cur));
     }, 1000);
   }, [currentExp, experiments.length]);
+
+  const selectExperiment = useCallback((i: number) => {
+    setView('experiment');
+    setCurrentExp(i);
+  }, []);
+
+  const selectPractice = useCallback(() => setView('practice'), []);
 
   const exp = experiments[currentExp];
 
@@ -89,11 +152,11 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
           <div className="sticky top-6 space-y-1">
             {experiments.map((e, i) => {
               const isCompleted = completed.has(i);
-              const isCurrent = i === currentExp;
+              const isCurrent = i === currentExp && view === 'experiment';
               const isLocked = i > 0 && !completed.has(i - 1) && !isCurrent;
               return (
                 <button key={e.id}
-                  onClick={() => !isLocked && setCurrentExp(i)}
+                  onClick={() => !isLocked && selectExperiment(i)}
                   disabled={isLocked}
                   className={`w-full text-left rounded-lg px-3 py-2 text-xs transition-all ${
                     isCurrent ? theme.active :
@@ -113,6 +176,47 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
                 </button>
               );
             })}
+
+            {hasPractice && (
+              <div className="pt-4 mt-4 border-t border-stone-200 space-y-1">
+                <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Practice
+                </div>
+                <button
+                  type="button"
+                  onClick={selectPractice}
+                  className={`w-full text-left rounded-lg px-3 py-2 text-xs transition-all ${
+                    view === 'practice'
+                      ? theme.active
+                      : 'text-stone-500 hover:bg-stone-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="6" />
+                      <circle cx="12" cy="12" r="2" />
+                    </svg>
+                    <div>
+                      <div className="font-semibold">Practice Mode</div>
+                      <div className="text-[10px] text-stone-400">
+                        Quick drills, spaced repetition
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
           </div>
         </nav>
 
@@ -125,10 +229,10 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
               const isLocked = i > 0 && !completed.has(i - 1) && i !== currentExp;
               return (
                 <button key={e.id}
-                  onClick={() => !isLocked && setCurrentExp(i)}
+                  onClick={() => !isLocked && selectExperiment(i)}
                   disabled={isLocked}
                   className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all ${
-                    i === currentExp ? `${theme.button} text-white` :
+                    i === currentExp && view === 'experiment' ? `${theme.button} text-white` :
                     isCompleted ? `${theme.complete}` :
                     isLocked ? 'bg-stone-100 text-stone-300' :
                     'bg-stone-100 text-stone-500'
@@ -137,28 +241,47 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
                 </button>
               );
             })}
+            {hasPractice && (
+              <button
+                type="button"
+                onClick={selectPractice}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all ${
+                  view === 'practice'
+                    ? `${theme.button} text-white`
+                    : 'bg-stone-100 text-stone-500'
+                }`}
+              >
+                Practice
+              </button>
+            )}
           </div>
 
-          {/* Experiment card */}
-          <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
-            <div className="mb-6">
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-bold text-stone-800">{exp.title}</h2>
-                {completed.has(currentExp) && (
-                  <span className={`text-xs ${theme.complete} px-2 py-0.5 rounded-full font-bold`}>
-                    Complete
-                  </span>
-                )}
+          {view === 'practice' && hasPractice ? (
+            <>{practiceMode}</>
+          ) : (
+            <>
+              {/* Experiment card */}
+              <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
+                <div className="mb-6">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-bold text-stone-800">{exp.title}</h2>
+                    {completed.has(currentExp) && (
+                      <span className={`text-xs ${theme.complete} px-2 py-0.5 rounded-full font-bold`}>
+                        Complete
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-stone-500 mt-0.5">{exp.subtitle}</p>
+                </div>
+                <exp.Component key={exp.id} onComplete={handleComplete} />
               </div>
-              <p className="text-sm text-stone-500 mt-0.5">{exp.subtitle}</p>
-            </div>
-            <exp.Component key={exp.id} onComplete={handleComplete} />
-          </div>
 
-          {/* Progress */}
-          <div className="mt-6 text-center text-xs text-stone-400">
-            {completed.size} / {experiments.length} experiments completed
-          </div>
+              {/* Progress */}
+              <div className="mt-6 text-center text-xs text-stone-400">
+                {completed.size} / {experiments.length} experiments completed
+              </div>
+            </>
+          )}
         </main>
       </div>
     </div>

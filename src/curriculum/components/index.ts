@@ -1,4 +1,4 @@
-export { ModuleShell } from './ModuleShell';
+export { ModuleShell, ModuleShellPracticeProvider } from './ModuleShell';
 export type { ModuleDefinition, ExperimentDefinition } from './ModuleShell';
 
 export { QuestionPanel } from './QuestionPanel';
