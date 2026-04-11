@@ -33,39 +33,41 @@ export interface LinkedCrossResult {
   recombinationFrequency: number;
 }
 
-// ── Gene definitions (Drosophila) ──────────────────────────────────────
+// ── Gene definitions (maize chromosome 9) ─────────────────────────────
+// The classical plant linkage trio, from Creighton & McClintock (1931):
+// three genes linked on maize chromosome 9, order C — Sh — Wx.
 
-export const BODY_COLOR: LinkedGeneDefinition = {
-  id: 'body',
-  name: 'Body color',
-  alleles: ['b+', 'b'],
+export const KERNEL_COLOR: LinkedGeneDefinition = {
+  id: 'color',
+  name: 'Aleurone color',
+  alleles: ['C', 'c'],
   phenotypeMap: {
-    'b+b+': 'Wild-type body', 'b+b': 'Wild-type body',
-    'bb+': 'Wild-type body', 'bb': 'Black body',
+    'CC': 'Purple', 'Cc': 'Purple',
+    'cC': 'Purple', 'cc': 'Yellow',
   },
-  colorMap: { 'Wild-type body': '#c2a06a', 'Black body': '#2d2520' },
+  colorMap: { 'Purple': '#5a2a6b', 'Yellow': '#e8c24a' },
 };
 
-export const WING_TYPE: LinkedGeneDefinition = {
-  id: 'wing',
-  name: 'Wing type',
-  alleles: ['vg+', 'vg'],
+export const KERNEL_SHAPE: LinkedGeneDefinition = {
+  id: 'shape',
+  name: 'Kernel shape',
+  alleles: ['Sh', 'sh'],
   phenotypeMap: {
-    'vg+vg+': 'Normal wings', 'vg+vg': 'Normal wings',
-    'vgvg+': 'Normal wings', 'vgvg': 'Vestigial wings',
+    'ShSh': 'Plump', 'Shsh': 'Plump',
+    'shSh': 'Plump', 'shsh': 'Shrunken',
   },
-  colorMap: { 'Normal wings': '#8ab4c4', 'Vestigial wings': '#c49a6a' },
+  colorMap: { 'Plump': '#e4d08a', 'Shrunken': '#a8874a' },
 };
 
-export const EYE_COLOR: LinkedGeneDefinition = {
-  id: 'eye',
-  name: 'Eye color',
-  alleles: ['cn+', 'cn'],
+export const ENDOSPERM: LinkedGeneDefinition = {
+  id: 'endo',
+  name: 'Endosperm starch',
+  alleles: ['Wx', 'wx'],
   phenotypeMap: {
-    'cn+cn+': 'Wild-type eyes', 'cn+cn': 'Wild-type eyes',
-    'cncn+': 'Wild-type eyes', 'cncn': 'Cinnabar eyes',
+    'WxWx': 'Starchy', 'Wxwx': 'Starchy',
+    'wxWx': 'Starchy', 'wxwx': 'Waxy',
   },
-  colorMap: { 'Wild-type eyes': '#8b2020', 'Cinnabar eyes': '#e07020' },
+  colorMap: { 'Starchy': '#f2e8c4', 'Waxy': '#d4a870' },
 };
 
 // ── Helper functions ───────────────────────────────────────────────────
@@ -114,9 +116,13 @@ export function getLinkedGenotypeLabel(org: LinkedOrganism, genes: LinkedGeneDef
   }).join(' ');
 }
 
-/** Check if an allele is dominant (contains '+') */
+/** Check if an allele is dominant.
+ *  Supports both Drosophila '+' notation and classical plant genetics
+ *  (first character uppercase = dominant, e.g. 'C' vs 'c', 'Sh' vs 'sh'). */
 function isDominant(allele: string): boolean {
-  return allele.endsWith('+');
+  if (allele.endsWith('+')) return true;
+  const c = allele[0];
+  return c >= 'A' && c <= 'Z';
 }
 
 /** Check if organism is homozygous recessive for a gene */

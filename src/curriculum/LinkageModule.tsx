@@ -4,6 +4,11 @@
  * Students discover gene linkage, recombination, chromosome mapping,
  * and statistical testing through seven progressive experiments.
  *
+ * Organism: maize (corn). The canonical plant linkage trio lives on
+ * chromosome 9 — colored aleurone (C), kernel shape (Sh), waxy endosperm
+ * (Wx) — the three genes Creighton & McClintock used in 1931 to prove
+ * crossing over corresponds to physical chromosome exchange.
+ *
  * Experiment flow:
  *  1. Linked Genes — testcross shows non-1:1:1:1 ratio
  *  2. Coupling vs Repulsion — same genes, different chromosome arrangement
@@ -18,7 +23,7 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   linkedCross, chiSquare, classifyThreePoint, threePointAnalysis,
   makeLinkedOrganism, getLinkedPhenotypeLabel,
-  BODY_COLOR, WING_TYPE, EYE_COLOR,
+  KERNEL_COLOR, KERNEL_SHAPE, ENDOSPERM,
   type LinkedOrganism, type LinkedCrossResult, type LinkedGeneDefinition,
 } from './linkage-engine';
 import {
@@ -156,15 +161,15 @@ function LinkageCrossWorkbench({ parentA, parentB, genes, recombFreqs, onCross, 
 // ── Experiments ──────────────────────────────────────────────────────────
 
 function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
-  // Coupling: AB/ab × ab/ab (testcross)
-  const parentAB = useMemo(() => makeLinkedOrganism(
-    { body: 'b+', wing: 'vg+' },
-    { body: 'b', wing: 'vg' },
+  // Coupling: CSh/csh × csh/csh (testcross)
+  const parentCSh = useMemo(() => makeLinkedOrganism(
+    { color: 'C', shape: 'Sh' },
+    { color: 'c', shape: 'sh' },
     'coupling',
   ), []);
   const tester = useMemo(() => makeLinkedOrganism(
-    { body: 'b', wing: 'vg' },
-    { body: 'b', wing: 'vg' },
+    { color: 'c', shape: 'sh' },
+    { color: 'c', shape: 'sh' },
     'tester',
   ), []);
 
@@ -172,30 +177,30 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
-  const genes = [BODY_COLOR, WING_TYPE];
-  const recombFreqs = [0.17]; // 17 cM between body and wing
+  const genes = [KERNEL_COLOR, KERNEL_SHAPE];
+  const recombFreqs = [0.17]; // 17 cM between C and Sh (pedagogical value)
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Cross a fly heterozygous for <strong>body color</strong> (b+/b) and <strong>wing type</strong> (vg+/vg) with a
-        homozygous recessive tester (b/b, vg/vg). If the genes assort independently, you'd expect a <strong>1:1:1:1</strong> ratio.
+        Cross a maize plant heterozygous for <strong>aleurone color</strong> (C/c) and <strong>kernel shape</strong> (Sh/sh) with a
+        homozygous recessive tester (cc, shsh). If the genes assort independently, you'd expect a <strong>1:1:1:1</strong> ratio of kernel phenotypes on the ear.
       </p>
 
       <LinkageCrossWorkbench
-        parentA={parentAB} parentB={tester} genes={genes} recombFreqs={recombFreqs}
+        parentA={parentCSh} parentB={tester} genes={genes} recombFreqs={recombFreqs}
         onCross={setCrossResult} crossResult={crossResult}
-        sampleSize={200} label="Testcross: b+/b vg+/vg × b/b vg/vg"
+        sampleSize={200} label="Testcross: C Sh / c sh × c sh / c sh"
       />
 
       {crossResult && (
         <QuestionPanel
-          question="The offspring DON'T follow a 1:1:1:1 ratio. Two classes are much more common than the other two. Why?"
+          question="The kernels on the ear DON'T follow a 1:1:1:1 ratio. Two classes are much more common than the other two. Why?"
           correct={correct}
           feedback={correct === true
-            ? "Correct! These two genes are on the SAME chromosome. They tend to be inherited together — this is called genetic linkage. The rare classes are recombinants, produced when crossing over separates the linked alleles."
+            ? "Correct! These two genes are on the SAME chromosome (maize chromosome 9). They tend to be inherited together — this is called genetic linkage. The rare classes are recombinants, produced when crossing over separates the linked alleles."
             : correct === false
-            ? "Look at which classes are most frequent. The parental combinations (b+ vg+ and b vg) are far more common than the recombinant combinations..."
+            ? "Look at which kernel classes are most frequent. The parental combinations (Purple Plump and Yellow Shrunken) are far more common than the recombinant combinations..."
             : undefined}
         >
           <div className="flex gap-2 flex-wrap">
@@ -226,24 +231,24 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
 }
 
 function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
-  // Coupling: AB/ab  vs  Repulsion: Ab/aB
+  // Coupling: C Sh / c sh   vs   Repulsion: C sh / c Sh
   const coupling = useMemo(() => makeLinkedOrganism(
-    { body: 'b+', wing: 'vg+' },
-    { body: 'b', wing: 'vg' },
+    { color: 'C', shape: 'Sh' },
+    { color: 'c', shape: 'sh' },
     'coupling',
   ), []);
   const repulsion = useMemo(() => makeLinkedOrganism(
-    { body: 'b+', wing: 'vg' },
-    { body: 'b', wing: 'vg+' },
+    { color: 'C', shape: 'sh' },
+    { color: 'c', shape: 'Sh' },
     'repulsion',
   ), []);
   const tester = useMemo(() => makeLinkedOrganism(
-    { body: 'b', wing: 'vg' },
-    { body: 'b', wing: 'vg' },
+    { color: 'c', shape: 'sh' },
+    { color: 'c', shape: 'sh' },
     'tester',
   ), []);
 
-  const genes = [BODY_COLOR, WING_TYPE];
+  const genes = [KERNEL_COLOR, KERNEL_SHAPE];
   const recombFreqs = [0.17];
 
   const [couplingResult, setCouplingResult] = useState<LinkedCrossResult | null>(null);
@@ -255,7 +260,7 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Both parents below are <strong>b+/b vg+/vg</strong> — same genotype! But the alleles are arranged
+        Both parents below are <strong>Cc Shsh</strong> — same genotype! But the alleles are arranged
         differently on the chromosomes. Compare the two testcrosses.
       </p>
 
@@ -263,7 +268,7 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
         parentA={coupling} parentB={tester} genes={genes} recombFreqs={recombFreqs}
         onCross={(r) => { setCouplingResult(r); setStep(s => Math.max(s, 1)); }}
         crossResult={couplingResult}
-        sampleSize={200} label="Coupling (cis): b+ vg+ / b vg × tester"
+        sampleSize={200} label="Coupling (cis): C Sh / c sh × tester"
       />
 
       {step >= 1 && (
@@ -271,7 +276,7 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
           parentA={repulsion} parentB={tester} genes={genes} recombFreqs={recombFreqs}
           onCross={(r) => { setRepulsionResult(r); setStep(s => Math.max(s, 2)); }}
           crossResult={repulsionResult}
-          sampleSize={200} label="Repulsion (trans): b+ vg / b vg+ × tester"
+          sampleSize={200} label="Repulsion (trans): C sh / c Sh × tester"
         />
       )}
 
@@ -314,17 +319,17 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
 
 function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
   const parent = useMemo(() => makeLinkedOrganism(
-    { body: 'b+', wing: 'vg+' },
-    { body: 'b', wing: 'vg' },
+    { color: 'C', shape: 'Sh' },
+    { color: 'c', shape: 'sh' },
     'het',
   ), []);
   const tester = useMemo(() => makeLinkedOrganism(
-    { body: 'b', wing: 'vg' },
-    { body: 'b', wing: 'vg' },
+    { color: 'c', shape: 'sh' },
+    { color: 'c', shape: 'sh' },
     'tester',
   ), []);
 
-  const genes = [BODY_COLOR, WING_TYPE];
+  const genes = [KERNEL_COLOR, KERNEL_SHAPE];
   const recombFreqs = [0.17];
 
   const [crossResult, setCrossResult] = useState<LinkedCrossResult | null>(null);
@@ -343,7 +348,7 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
       <LinkageCrossWorkbench
         parentA={parent} parentB={tester} genes={genes} recombFreqs={recombFreqs}
         onCross={setCrossResult} crossResult={crossResult}
-        sampleSize={500} label="Testcross: b+ vg+ / b vg × b vg / b vg"
+        sampleSize={500} label="Testcross: C Sh / c sh × c sh / c sh"
       />
 
       {crossResult && (
@@ -405,7 +410,7 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        You've calculated that body color and wing type have a recombination frequency of about <strong>17%</strong>.
+        You've calculated that aleurone color and kernel shape have a recombination frequency of about <strong>17%</strong>.
         In genetics, <strong>1% RF = 1 centiMorgan (cM)</strong> of map distance.
       </p>
 
@@ -415,7 +420,7 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
       </div>
 
       <QuestionPanel
-        question="If RF = 17%, what is the map distance between body color and wing type?"
+        question="If RF = 17%, what is the map distance between C and Sh?"
         correct={correct}
         feedback={correct === true
           ? "Correct! 17% RF = 17 cM. Now let's visualize this on a chromosome map."
@@ -445,8 +450,8 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
       {step >= 1 && (
         <div className="space-y-4">
           <p className="text-sm text-stone-600">
-            Place the <strong>wing type</strong> gene on the chromosome map. Body color is fixed at position 0.
-            Drag the slider to position wing type at the correct map distance.
+            Place the <strong>Sh</strong> locus on the chromosome map. The C locus is fixed at position 0.
+            Drag the slider to position Sh at the correct map distance.
           </p>
           <div className="relative">
             {/* Chromosome map SVG */}
@@ -463,12 +468,12 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
                   </g>
                 );
               })}
-              {/* Body color gene (fixed at 0) */}
-              <circle cx="30" cy="30" r="6" fill="#2d6080" />
-              <text x="30" y="72" textAnchor="middle" className="text-[8px] font-bold fill-cyan-900">Body</text>
-              {/* Wing type gene (draggable) */}
-              <circle cx={30 + (mapInput / 50) * 340} cy="30" r="6" fill="#e8a060" />
-              <text x={30 + (mapInput / 50) * 340} y="72" textAnchor="middle" className="text-[8px] font-bold fill-amber-700">Wing</text>
+              {/* C locus (fixed at 0) */}
+              <circle cx="30" cy="30" r="6" fill="#5a2a6b" />
+              <text x="30" y="72" textAnchor="middle" className="text-[8px] font-bold fill-cyan-900">C</text>
+              {/* Sh locus (draggable) */}
+              <circle cx={30 + (mapInput / 50) * 340} cy="30" r="6" fill="#b8860b" />
+              <text x={30 + (mapInput / 50) * 340} y="72" textAnchor="middle" className="text-[8px] font-bold fill-amber-700">Sh</text>
             </svg>
             <input
               type="range" min="0" max="50" step="1" value={mapInput}
@@ -494,11 +499,11 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
             Place Gene
           </button>
           {step === -1 && (
-            <div className="text-sm text-red-600 font-semibold">Not quite — remember, 17% RF = 17 cM from body color.</div>
+            <div className="text-sm text-red-600 font-semibold">Not quite — remember, 17% RF = 17 cM from the C locus.</div>
           )}
           {step === 2 && (
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
-              <strong>You built your first genetic map!</strong> Body color and wing type are 17 cM apart.
+              <strong>You built your first genetic map!</strong> C and Sh are 17 cM apart on maize chromosome 9.
               This technique — converting recombination frequencies to map distances — is the foundation of
               all genetic mapping.
             </div>
@@ -510,24 +515,24 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
 }
 
 function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
-  // Three genes: body color, eye color, wing type
-  // True order: body — eye — wing (or we set up a specific order for pedagogy)
-  // We present them as body, wing, eye and students must discover the correct order
-  const threeGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [BODY_COLOR, WING_TYPE, EYE_COLOR];
+  // Three genes on maize chromosome 9: aleurone color (C), endosperm (Wx), kernel shape (Sh)
+  // True order on chr9: C — Sh — Wx
+  // We present the genes in a scrambled order (C, Wx, Sh) so students must
+  // discover that Sh is actually in the middle.
+  const threeGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [KERNEL_COLOR, ENDOSPERM, KERNEL_SHAPE];
 
-  // True chromosome order: body — eye — wing
-  // RFs: body-eye = 8 cM, eye-wing = 10 cM
-  // We present genes in a different order so students discover the middle gene
-  const trueOrderGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [BODY_COLOR, EYE_COLOR, WING_TYPE];
+  // True chromosome order: C — Sh — Wx
+  // RFs: C–Sh = 8 cM, Sh–Wx = 10 cM
+  const trueOrderGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [KERNEL_COLOR, KERNEL_SHAPE, ENDOSPERM];
 
   const parent = useMemo(() => makeLinkedOrganism(
-    { body: 'b+', wing: 'vg+', eye: 'cn+' },
-    { body: 'b', wing: 'vg', eye: 'cn' },
+    { color: 'C', endo: 'Wx', shape: 'Sh' },
+    { color: 'c', endo: 'wx', shape: 'sh' },
     'trihybrid',
   ), []);
   const tester = useMemo(() => makeLinkedOrganism(
-    { body: 'b', wing: 'vg', eye: 'cn' },
-    { body: 'b', wing: 'vg', eye: 'cn' },
+    { color: 'c', endo: 'wx', shape: 'sh' },
+    { color: 'c', endo: 'wx', shape: 'sh' },
     'tester',
   ), []);
 
@@ -538,7 +543,7 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
   const [orderAnswer, setOrderAnswer] = useState('');
   const [orderCorrect, setOrderCorrect] = useState<boolean | null>(null);
 
-  // Recomb freqs in TRUE order: body-eye, eye-wing
+  // Recomb freqs in TRUE order: C–Sh, Sh–Wx
   const recombFreqs = [0.08, 0.10];
 
   const handleCross = useCallback(() => {
@@ -565,8 +570,8 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Now we track <strong>three linked genes</strong> in Drosophila: body color (b+/b),
-        wing type (vg+/vg), and eye color (cn+/cn). Perform a testcross with 1000 offspring.
+        Now we track <strong>three linked genes</strong> on maize chromosome 9: aleurone color (C/c),
+        endosperm starch (Wx/wx), and kernel shape (Sh/sh). Perform a testcross with 1000 offspring.
       </p>
 
       <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -584,7 +589,7 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
       {crossResult && classData && (
         <div className="space-y-4">
           <div className="text-xs text-stone-500 font-semibold text-center">
-            {crossResult.total} offspring — 8 phenotype classes (body, wing, eye: + = wild-type, - = mutant)
+            {crossResult.total} offspring — 8 kernel classes (+ = dominant, - = recessive)
           </div>
 
           {/* Offspring class table */}
@@ -593,9 +598,9 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
               <thead>
                 <tr className="bg-cyan-50">
                   <th className="border border-cyan-200 px-2 py-1 text-left">Class</th>
-                  <th className="border border-cyan-200 px-2 py-1">Body</th>
-                  <th className="border border-cyan-200 px-2 py-1">Wing</th>
-                  <th className="border border-cyan-200 px-2 py-1">Eye</th>
+                  <th className="border border-cyan-200 px-2 py-1">Color</th>
+                  <th className="border border-cyan-200 px-2 py-1">Endosperm</th>
+                  <th className="border border-cyan-200 px-2 py-1">Shape</th>
                   <th className="border border-cyan-200 px-2 py-1">Count</th>
                 </tr>
               </thead>
@@ -610,9 +615,9 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
                       'bg-white'
                     }>
                       <td className="border border-stone-200 px-2 py-1 font-mono">{pattern}</td>
-                      <td className="border border-stone-200 px-2 py-1 text-center">{pattern[0] === '+' ? 'Wild' : 'Black'}</td>
-                      <td className="border border-stone-200 px-2 py-1 text-center">{pattern[1] === '+' ? 'Normal' : 'Vestigial'}</td>
-                      <td className="border border-stone-200 px-2 py-1 text-center">{pattern[2] === '+' ? 'Wild' : 'Cinnabar'}</td>
+                      <td className="border border-stone-200 px-2 py-1 text-center">{pattern[0] === '+' ? 'Purple' : 'Yellow'}</td>
+                      <td className="border border-stone-200 px-2 py-1 text-center">{pattern[1] === '+' ? 'Starchy' : 'Waxy'}</td>
+                      <td className="border border-stone-200 px-2 py-1 text-center">{pattern[2] === '+' ? 'Plump' : 'Shrunken'}</td>
                       <td className="border border-stone-200 px-2 py-1 text-center font-bold">{count}</td>
                     </tr>
                   );
@@ -625,25 +630,19 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
             question="The two LEAST frequent classes are double crossovers. Compare them to the parental classes — which gene changed position?"
             correct={correct}
             feedback={correct === true
-              ? "Right! The double crossover class differs from the parental class at only the MIDDLE gene. This tells us wing type is NOT in the middle."
+              ? "Right! The double crossover class differs from the parental class at only the MIDDLE gene. The gene that flipped must be between the other two on the chromosome."
               : correct === false
               ? "Look at the rarest two classes and compare each allele (+/-) to the most common (parental) classes. Which gene flipped?"
               : undefined}
           >
             <div className="flex gap-2 flex-wrap">
-              {['Body color', 'Wing type', 'Eye color'].map(opt => (
+              {['Aleurone color (C)', 'Endosperm (Wx)', 'Kernel shape (Sh)'].map(opt => (
                 <button key={opt} onClick={() => {
                   setAnswer(opt);
-                  // The gene that flips in DCO is the middle gene
-                  // True order is body-eye-wing, so eye is middle when presented as body,wing,eye
-                  // In our presentation order (body, wing, eye), wing flips in DCO means wing is presented as middle
-                  // But true middle is eye... let's check what actually happens
-                  // Parent chrom1: b+ vg+ cn+, chrom2: b vg cn
-                  // True order: body-eye-wing with RFs 0.08, 0.10
-                  // DCO: body stays, eye flips, wing stays (in true order)
-                  // In presented order (body, wing, eye): body stays, wing stays, eye flips
-                  // So eye color is the gene that changed!
-                  const isCorrect = opt === 'Eye color';
+                  // True order on maize chr9 is C — Sh — Wx, so Sh is the middle gene.
+                  // We present the genes in order [C, Wx, Sh]; in a double crossover
+                  // around the middle gene (Sh), only Sh flips relative to the parental.
+                  const isCorrect = opt === 'Kernel shape (Sh)';
                   setCorrect(isCorrect);
                   if (isCorrect) setStep(1);
                 }}
@@ -663,20 +662,20 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
               question="The gene that flips in the double crossover class is the MIDDLE gene. What is the correct gene order?"
               correct={orderCorrect}
               feedback={orderCorrect === true
-                ? "Excellent! Body — Eye — Wing is the correct order. Eye color is in the middle because it's the gene that switches in the double crossover class. You've mapped three genes!"
+                ? "Excellent! C — Sh — Wx is the correct order on maize chromosome 9. Sh is in the middle because it's the gene that switches in the double crossover class. You've mapped three genes — this is the same logic Creighton & McClintock used in 1931!"
                 : orderCorrect === false
-                ? "The middle gene is the one that changed in the double crossover. Since eye color flipped, it must be between body and wing."
+                ? "The middle gene is the one that changed in the double crossover. Since Sh flipped, it must be between C and Wx."
                 : undefined}
             >
               <div className="flex gap-2 flex-wrap">
                 {[
-                  'Body — Wing — Eye',
-                  'Body — Eye — Wing',
-                  'Eye — Body — Wing',
+                  'C — Wx — Sh',
+                  'C — Sh — Wx',
+                  'Sh — C — Wx',
                 ].map(opt => (
                   <button key={opt} onClick={() => {
                     setOrderAnswer(opt);
-                    const isCorrect = opt === 'Body — Eye — Wing';
+                    const isCorrect = opt === 'C — Sh — Wx';
                     setOrderCorrect(isCorrect);
                     if (isCorrect) setTimeout(onComplete, 1500);
                   }}
@@ -707,7 +706,7 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
   // Given data: testcross offspring for two linked genes
   // Expected under independent assortment: 1:1:1:1
   const observed = [180, 170, 26, 24]; // parental:parental:recomb:recomb
-  const labels = ['Wild body, Normal wings', 'Black body, Vestigial wings', 'Wild body, Vestigial wings', 'Black body, Normal wings'];
+  const labels = ['Purple Plump', 'Yellow Shrunken', 'Purple Shrunken', 'Yellow Plump'];
   const total = observed.reduce((a, b) => a + b, 0);
   const expected = [total / 4, total / 4, total / 4, total / 4]; // 1:1:1:1
 
@@ -835,17 +834,17 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
 }
 
 function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
-  const threeGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [BODY_COLOR, WING_TYPE, EYE_COLOR];
-  const trueOrderGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [BODY_COLOR, EYE_COLOR, WING_TYPE];
+  const threeGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [KERNEL_COLOR, ENDOSPERM, KERNEL_SHAPE];
+  const trueOrderGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [KERNEL_COLOR, KERNEL_SHAPE, ENDOSPERM];
 
   const parent = useMemo(() => makeLinkedOrganism(
-    { body: 'b+', wing: 'vg+', eye: 'cn+' },
-    { body: 'b', wing: 'vg', eye: 'cn' },
+    { color: 'C', endo: 'Wx', shape: 'Sh' },
+    { color: 'c', endo: 'wx', shape: 'sh' },
     'trihybrid',
   ), []);
   const tester = useMemo(() => makeLinkedOrganism(
-    { body: 'b', wing: 'vg', eye: 'cn' },
-    { body: 'b', wing: 'vg', eye: 'cn' },
+    { color: 'c', endo: 'wx', shape: 'sh' },
+    { color: 'c', endo: 'wx', shape: 'sh' },
     'tester',
   ), []);
 
@@ -855,7 +854,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
   const [intInput, setIntInput] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
-  const recombFreqs = [0.08, 0.10]; // body-eye, eye-wing
+  const recombFreqs = [0.08, 0.10]; // C–Sh, Sh–Wx
   const usedCoincidence = 0.5; // strong positive interference
 
   const handleCross = useCallback(() => {
@@ -917,8 +916,8 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
 
           <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-sm text-cyan-800 space-y-2">
             <p><strong>Map distances:</strong></p>
-            <p>Region I (body — eye): ~{analysis.distances[0].toFixed(1)} cM</p>
-            <p>Region II (eye — wing): ~{analysis.distances[1].toFixed(1)} cM</p>
+            <p>Region I (C — Sh): ~{analysis.distances[0].toFixed(1)} cM</p>
+            <p>Region II (Sh — Wx): ~{analysis.distances[1].toFixed(1)} cM</p>
             <p><strong>Expected double crossovers</strong> = RF₁ × RF₂ × total = {(analysis.distances[0] / 100).toFixed(3)} × {(analysis.distances[1] / 100).toFixed(3)} × {crossResult.total} = <strong>{expectedDCO.toFixed(1)}</strong></p>
             <p><strong>Observed double crossovers</strong> = <strong>{observedDCO}</strong></p>
           </div>
