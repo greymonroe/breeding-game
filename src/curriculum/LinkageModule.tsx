@@ -34,9 +34,9 @@ function ChromosomeDiagram({ genes, chrom1, chrom2, label }: {
   chrom2: Record<string, string>;
   label?: string;
 }) {
-  const w = 320;
+  const w = 240;
   const h = 70;
-  const margin = 30;
+  const margin = 24;
   const barY1 = 18;
   const barY2 = 44;
 
@@ -131,11 +131,13 @@ function LinkageCrossWorkbench({ parentA, parentB, genes, recombFreqs, onCross, 
     <div className="space-y-4">
       {label && <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">{label}</div>}
       <div className="flex items-center justify-center gap-4 flex-wrap">
-        <ChromosomeDiagram genes={genes} chrom1={parentA.chromosome1} chrom2={parentA.chromosome2} label="Parent 1" />
-        <span className="text-2xl font-bold text-stone-400">&times;</span>
-        <ChromosomeDiagram genes={genes} chrom1={parentB.chromosome1} chrom2={parentB.chromosome2} label="Parent 2" />
+        <div className="flex items-center gap-3">
+          <ChromosomeDiagram genes={genes} chrom1={parentA.chromosome1} chrom2={parentA.chromosome2} label="Parent 1" />
+          <span className="text-2xl font-bold text-stone-400">&times;</span>
+          <ChromosomeDiagram genes={genes} chrom1={parentB.chromosome1} chrom2={parentB.chromosome2} label="Parent 2" />
+        </div>
         <button onClick={doCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
+          className="rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
           Cross!
         </button>
       </div>
@@ -568,11 +570,13 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
       </p>
 
       <div className="flex items-center justify-center gap-4 flex-wrap">
-        <ChromosomeDiagram genes={threeGenes} chrom1={parent.chromosome1} chrom2={parent.chromosome2} label="Trihybrid Parent" />
-        <span className="text-2xl font-bold text-stone-400">&times;</span>
-        <ChromosomeDiagram genes={threeGenes} chrom1={tester.chromosome1} chrom2={tester.chromosome2} label="Tester" />
+        <div className="flex items-center gap-3">
+          <ChromosomeDiagram genes={threeGenes} chrom1={parent.chromosome1} chrom2={parent.chromosome2} label="Trihybrid Parent" />
+          <span className="text-2xl font-bold text-stone-400">&times;</span>
+          <ChromosomeDiagram genes={threeGenes} chrom1={tester.chromosome1} chrom2={tester.chromosome2} label="Tester" />
+        </div>
         <button onClick={handleCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
+          className="rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
           Cross!
         </button>
       </div>
@@ -881,11 +885,13 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
       </p>
 
       <div className="flex items-center justify-center gap-4 flex-wrap">
-        <ChromosomeDiagram genes={threeGenes} chrom1={parent.chromosome1} chrom2={parent.chromosome2} label="Trihybrid" />
-        <span className="text-2xl font-bold text-stone-400">&times;</span>
-        <span className="text-sm text-stone-500">tester (all recessive)</span>
+        <div className="flex items-center gap-3">
+          <ChromosomeDiagram genes={threeGenes} chrom1={parent.chromosome1} chrom2={parent.chromosome2} label="Trihybrid" />
+          <span className="text-2xl font-bold text-stone-400">&times;</span>
+          <span className="text-sm text-stone-500">tester (all recessive)</span>
+        </div>
         <button onClick={handleCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
+          className="rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
           Cross! (2000 offspring)
         </button>
       </div>
