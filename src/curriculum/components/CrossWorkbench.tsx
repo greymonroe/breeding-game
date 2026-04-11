@@ -31,7 +31,7 @@ export function CrossWorkbench({
 
   return (
     <div className="space-y-4">
-      {label && <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">{label}</div>}
+      {label && <div className="text-xs font-bold text-stone-400 tracking-wider">{label}</div>}
       <div className="flex items-center justify-center gap-4">
         <OrganismCard org={parentA} genes={genes} label="Parent 1"
           showGenotype={showGenotypes} epistasis={epistasis} />

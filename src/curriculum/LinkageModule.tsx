@@ -134,7 +134,7 @@ function LinkageCrossWorkbench({ parentA, parentB, genes, recombFreqs, onCross, 
 
   return (
     <div className="space-y-4">
-      {label && <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">{label}</div>}
+      {label && <div className="text-xs font-bold text-stone-400 tracking-wider">{label}</div>}
       <div className="flex items-center justify-center gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <ChromosomeDiagram genes={genes} chrom1={parentA.chromosome1} chrom2={parentA.chromosome2} label="Parent 1" />
