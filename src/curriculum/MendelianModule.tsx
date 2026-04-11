@@ -20,12 +20,69 @@ import {
   cross, makeOrganism, getAdditiveValue, makeAdditiveGene,
   FLOWER_COLOR, FLOWER_COLOR_INCOMPLETE, SEED_SHAPE,
   PIGMENT_GENE, AGOUTI_GENE,
-  type CrossResult,
+  type CrossResult, type Organism, type GeneDefinition,
 } from './genetics-engine';
 import {
-  ModuleShell, QuestionPanel, CrossWorkbench, HistogramChart,
+  ModuleShell, QuestionPanel, CrossWorkbench, HistogramChart, GameteVisualizer,
   type ModuleDefinition,
 } from './components';
+
+// ── Shared "Show gametes" toggle ──────────────────────────────────────────
+//
+// Thin wrapper that mounts GameteVisualizer behind an opt-in toggle. Used by
+// Exp 1 (Rr × Rr), Exp 2 (Rr × rr), and Exp 5 (dihybrid). Same component,
+// different parents/genes — this is Phase 2 item 2.1 of MENDELIAN_V2_PLAN.md.
+//
+// The toggle defaults to collapsed so students aren't overwhelmed with
+// animation on first view. When expanded, GameteVisualizer's own internal
+// controls (speed, view toggle, step-through) take over. When collapsed, the
+// visualizer is UNMOUNTED so each show starts with a fresh cycle.
+function GameteToggle({
+  parentA,
+  parentB,
+  genes,
+  sampleSize = 16,
+}: {
+  parentA: Organism;
+  parentB: Organism;
+  genes: GeneDefinition[];
+  sampleSize?: number;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 my-6 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-[200px]">
+          <p className="text-sm font-bold text-stone-800">See the mechanism: gametes</p>
+          {!show && (
+            <p className="text-xs text-stone-500 mt-0.5">
+              Watch how each parent's alleles segregate into gametes and fuse to make offspring.
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShow(v => !v)}
+          className={`rounded-xl px-4 py-2 text-xs font-bold border-2 transition-all ${
+            show
+              ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
+              : 'bg-white text-emerald-700 border-emerald-400 hover:bg-emerald-50'
+          }`}
+        >
+          {show ? 'Hide gametes \u2191' : 'Show gametes \u2193'}
+        </button>
+      </div>
+      {show && (
+        <GameteVisualizer
+          parentA={parentA}
+          parentB={parentB}
+          genes={genes}
+          sampleSize={sampleSize}
+        />
+      )}
+    </div>
+  );
+}
 
 // ── Experiments ──────────────────────────────────────────────────────────
 
@@ -164,6 +221,20 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
             ))}
           </div>
         </QuestionPanel>
+      )}
+
+      {/* Phase 2 gamete visualizer — mounts AFTER the F2 ratio is on screen and
+          BEFORE the noise-literacy panel. Pedagogical order: see the ratio →
+          see *why* (gamete mechanism) → see that the ratio is noisy. The cross
+          matches the F2 the student just ran: Rr × Rr using the same F1
+          siblings as the CrossWorkbench above. */}
+      {step >= 3 && f2Result && f1Child && (
+        <GameteToggle
+          parentA={f1Child}
+          parentB={f1Result!.offspring[1] ?? f1Child}
+          genes={[FLOWER_COLOR]}
+          sampleSize={16}
+        />
       )}
 
       {/* Noise literacy: replicate the F2 cross 10 times so students see sampling
@@ -312,6 +383,17 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
             onCross={(r) => { setCrossResult(r); setTimeout(onComplete, 2000); }}
             crossResult={crossResult}
             sampleSize={100} label="Test Cross: Rr × rr" showGenotypes
+          />
+
+          {/* Phase 2 gamete visualizer — same Rr × rr test cross the student
+              just ran. Watching the heterozygote split into R and r gametes
+              while the rr tester only emits r makes the 1:1 ratio mechanical
+              instead of memorized. */}
+          <GameteToggle
+            parentA={parentRr}
+            parentB={parentrr}
+            genes={[FLOWER_COLOR]}
+            sampleSize={16}
           />
         </>
       )}
@@ -774,6 +856,19 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             sampleSize={200} label="F2: Dihybrid F1 × F1"
           />
         </>
+      )}
+
+      {/* Phase 2 gamete visualizer — dihybrid Rr Ss × Rr Ss. Two-gene mount:
+          the component enumerates 2^2 = 4 possible gametes per parent and the
+          Punnett view renders a 4×4 grid. Flow: derivation grid (predict) →
+          F2 CrossWorkbench (observe) → gamete mechanism (see why). */}
+      {step >= 2 && f2Result && f1Child && (
+        <GameteToggle
+          parentA={f1Child}
+          parentB={f1Result!.offspring[1] ?? f1Child}
+          genes={[FLOWER_COLOR, SEED_SHAPE]}
+          sampleSize={16}
+        />
       )}
 
       {step >= 2 && f2Result && (
