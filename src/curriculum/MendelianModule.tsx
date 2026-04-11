@@ -147,14 +147,14 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
         'Because each F1 parent carries one hidden r allele, and 1/4 of the time both parents pass r to the offspring.',
       correct: true,
       feedback:
-        "Exactly — and this is the Law of Segregation stated mechanistically. Every F1 parent is Rr. When it makes gametes, half carry R and half carry r. When two F1 plants cross, the probability that both contribute r is 1/2 × 1/2 = 1/4. That's the 1/4 white. Coming up in Experiment 1: you'll work this out at the gamete level and see it animate.",
+        "Exactly — and this is the Law of Segregation stated mechanistically. Every F1 parent is Rr. When it makes gametes, half carry R and half carry r. When two F1 plants cross, the probability that both contribute r is 1/2 × 1/2 = 1/4. That's the 1/4 white. Coming up in Experiment 2: you'll work this out at the gamete level and see it animate.",
     },
     {
       key: 'hook',
-      label: "I want to learn how — take me to Experiment 1.",
+      label: "I want to learn how — take me to Experiment 2.",
       correct: true,
       feedback:
-        "Perfect — that's the right instinct. You've observed the pattern (3:1), and now you want the mechanism that generates it. Experiment 1 builds on exactly this moment: every F1 parent (Rr) makes two kinds of gametes, half R and half r, and 1/2 × 1/2 = 1/4 is where the 1/4 white comes from. That's the Law of Segregation.",
+        "Perfect — that's the right instinct. You've observed the pattern (3:1), and now you want the mechanism that generates it. Experiment 2 builds on exactly this moment: every F1 parent (Rr) makes two kinds of gametes, half R and half r, and 1/2 × 1/2 = 1/4 is where the 1/4 white comes from. That's the Law of Segregation.",
     },
   ] as const;
 
@@ -422,6 +422,15 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
     setReplicates(fractions);
   }, [f1Child, f1Result]);
 
+  // Auto-advance after the student answers the F2 ratio question correctly.
+  // useEffect with cleanup — never setTimeout from a click handler.
+  useEffect(() => {
+    if (answer2Correct === true) {
+      const t = setTimeout(onComplete, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [answer2Correct, onComplete]);
+
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
@@ -510,9 +519,7 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
             {['1:1', '3:1', '2:1', '9:3:3:1'].map(opt => (
               <button key={opt} onClick={() => {
                 setAnswer2(opt);
-                const correct = opt === '3:1';
-                setAnswer2Correct(correct);
-                if (correct) setTimeout(onComplete, 1500);
+                setAnswer2Correct(opt === '3:1');
               }}
                 className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
                   answer2 === opt
@@ -646,7 +653,7 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        You know from experiment 1 that <strong>R</strong> is dominant over <strong>r</strong>.
+        You know from Experiment 2 that <strong>R</strong> is dominant over <strong>r</strong>.
         Now let's predict: if you cross a heterozygous red plant (<strong>Rr</strong>) with a white plant (<strong>rr</strong>),
         what ratio of red to white do you expect?
       </p>
@@ -655,7 +662,7 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
         question="Before crossing — predict the offspring ratio:"
         correct={correct}
         feedback={correct === true
-          ? "Correct! Rr × rr produces Rr (red) and rr (white) in equal proportions. Crossing against a homozygous recessive tester is one of the most powerful tools in genetics — you'll meet it again by name in Experiment 4."
+          ? "Correct! Rr × rr produces Rr (red) and rr (white) in equal proportions. Crossing against a homozygous recessive tester is one of the most powerful tools in genetics — you'll meet it again by name in Experiment 5."
           : correct === false
           ? "Think about what gametes each parent can produce. Rr makes R and r gametes; rr makes only r gametes."
           : undefined}
@@ -691,13 +698,16 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
           {/* Phase 2 gamete visualizer — same Rr × rr test cross the student
               just ran. Watching the heterozygote split into R and r gametes
               while the rr tester only emits r makes the 1:1 ratio mechanical
-              instead of memorized. */}
-          <GameteToggle
-            parentA={parentRr}
-            parentB={parentrr}
-            genes={[FLOWER_COLOR]}
-            sampleSize={16}
-          />
+              instead of memorized. Gated on crossResult so the mechanistic
+              explanation appears *after* the observation, not before. */}
+          {crossResult && (
+            <GameteToggle
+              parentA={parentRr}
+              parentB={parentrr}
+              genes={[FLOWER_COLOR]}
+              sampleSize={16}
+            />
+          )}
         </>
       )}
 
@@ -732,6 +742,15 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   const parentrr = useMemo(() => makeOrganism({ color_inc: ['r', 'r'] }, 'rr'), []);
 
   const f1Child = f1Result?.offspring[0];
+
+  // Auto-advance once the student answers the F2 ratio correctly.
+  // useEffect with cleanup — never setTimeout from a click handler.
+  useEffect(() => {
+    if (f2Correct === true) {
+      const t = setTimeout(onComplete, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [f2Correct, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -813,9 +832,7 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
             {['3:1', '1:2:1', '9:3:4', '1:1:1'].map(opt => (
               <button key={opt} onClick={() => {
                 setF2Answer(opt);
-                const isCorrect = opt === '1:2:1';
-                setF2Correct(isCorrect);
-                if (isCorrect) setTimeout(onComplete, 1500);
+                setF2Correct(opt === '1:2:1');
               }}
                 className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
                   f2Answer === opt
@@ -1049,7 +1066,7 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Now we track <strong>two genes at once</strong>: flower color (R/r) and seed shape (S/s, where S = Round is dominant).
+        Now we track <strong>two genes at once</strong>: flower color (Rr) and seed shape (Ss, where S = Round is dominant).
         We'll write the dihybrid genotype with a space — <strong>Rr Ss</strong> — to keep the two genes visually distinct.
         Cross a <strong>Red/Round</strong> plant with a <strong>White/Wrinkled</strong> plant.
       </p>

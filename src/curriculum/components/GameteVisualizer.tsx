@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OrganismCard } from './OrganismCard';
+import { phenotypeFill, alleleFill } from './colors';
 import {
   cross,
   getPhenotypeLabel,
@@ -55,34 +56,11 @@ interface GameteVisualizerProps {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-/**
- * Deterministic phenotype color lookup by label.
- * Never palette[index] — this guarantees the same phenotype always renders
- * in the same color across the gamete view, the Punnett view, and the
- * offspring grid.
- */
-function phenotypeFill(label: string, genes: GeneDefinition[]): string {
-  // Direct single-gene lookup
-  if (!label.includes(', ')) {
-    for (const g of genes) {
-      const c = g.colorMap[label];
-      if (c) return c;
-    }
-    return '#cfcfcf';
-  }
-  // Multi-gene composite: use the first gene's color for the primary fill.
-  const parts = label.split(', ').map(p => p.trim());
-  return genes[0]?.colorMap[parts[0]] ?? '#cfcfcf';
-}
-
-/** Color for an *allele gamete* — color of the dominant-or-not phenotype
- *  that a single copy of that allele, paired with itself, would produce. */
-function alleleFill(allele: string, gene: GeneDefinition): string {
-  const key = `${allele}${allele}`;
-  const pheno = gene.phenotypeMap[key] ?? 'Unknown';
-  return gene.colorMap[pheno] ?? '#cfcfcf';
-}
+//
+// Phenotype and allele color lookups live in `./colors` so RatioBar and
+// GameteVisualizer share one source of truth. Colors here must always be
+// resolved from a stable semantic key (phenotype label or allele letter),
+// never a palette index.
 
 /** Enumerate every possible gamete (one allele per gene) an organism can make.
  *  For N genes this returns 2^N strings (e.g. monohybrid -> 2, dihybrid -> 4).

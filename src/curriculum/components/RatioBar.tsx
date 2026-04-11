@@ -1,4 +1,5 @@
 import type { GeneDefinition } from '../genetics-engine';
+import { phenotypeColors, epistasisColors, FALLBACK_FILL } from './colors';
 
 export function RatioBar({ counts, colorMap, genes, epistasis = false, order }: {
   counts: Record<string, number>; colorMap?: Record<string, string>;
@@ -22,31 +23,16 @@ export function RatioBar({ counts, colorMap, genes, epistasis = false, order }: 
 
   // Resolve a label like "Red" or "Red, Round" to a primary fill color
   // and (optionally) a secondary indicator color for the second gene.
+  // The actual resolution logic lives in `./colors` so RatioBar and
+  // GameteVisualizer share a single source of truth.
   function resolveColors(label: string): { fill: string; secondary?: string } {
     if (colorMap && colorMap[label]) return { fill: colorMap[label] };
     if (epistasis) {
-      // Maize aleurone palette
-      if (label === 'Colorless') return { fill: '#fef3c7' };
-      if (label === 'Purple') return { fill: '#6b21a8' };
-      if (label === 'Red') return { fill: '#c2410c' };
+      const c = epistasisColors(label);
+      if (c) return { fill: c };
     }
-    if (genes && genes.length > 0) {
-      // Single-gene case: direct lookup
-      if (!label.includes(', ')) {
-        return { fill: genes[0]?.colorMap?.[label] ?? '#999' };
-      }
-      // Multi-gene case: look up each part in the matching gene's colorMap.
-      const parts = label.split(', ').map(p => p.trim());
-      let fill: string | undefined;
-      let secondary: string | undefined;
-      for (let i = 0; i < parts.length && i < genes.length; i++) {
-        const c = genes[i]?.colorMap?.[parts[i]];
-        if (i === 0) fill = c;
-        else if (i === 1 && !secondary) secondary = c;
-      }
-      return { fill: fill ?? '#999', secondary };
-    }
-    return { fill: '#999' };
+    if (genes && genes.length > 0) return phenotypeColors(label, genes);
+    return { fill: FALLBACK_FILL };
   }
 
   return (

@@ -8,3 +8,11 @@ export { OrganismCard } from './OrganismCard';
 export { GameteVisualizer } from './GameteVisualizer';
 export { HistogramChart } from './HistogramChart';
 export type { HistogramChartProps } from './HistogramChart';
+export {
+  phenotypeFill,
+  phenotypeColors,
+  alleleFill,
+  epistasisColors,
+  FALLBACK_FILL,
+} from './colors';
+export type { PhenotypeColors } from './colors';

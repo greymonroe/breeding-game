@@ -11,10 +11,32 @@ export interface GeneDefinition {
   name: string;           // e.g. "Flower color"
   alleles: [string, string]; // e.g. ["R", "r"]
   dominance: DominanceType;
-  /** Map genotype → phenotype label. E.g. { "RR": "Red", "Rr": "Red", "rR": "Red", "rr": "White" } */
+  /**
+   * Map canonical genotype key → phenotype label. Use the
+   * `canonicalGenotypeKey` helper to build keys — it sorts the two alleles
+   * so uppercase (dominant) comes first, which means authors only need to
+   * write each heterozygote once (e.g. "Rr", not both "Rr" and "rR"). The
+   * engine normalizes both draw orders before lookup.
+   */
   phenotypeMap: Record<string, string>;
   /** Map phenotype → CSS color for display */
   colorMap: Record<string, string>;
+}
+
+/**
+ * Canonical ordering for a two-allele genotype key. Uppercase alleles sort
+ * before lowercase; same-case alleles keep their natural string order. So
+ * "rR" → "Rr", "Rr" → "Rr", "rr" → "rr", "RR" → "RR". This lets
+ * `phenotypeMap` authors write each heterozygote exactly once without
+ * worrying which allele the parent contributed first at meiosis.
+ */
+export function canonicalGenotypeKey(a: string, b: string): string {
+  const aUpper = a === a.toUpperCase() && a !== a.toLowerCase();
+  const bUpper = b === b.toUpperCase() && b !== b.toLowerCase();
+  if (aUpper && !bUpper) return `${a}${b}`;
+  if (!aUpper && bUpper) return `${b}${a}`;
+  // Same case (both upper or both lower) — preserve natural ordering.
+  return a <= b ? `${a}${b}` : `${b}${a}`;
 }
 
 export interface Organism {
@@ -34,12 +56,16 @@ export interface CrossResult {
 
 // ── Gene definitions for curriculum ──
 
+// phenotypeMap keys use canonicalGenotypeKey (uppercase-first). Each
+// heterozygote is written exactly once — the engine normalizes both draw
+// orders before lookup.
+
 export const FLOWER_COLOR: GeneDefinition = {
   id: 'color',
   name: 'Flower color',
   alleles: ['R', 'r'],
   dominance: 'complete',
-  phenotypeMap: { 'RR': 'Red', 'Rr': 'Red', 'rR': 'Red', 'rr': 'White' },
+  phenotypeMap: { 'RR': 'Red', 'Rr': 'Red', 'rr': 'White' },
   colorMap: { 'Red': '#dc4444', 'White': '#f5f0e0' },
 };
 
@@ -48,7 +74,7 @@ export const FLOWER_COLOR_INCOMPLETE: GeneDefinition = {
   name: 'Flower color',
   alleles: ['R', 'r'],
   dominance: 'incomplete',
-  phenotypeMap: { 'RR': 'Red', 'Rr': 'Pink', 'rR': 'Pink', 'rr': 'White' },
+  phenotypeMap: { 'RR': 'Red', 'Rr': 'Pink', 'rr': 'White' },
   colorMap: { 'Red': '#dc4444', 'Pink': '#e8a0a0', 'White': '#f5f0e0' },
 };
 
@@ -57,7 +83,7 @@ export const SEED_SHAPE: GeneDefinition = {
   name: 'Seed shape',
   alleles: ['S', 's'],
   dominance: 'complete',
-  phenotypeMap: { 'SS': 'Round', 'Ss': 'Round', 'sS': 'Round', 'ss': 'Wrinkled' },
+  phenotypeMap: { 'SS': 'Round', 'Ss': 'Round', 'ss': 'Wrinkled' },
   colorMap: { 'Round': '#7ab55c', 'Wrinkled': '#c9a84c' },
 };
 
@@ -66,7 +92,7 @@ export const PLANT_HEIGHT: GeneDefinition = {
   name: 'Plant height',
   alleles: ['T', 't'],
   dominance: 'complete',
-  phenotypeMap: { 'TT': 'Tall', 'Tt': 'Tall', 'tT': 'Tall', 'tt': 'Short' },
+  phenotypeMap: { 'TT': 'Tall', 'Tt': 'Tall', 'tt': 'Short' },
   colorMap: { 'Tall': '#4a8a5a', 'Short': '#8ab47a' },
 };
 
@@ -78,7 +104,7 @@ export const PIGMENT_GENE: GeneDefinition = {
   name: 'Aleurone Color (C)',
   alleles: ['C', 'c'],
   dominance: 'complete',
-  phenotypeMap: { 'CC': 'Colored', 'Cc': 'Colored', 'cC': 'Colored', 'cc': 'Colorless' },
+  phenotypeMap: { 'CC': 'Colored', 'Cc': 'Colored', 'cc': 'Colorless' },
   colorMap: { 'Colored': '#6b21a8', 'Colorless': '#fef3c7' },
 };
 
@@ -87,7 +113,7 @@ export const AGOUTI_GENE: GeneDefinition = {
   name: 'Aleurone Pigment (R)',
   alleles: ['R', 'r'],
   dominance: 'complete',
-  phenotypeMap: { 'RR': 'Purple', 'Rr': 'Purple', 'rR': 'Purple', 'rr': 'Red' },
+  phenotypeMap: { 'RR': 'Purple', 'Rr': 'Purple', 'rr': 'Red' },
   colorMap: { 'Purple': '#6b21a8', 'Red': '#c2410c' },
 };
 
@@ -101,10 +127,10 @@ export function makeAdditiveGene(id: string, index: number): GeneDefinition {
     name: `QTL ${index + 1}`,
     alleles: [upper, lower],
     dominance: 'complete', // not really used for quantitative
+    // Canonical keys (uppercase-first) — normalizer handles draw order.
     phenotypeMap: {
       [`${upper}${upper}`]: '+2',
       [`${upper}${lower}`]: '+1',
-      [`${lower}${upper}`]: '+1',
       [`${lower}${lower}`]: '+0',
     },
     colorMap: { '+2': '#2d6a4f', '+1': '#74c69d', '+0': '#d4c4a8' },
@@ -120,13 +146,16 @@ export function makeOrganism(
   return { id: id ?? `org_${Math.random().toString(36).slice(2, 8)}`, genotype };
 }
 
-/** Get phenotype string for an organism across specified genes */
+/** Get phenotype string for an organism across specified genes.
+ *  Genotype lookup is normalized via `canonicalGenotypeKey`, so a gene
+ *  only needs to define each heterozygote once regardless of which parent
+ *  contributed which allele. */
 export function getPhenotype(org: Organism, genes: GeneDefinition[]): Record<string, string> {
   const result: Record<string, string> = {};
   for (const gene of genes) {
     const alleles = org.genotype[gene.id];
     if (!alleles) continue;
-    const key = `${alleles[0]}${alleles[1]}`;
+    const key = canonicalGenotypeKey(alleles[0], alleles[1]);
     result[gene.id] = gene.phenotypeMap[key] ?? 'Unknown';
   }
   return result;
@@ -138,12 +167,14 @@ export function getPhenotypeLabel(org: Organism, genes: GeneDefinition[]): strin
   return genes.map(g => pheno[g.id]).join(', ');
 }
 
-/** Get genotype label */
+/** Get genotype label. Uses the canonical key ordering (uppercase first)
+ *  so students always see "Rr", never "rR", regardless of which parent
+ *  contributed which allele at meiosis. */
 export function getGenotypeLabel(org: Organism, genes: GeneDefinition[]): string {
   return genes.map(g => {
     const alleles = org.genotype[g.id];
     if (!alleles) return '??';
-    return `${alleles[0]}${alleles[1]}`;
+    return canonicalGenotypeKey(alleles[0], alleles[1]);
   }).join(' ');
 }
 
