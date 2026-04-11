@@ -469,34 +469,43 @@ interface BackwardCase {
   explanation: string;
 }
 
+// F-052 distractor diversity: every case's distractor pool mixes
+//   * the tempting "swapped" homozygous pair (RR x RR, rr x rr) that gives
+//     all-one-phenotype — wrong whenever the ratio shows any minority class
+//   * at least one het x hom distractor (tempting because "heterozygous
+//     somewhere"), forcing the student to check the ratio sign
+//   * the canonical other-ratio cases (3:1, 1:1, all-red, all-white)
+// The point: a student cannot pattern-match "some ratio -> heterozygous
+// answer"; they have to actually work out which homozygote produces which
+// phenotype and whether it matches the observed ratio.
 const BACKWARD_CASES: readonly BackwardCase[] = [
   {
     observed: '3:1',
     correctParents: 'Rr \u00d7 Rr',
-    distractors: ['RR \u00d7 Rr', 'Rr \u00d7 rr', 'RR \u00d7 rr'],
+    distractors: ['RR \u00d7 RR', 'rr \u00d7 rr', 'Rr \u00d7 rr'],
     explanation:
       'A 3:1 phenotype ratio means 1/4 of offspring are the recessive class. That 1/4 can only arise if BOTH parents contribute an r allele half the time \u2014 i.e. both parents are Rr. Each parent\u2019s gametes are 1/2 R : 1/2 r, so offspring are 1 RR : 2 Rr : 1 rr (3 red : 1 white).',
   },
   {
     observed: '1:1',
     correctParents: 'Rr \u00d7 rr',
-    distractors: ['Rr \u00d7 Rr', 'RR \u00d7 rr', 'rr \u00d7 rr'],
+    distractors: ['Rr \u00d7 Rr', 'RR \u00d7 rr', 'RR \u00d7 RR'],
     explanation:
       'A 1:1 phenotype ratio is the signature of a test cross: one parent is heterozygous (Rr, gives R or r with equal probability), the other is homozygous recessive (rr, always gives r). Half the offspring are Rr (red), half are rr (white).',
   },
   {
     observed: 'all-red',
     correctParents: 'RR \u00d7 rr',
-    distractors: ['Rr \u00d7 Rr', 'Rr \u00d7 rr', 'rr \u00d7 rr'],
+    distractors: ['RR \u00d7 RR', 'Rr \u00d7 Rr', 'rr \u00d7 rr'],
     explanation:
-      'When every offspring is red and none are white, one parent must be incapable of passing r. RR \u00d7 rr is the classic "uniform F1" cross: every offspring inherits R from the RR parent and r from the rr parent, so every offspring is Rr (red).',
+      'When every offspring is red and none are white, one parent must be incapable of passing r. RR \u00d7 rr is the classic "uniform F1" cross: every offspring inherits R from the RR parent and r from the rr parent, so every offspring is Rr (red). RR \u00d7 RR also gives all red but produces no r allele at all, so the F1 would breed true \u2014 and for this problem we want the simplest cross consistent with the observation, which is the parental testcross.',
   },
   {
     observed: 'all-white',
     correctParents: 'rr \u00d7 rr',
-    distractors: ['Rr \u00d7 rr', 'Rr \u00d7 Rr', 'RR \u00d7 rr'],
+    distractors: ['RR \u00d7 rr', 'Rr \u00d7 rr', 'Rr \u00d7 Rr'],
     explanation:
-      'Every offspring is white (rr), so neither parent can contribute an R allele. Both parents must be homozygous recessive rr.',
+      'Every offspring is white (rr), so neither parent can contribute an R allele. Both parents must be homozygous recessive rr. Any parent carrying even one R would produce some red offspring, which you don\u2019t see.',
   },
 ];
 
@@ -639,9 +648,9 @@ const BACKWARD_DIHYBRID_CASES: readonly BackwardDihybridCase[] = [
           'Rr Ss \u00d7 Rr Ss gives 9:3:3:1 \u2014 you would see white and wrinkled offspring in the F1, not all red-round.',
       },
       {
-        label: 'RR Ss \u00d7 Rr SS',
+        label: 'RR Ss \u00d7 rr ss',
         reason:
-          'This cross would give all red (both parents contribute R or pass through RR) but the Ss \u00d7 SS side gives all round only because one parent is SS \u2014 fine, but the setup question asks what cross MOST likely produced a uniform F1, and the canonical answer is homozygous \u00d7 homozygous recessive.',
+          'RR \u00d7 rr gives all red, but Ss \u00d7 ss gives 1 round : 1 wrinkled \u2014 so half the F1 would be wrinkled, not uniform. A truly uniform F1 requires homozygosity at every gene in the parents.',
       },
       {
         label: 'Rr Ss \u00d7 rr ss',
@@ -967,7 +976,12 @@ const GENERATORS: Record<PracticeProblemType, (rng: Rng) => PracticeProblem> = {
   'incomplete-dominance': generateIncompleteDominance,
 };
 
-export const ALL_PROBLEM_TYPES: readonly PracticeProblemType[] = [
+// Internal-only. F-048 dropped the external `export` — nothing outside
+// `problems.ts` consumed it. `generateRandomProblem` below is the sole
+// in-file consumer, used to hand-roll a uniformly-random problem from the
+// full type set. If you add a new problem type, add it here AND to
+// `GENERATORS` above.
+const ALL_PROBLEM_TYPES: readonly PracticeProblemType[] = [
   'forward-monohybrid',
   'forward-dihybrid',
   'backward-monohybrid',

@@ -205,11 +205,17 @@ export function recordAnswer(
 export function recordSessionEnd(
   state: PracticeState,
   problemsAttempted: number,
-  _problemsCorrect: number,
   now: number = Date.now(),
 ): PracticeState {
   const today = localDateString(now);
-  const yesterday = localDateString(now - 24 * 60 * 60 * 1000);
+  // Yesterday via calendar-day arithmetic, not millisecond subtraction.
+  // `new Date(now - 24h)` breaks on the day DST ends (the local clock
+  // falls back, so 24h ago lands two calendar days earlier), silently
+  // resetting streaks for one user per year. `setDate(d - 1)` uses
+  // calendar days and handles DST transitions correctly. F-046.
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = localDateString(yesterdayDate.getTime());
   const last = state.streak.lastSessionDate;
 
   let current: number;

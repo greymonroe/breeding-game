@@ -9,7 +9,6 @@ export {
   generateProblem,
   generateRandomProblem,
   generateProblemForConcept,
-  ALL_PROBLEM_TYPES,
   ALL_CONCEPTS,
   CONCEPT_LABELS,
   CONCEPT_TO_TYPE,

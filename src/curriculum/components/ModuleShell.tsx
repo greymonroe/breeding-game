@@ -284,7 +284,7 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
                       {isCompleted ? '\u2705' : isLocked ? '\u{1F512}' : '\u{25CB}'}
                     </span>
                     <div>
-                      <div className="font-semibold">{e.title}</div>
+                      <div className="font-semibold">{`${i + 1}. ${e.title}`}</div>
                       <div className="text-[10px] text-stone-400">{e.subtitle}</div>
                     </div>
                   </div>
@@ -352,7 +352,7 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
                     isLocked ? 'bg-stone-100 text-stone-300' :
                     'bg-stone-100 text-stone-500'
                   }`}>
-                  {isCompleted ? '\u2705' : ''} {e.title}
+                  {isCompleted ? '\u2705' : ''} {`${i + 1}. ${e.title}`}
                 </button>
               );
             })}
@@ -379,7 +379,7 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
               <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
                 <div className="mb-6">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-bold text-stone-800">{exp.title}</h2>
+                    <h2 className="text-lg font-bold text-stone-800">{`${currentExp + 1}. ${exp.title}`}</h2>
                     {completed.has(currentExp) && (
                       <span className={`text-xs ${theme.complete} px-2 py-0.5 rounded-full font-bold`}>
                         Complete

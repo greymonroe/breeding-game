@@ -89,8 +89,7 @@ export function PracticeMode() {
     saveState(updated);
 
     if (newResults.length >= SESSION_LENGTH) {
-      const correctCount = newResults.filter(r => r.correct).length;
-      const finalState = recordSessionEnd(updated, newResults.length, correctCount);
+      const finalState = recordSessionEnd(updated, newResults.length);
       setState(finalState);
       saveState(finalState);
       setSessionResults(newResults);
@@ -188,10 +187,7 @@ function LandingCard({
       <div className="rounded-2xl border border-stone-200 shadow-sm bg-white p-6 space-y-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h2
-              className="text-2xl text-stone-800"
-              style={{ fontFamily: "'Patrick Hand', cursive" }}
-            >
+            <h2 className="text-2xl text-stone-800 font-hand">
               Practice Mode
             </h2>
             <p className="text-sm text-stone-600 mt-1">
@@ -317,10 +313,7 @@ function SessionCard({
     <div className="rounded-2xl border border-stone-200 shadow-sm bg-white p-6 space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <span
-            className="text-xl text-stone-800"
-            style={{ fontFamily: "'Patrick Hand', cursive" }}
-          >
+          <span className="text-xl text-stone-800 font-hand">
             Question {progress.index} of {progress.total}
           </span>
           <span className="text-xs text-stone-500">
@@ -553,10 +546,7 @@ function Scorecard({
       {perfect && !reducedMotion && <Celebration />}
       <div className="flex items-start justify-between gap-3 flex-wrap relative">
         <div>
-          <h2
-            className="text-2xl text-stone-800"
-            style={{ fontFamily: "'Patrick Hand', cursive" }}
-          >
+          <h2 className="text-2xl text-stone-800 font-hand">
             Session complete
           </h2>
           <p className="text-sm text-stone-500 mt-0.5">
@@ -569,10 +559,7 @@ function Scorecard({
       </div>
 
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center relative">
-        <div
-          className="text-5xl font-bold text-emerald-800"
-          style={{ fontFamily: "'Patrick Hand', cursive" }}
-        >
+        <div className="text-5xl font-bold text-emerald-800 font-hand">
           {correctCount} / {results.length}
         </div>
         <div className="text-xs uppercase tracking-wide text-emerald-700 mt-1">

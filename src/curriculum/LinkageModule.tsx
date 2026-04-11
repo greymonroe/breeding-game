@@ -1067,13 +1067,14 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
 // ── Module definition ───────────────────────────────────────────────────
 
 const EXPERIMENTS = [
-  { id: 'linked_genes', title: '1. Linked Genes', subtitle: 'When genes don\'t assort independently', Component: Exp1_LinkedGenes },
-  { id: 'coupling_repulsion', title: '2. Coupling vs Repulsion', subtitle: 'Cis and trans arrangements', Component: Exp2_CouplingRepulsion },
-  { id: 'recomb_freq', title: '3. Recombination Frequency', subtitle: 'Counting recombinants', Component: Exp3_RecombFrequency },
-  { id: 'map_distance', title: '4. Map Distance', subtitle: 'RF% = centiMorgans', Component: Exp4_MapDistance },
-  { id: 'three_point', title: '5. Three-Point Cross', subtitle: 'Determine gene order', Component: Exp5_ThreePointCross },
-  { id: 'chi_square', title: '6. Chi-Square Test', subtitle: 'Statistical hypothesis testing', Component: Exp6_ChiSquare },
-  { id: 'interference', title: '7. Interference', subtitle: 'Double crossover analysis', Component: Exp7_Interference },
+  // Titles are plain; ModuleShell prefixes the index at render time (F-044).
+  { id: 'linked_genes', title: 'Linked Genes', subtitle: 'When genes don\'t assort independently', Component: Exp1_LinkedGenes },
+  { id: 'coupling_repulsion', title: 'Coupling vs Repulsion', subtitle: 'Cis and trans arrangements', Component: Exp2_CouplingRepulsion },
+  { id: 'recomb_freq', title: 'Recombination Frequency', subtitle: 'Counting recombinants', Component: Exp3_RecombFrequency },
+  { id: 'map_distance', title: 'Map Distance', subtitle: 'RF% = centiMorgans', Component: Exp4_MapDistance },
+  { id: 'three_point', title: 'Three-Point Cross', subtitle: 'Determine gene order', Component: Exp5_ThreePointCross },
+  { id: 'chi_square', title: 'Chi-Square Test', subtitle: 'Statistical hypothesis testing', Component: Exp6_ChiSquare },
+  { id: 'interference', title: 'Interference', subtitle: 'Double crossover analysis', Component: Exp7_Interference },
 ];
 
 const LINKAGE_MODULE: ModuleDefinition = {

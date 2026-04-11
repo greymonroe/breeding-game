@@ -153,6 +153,12 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
   // advance without committing to a mental model.
   const [exitState, setExitState] =
     useState<'correct' | 'incorrect' | 'acknowledged' | null>(null);
+  // Latched: once the student ever commits to a forward-advancing exit
+  // option (correct OR acknowledged hook), this flips to true and never
+  // resets — so an incorrect re-click can't erase progress or cancel the
+  // pending advance. Same shape as Exp 5's `forwardEverCorrect` latch
+  // introduced in Bundle B. Carry-over 1 from Bundle G.
+  const [exitEverCommitted, setExitEverCommitted] = useState(false);
 
   // Use the first two F1 siblings as the F1 × F1 cross. Both are Rr by
   // construction (RR × rr → every offspring is Rr), so this is a genuine
@@ -213,11 +219,11 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
   // after a short read-through delay. An incorrect answer does NOT advance.
   // useEffect, not setTimeout-from-render.
   useEffect(() => {
-    if (exitState === 'correct' || exitState === 'acknowledged') {
+    if (exitEverCommitted) {
       const t = setTimeout(() => onComplete(), 2200);
       return () => clearTimeout(t);
     }
-  }, [exitState, onComplete]);
+  }, [exitEverCommitted, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -225,14 +231,12 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
           lab-notebook feel. Factually neutral on specifics we're not sure of. */}
       <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm space-y-3">
         <div
-          className="text-xs font-semibold tracking-wider text-stone-500 uppercase"
-          style={{ fontFamily: '"Patrick Hand", cursive' }}
+          className="text-xs font-semibold tracking-wider text-stone-500 uppercase font-hand"
         >
           Mendel's garden, Brno — 1865
         </div>
         <p
-          className="text-lg leading-snug text-stone-800"
-          style={{ fontFamily: '"Patrick Hand", cursive' }}
+          className="text-lg leading-snug text-stone-800 font-hand"
         >
           It's 1865. You're Gregor Mendel, a monk in a monastery garden in Brno, Moravia,
           growing pea plants. You have hundreds of them, neatly labeled, and you're about
@@ -442,6 +446,9 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
                   onClick={() => {
                     setExitAnswer(opt.key);
                     setExitState(opt.state);
+                    if (opt.state === 'correct' || opt.state === 'acknowledged') {
+                      setExitEverCommitted(true);
+                    }
                   }}
                   className={`w-full text-left rounded-lg border-2 px-4 py-3 text-sm font-semibold transition-all ${
                     picked
@@ -773,23 +780,40 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
                     style={{ top: `${(1 - 0.75) * 100}%` }}
                     aria-hidden
                   />
-                  {/* Bars */}
+                  {/* Bars — each replicate is a two-color stacked bar spanning
+                      the full 0-100% height. White segment sits at the bottom
+                      (from 0 up to 1-frac), red segment sits on top (the
+                      remaining frac). Both counts are visible so the student
+                      sees red and white moving together across runs — the
+                      pedagogical point of the whole panel. Colors come from
+                      the deterministic FLOWER_COLOR colorMap, keyed by label. */}
                   <div className="absolute inset-0 flex items-end justify-around gap-1 pl-2">
-                    {replicates.map((frac, i) => (
-                      <div
-                        key={i}
-                        className="flex flex-col items-center flex-1 max-w-[32px] group"
-                        title={`Run ${i + 1}: ${(frac * 100).toFixed(0)}% red`}
-                      >
+                    {replicates.map((frac, i) => {
+                      const redPct = frac * 100;
+                      const whitePct = (1 - frac) * 100;
+                      return (
                         <div
-                          className="w-full rounded-t"
-                          style={{
-                            height: `${frac * 100}%`,
-                            backgroundColor: FLOWER_COLOR.colorMap['Red'],
-                          }}
-                        />
-                      </div>
-                    ))}
+                          key={i}
+                          className="flex flex-col items-stretch flex-1 max-w-[32px] h-full group"
+                          title={`Run ${i + 1}: ${redPct.toFixed(0)}% red, ${whitePct.toFixed(0)}% white`}
+                        >
+                          <div
+                            className="w-full rounded-t"
+                            style={{
+                              height: `${redPct}%`,
+                              backgroundColor: FLOWER_COLOR.colorMap['Red'],
+                            }}
+                          />
+                          <div
+                            className="w-full border-t border-stone-300"
+                            style={{
+                              height: `${whitePct}%`,
+                              backgroundColor: FLOWER_COLOR.colorMap['White'],
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                   {/* 0.75 target label */}
                   <span
@@ -827,8 +851,7 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
           feedback={backOpt ? backOpt.feedback : undefined}
         >
           <div
-            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
-            style={{ fontFamily: '"Patrick Hand", cursive' }}
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand"
           >
             Working backward
           </div>
@@ -1016,8 +1039,7 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
           feedback={backOpt ? backOpt.feedback : undefined}
         >
           <div
-            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
-            style={{ fontFamily: '"Patrick Hand", cursive' }}
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand"
           >
             Working backward
           </div>
@@ -1244,8 +1266,7 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
           feedback={backOpt ? backOpt.feedback : undefined}
         >
           <div
-            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
-            style={{ fontFamily: '"Patrick Hand", cursive' }}
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand"
           >
             Working backward
           </div>
@@ -1518,8 +1539,7 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
           feedback={backOpt ? backOpt.feedback : undefined}
         >
           <div
-            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
-            style={{ fontFamily: '"Patrick Hand", cursive' }}
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand"
           >
             Working backward
           </div>
@@ -2127,8 +2147,7 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
           feedback={backOpt ? backOpt.feedback : undefined}
         >
           <div
-            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
-            style={{ fontFamily: '"Patrick Hand", cursive' }}
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand"
           >
             Working backward
           </div>
@@ -2332,8 +2351,7 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
           feedback={backOpt ? backOpt.feedback : undefined}
         >
           <div
-            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
-            style={{ fontFamily: '"Patrick Hand", cursive' }}
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand"
           >
             Working backward
           </div>
@@ -2575,8 +2593,7 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
               feedback={backOpt ? backOpt.feedback : undefined}
             >
               <div
-                className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
-                style={{ fontFamily: '"Patrick Hand", cursive' }}
+                className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand"
               >
                 Working backward
               </div>
@@ -2611,14 +2628,18 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
 // ── Module definition ───────────────────────────────────────────────────
 
 const EXPERIMENTS = [
-  { id: 'particulate-vs-blending', title: "1. Mendel's Insight — 1865", subtitle: 'Particulate vs blending inheritance', Component: Exp0_ParticulateVsBlending },
-  { id: 'one_gene', title: '2. One Gene', subtitle: 'Discover dominance and the 3:1 ratio', Component: Exp1_OneGene },
-  { id: 'prediction', title: '3. Predict Offspring', subtitle: 'Use genotypes to predict ratios', Component: Exp2_GenotypePrediction },
-  { id: 'incomplete', title: '4. Incomplete Dominance', subtitle: 'When the heterozygote looks different', Component: Exp3_IncompleteDominance },
-  { id: 'test_cross', title: '5. The Test Cross', subtitle: 'Unmask hidden genotypes', Component: Exp4_TestCross },
-  { id: 'two_genes', title: '6. Two Genes', subtitle: 'Independent assortment and 9:3:3:1', Component: Exp5_TwoGenes },
-  { id: 'epistasis', title: '7. Epistasis', subtitle: 'When one gene masks another', Component: Exp6_Epistasis },
-  { id: 'quantitative', title: '8. Many Genes — Tomato Fruit Weight', subtitle: 'From Mendelian ratios to continuous variation', Component: Exp7_Quantitative },
+  // Titles below are intentionally plain (no leading "N."). The numeric
+  // prefix is added at render time by `ModuleShell` from the array index,
+  // so renumbering or reordering experiments here requires no edits to
+  // any title string. F-044.
+  { id: 'particulate-vs-blending', title: "Mendel's Insight — 1865", subtitle: 'Particulate vs blending inheritance', Component: Exp0_ParticulateVsBlending },
+  { id: 'one_gene', title: 'One Gene', subtitle: 'Discover dominance and the 3:1 ratio', Component: Exp1_OneGene },
+  { id: 'prediction', title: 'Predict Offspring', subtitle: 'Use genotypes to predict ratios', Component: Exp2_GenotypePrediction },
+  { id: 'incomplete', title: 'Incomplete Dominance', subtitle: 'When the heterozygote looks different', Component: Exp3_IncompleteDominance },
+  { id: 'test_cross', title: 'The Test Cross', subtitle: 'Unmask hidden genotypes', Component: Exp4_TestCross },
+  { id: 'two_genes', title: 'Two Genes', subtitle: 'Independent assortment and 9:3:3:1', Component: Exp5_TwoGenes },
+  { id: 'epistasis', title: 'Epistasis', subtitle: 'When one gene masks another', Component: Exp6_Epistasis },
+  { id: 'quantitative', title: 'Many Genes — Tomato Fruit Weight', subtitle: 'From Mendelian ratios to continuous variation', Component: Exp7_Quantitative },
 ];
 
 const MENDELIAN_MODULE: ModuleDefinition = {

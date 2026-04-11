@@ -939,13 +939,14 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
 // ── Module definition ───────────────────────────────────────────────────
 
 const EXPERIMENTS = [
-  { id: 'allele_freq', title: '1. Allele Frequencies', subtitle: 'Count alleles and compute p and q', Component: Exp1_AlleleFrequencies },
-  { id: 'hwe', title: '2. Hardy-Weinberg', subtitle: 'Predict genotype frequencies from p and q', Component: Exp2_HardyWeinberg },
-  { id: 'drift', title: '3. Genetic Drift', subtitle: 'Small vs large populations', Component: Exp3_GeneticDrift },
-  { id: 'selection', title: '4. Natural Selection', subtitle: 'Directional change from fitness differences', Component: Exp4_NaturalSelection },
-  { id: 'migration', title: '5. Migration', subtitle: 'Gene flow homogenizes populations', Component: Exp5_Migration },
-  { id: 'mut_sel_balance', title: '6. Mutation-Selection', subtitle: 'Why deleterious alleles persist', Component: Exp6_MutationSelectionBalance },
-  { id: 'founder', title: '7. Founder Effect', subtitle: 'Sampling shifts allele frequencies', Component: Exp7_FounderEffect },
+  // Titles are plain; ModuleShell prefixes the index at render time (F-044).
+  { id: 'allele_freq', title: 'Allele Frequencies', subtitle: 'Count alleles and compute p and q', Component: Exp1_AlleleFrequencies },
+  { id: 'hwe', title: 'Hardy-Weinberg', subtitle: 'Predict genotype frequencies from p and q', Component: Exp2_HardyWeinberg },
+  { id: 'drift', title: 'Genetic Drift', subtitle: 'Small vs large populations', Component: Exp3_GeneticDrift },
+  { id: 'selection', title: 'Natural Selection', subtitle: 'Directional change from fitness differences', Component: Exp4_NaturalSelection },
+  { id: 'migration', title: 'Migration', subtitle: 'Gene flow homogenizes populations', Component: Exp5_Migration },
+  { id: 'mut_sel_balance', title: 'Mutation-Selection', subtitle: 'Why deleterious alleles persist', Component: Exp6_MutationSelectionBalance },
+  { id: 'founder', title: 'Founder Effect', subtitle: 'Sampling shifts allele frequencies', Component: Exp7_FounderEffect },
 ];
 
 const POPGEN_MODULE: ModuleDefinition = {
