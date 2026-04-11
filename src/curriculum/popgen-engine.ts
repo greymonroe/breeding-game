@@ -103,14 +103,19 @@ export function simulate(config: PopGenConfig): PopGenResult {
     // Clamp
     p = Math.max(0, Math.min(1, p));
 
-    // 4. Drift — Wright-Fisher sampling of 2N alleles
+    // 4. Drift — Wright-Fisher sampling of 2N alleles (this IS the drift step)
     const nA = binomial(2 * popSize, p);
     p = nA / (2 * popSize);
 
-    // Reconstruct genotypes from new allele freq
-    geno = sampleGenotypes(popSize, p);
-    // Correct allele freq to match actual genotype counts
-    p = (2 * geno.AA + geno.Aa) / (2 * popSize);
+    // Deterministic HW genotype reconstruction from post-drift p.
+    // Do NOT redraw genotypes here — that would add a second round of
+    // sampling noise on top of Wright-Fisher drift and force HWE on output.
+    const q = 1 - p;
+    const AA = Math.round(popSize * p * p);
+    const aa = Math.round(popSize * q * q);
+    // Absorb any rounding residual into Aa so AA+Aa+aa === popSize exactly.
+    const Aa = popSize - AA - aa;
+    geno = { AA, Aa, aa };
 
     freqHistory.push(p);
     genotypeHistory.push({ ...geno });
