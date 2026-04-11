@@ -20,7 +20,8 @@ export function OrganismCard({
   if (epistasis) {
     const ep = getEpistasisPhenotype(org, PIGMENT_GENE, AGOUTI_GENE);
     displayLabel = ep;
-    displayColor = ep === 'Albino' ? '#f5f0e0' : ep === 'Agouti' ? '#a08060' : '#3a2820';
+    // Maize aleurone palette: purple anthocyanin, red pigment, pale cream colorless.
+    displayColor = ep === 'Colorless' ? '#fef3c7' : ep === 'Purple' ? '#6b21a8' : '#c2410c';
   }
 
   const px = size === 'sm' ? 'p-1.5' : 'p-2';
@@ -32,7 +33,7 @@ export function OrganismCard({
         ${selected ? 'border-amber-500 bg-amber-50 shadow-md' : 'border-stone-200 bg-white'}
         ${onClick ? 'cursor-pointer hover:border-amber-300' : ''}`}
     >
-      <OrganismIcon type={epistasis ? 'mouse' : 'plant'} color={displayColor} size={size} />
+      <OrganismIcon type="plant" color={displayColor} size={size} />
       {genes.length > 1 && !epistasis && (
         <div className="flex gap-0.5">
           {genes.slice(1).map(g => (

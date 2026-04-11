@@ -8,11 +8,12 @@ import {
 
 export function CrossWorkbench({
   parentA, parentB, genes, onCross, crossResult, sampleSize = 100,
-  showGenotypes = false, epistasis = false, label,
+  showGenotypes = false, epistasis = false, label, order,
 }: {
   parentA: Organism; parentB: Organism; genes: GeneDefinition[];
   onCross: (result: CrossResult) => void; crossResult: CrossResult | null;
   sampleSize?: number; showGenotypes?: boolean; epistasis?: boolean; label?: string;
+  order?: string[];
 }) {
   const doCross = useCallback(() => {
     const result = cross(parentA, parentB, genes, sampleSize);
@@ -48,7 +49,7 @@ export function CrossWorkbench({
           <div className="text-xs text-stone-500 font-semibold text-center">
             {crossResult.total} offspring produced
           </div>
-          <RatioBar counts={displayCounts} genes={genes} epistasis={epistasis} />
+          <RatioBar counts={displayCounts} genes={genes} epistasis={epistasis} order={order} />
           {showGenotypes && (
             <div className="text-xs text-stone-400 text-center font-mono">
               Genotypes: {Object.entries(crossResult.genotypeCounts)

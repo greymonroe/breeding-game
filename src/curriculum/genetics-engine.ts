@@ -70,23 +70,25 @@ export const PLANT_HEIGHT: GeneDefinition = {
   colorMap: { 'Tall': '#4a8a5a', 'Short': '#8ab47a' },
 };
 
-// Epistasis example: coat color in mice (agouti/non-agouti + pigment/albino)
+// Epistasis example: maize aleurone color (C colored-vs-colorless + R purple-vs-red).
+// cc kernels are colorless regardless of R; C_ R_ → Purple, C_ rr → Red.
+// Variable names kept (PIGMENT_GENE / AGOUTI_GENE) for backward compatibility with importers.
 export const PIGMENT_GENE: GeneDefinition = {
-  id: 'pigment',
-  name: 'Pigment production',
+  id: 'aleurone_c',
+  name: 'Aleurone Color (C)',
   alleles: ['C', 'c'],
   dominance: 'complete',
-  phenotypeMap: { 'CC': 'Pigmented', 'Cc': 'Pigmented', 'cC': 'Pigmented', 'cc': 'Albino' },
-  colorMap: { 'Pigmented': '#6b4c3b', 'Albino': '#f5f0e0' },
+  phenotypeMap: { 'CC': 'Colored', 'Cc': 'Colored', 'cC': 'Colored', 'cc': 'Colorless' },
+  colorMap: { 'Colored': '#6b21a8', 'Colorless': '#fef3c7' },
 };
 
 export const AGOUTI_GENE: GeneDefinition = {
-  id: 'agouti',
-  name: 'Color pattern',
-  alleles: ['A', 'a'],
+  id: 'aleurone_r',
+  name: 'Aleurone Pigment (R)',
+  alleles: ['R', 'r'],
   dominance: 'complete',
-  phenotypeMap: { 'AA': 'Agouti', 'Aa': 'Agouti', 'aA': 'Agouti', 'aa': 'Solid' },
-  colorMap: { 'Agouti': '#a08060', 'Solid': '#3a2820' },
+  phenotypeMap: { 'RR': 'Purple', 'Rr': 'Purple', 'rR': 'Purple', 'rr': 'Red' },
+  colorMap: { 'Purple': '#6b21a8', 'Red': '#c2410c' },
 };
 
 // ── Quantitative trait genes (additive) ──
@@ -145,16 +147,18 @@ export function getGenotypeLabel(org: Organism, genes: GeneDefinition[]): string
   }).join(' ');
 }
 
-/** Epistasis phenotype: for the coat color example */
+/** Epistasis phenotype: maize aleurone color (recessive epistasis, 9:3:4).
+ *  cc is epistatic and masks the R gene → Colorless.
+ *  Otherwise R_ → Purple, rr → Red. */
 export function getEpistasisPhenotype(
   org: Organism,
   pigmentGene: GeneDefinition,
   agoutiGene: GeneDefinition
 ): string {
   const pigment = getPhenotype(org, [pigmentGene])[pigmentGene.id];
-  if (pigment === 'Albino') return 'Albino'; // cc is epistatic — masks agouti
-  const agouti = getPhenotype(org, [agoutiGene])[agoutiGene.id];
-  return agouti === 'Agouti' ? 'Agouti' : 'Black';
+  if (pigment === 'Colorless') return 'Colorless'; // cc is epistatic — masks R
+  const r = getPhenotype(org, [agoutiGene])[agoutiGene.id];
+  return r === 'Purple' ? 'Purple' : 'Red';
 }
 
 /** Compute additive genetic value from multiple QTL genes */
