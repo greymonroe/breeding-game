@@ -41,7 +41,26 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
   const [answer2, setAnswer2] = useState('');
   const [answer2Correct, setAnswer2Correct] = useState<boolean | null>(null);
 
+  // Replicate panel (noise literacy): each entry is the red fraction of one
+  // independent Rr x Rr cross of sampleSize offspring. We reuse the engine's
+  // `cross()` to draw — never hand-rolled — so the variation students see is
+  // the same stochastic process the main F2 panel uses.
+  const [replicates, setReplicates] = useState<number[]>([]);
+
   const f1Child = f1Result ? f1Result.offspring[0] : null;
+
+  const runReplicates = useCallback(() => {
+    if (!f1Child) return;
+    const partner = f1Result?.offspring[1] ?? f1Child;
+    const SAMPLE_SIZE = 100;
+    const fractions: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const rep = cross(f1Child, partner, [FLOWER_COLOR], SAMPLE_SIZE);
+      const red = rep.phenotypeCounts['Red'] ?? 0;
+      fractions.push(red / SAMPLE_SIZE);
+    }
+    setReplicates(fractions);
+  }, [f1Child, f1Result]);
 
   return (
     <div className="space-y-6">
@@ -85,6 +104,20 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
             ))}
           </div>
         </QuestionPanel>
+      )}
+
+      {/* Dominance molecular callout — kill the "stronger allele" misconception. */}
+      {step >= 2 && (
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 p-6 shadow-sm">
+          <p className="text-sm font-bold text-violet-900 mb-2">Why is R dominant over r?</p>
+          <p className="text-sm text-violet-800 leading-relaxed">
+            The <strong>R</strong> allele codes for a working enzyme that makes red pigment.
+            The <strong>r</strong> allele is a broken version — it can't make pigment.
+            A plant with even one R allele (Rr) makes <em>enough</em> pigment to look red.
+            Dominance isn't about which allele is "stronger" or "wins" — it's about whether
+            one working copy is enough to produce the phenotype.
+          </p>
+        </div>
       )}
 
       {/* Step 3: F1 × F1 */}
@@ -131,6 +164,97 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
             ))}
           </div>
         </QuestionPanel>
+      )}
+
+      {/* Noise literacy: replicate the F2 cross 10 times so students see sampling
+          variation is normal. Reuses cross() from the engine — no hand-rolled draws.
+          Each bar is the red fraction of 100 offspring from one independent Rr x Rr. */}
+      {step >= 3 && f2Result && (
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <p className="text-sm font-bold text-stone-800">Is your 3:1 exact? Let's run it 10 more times.</p>
+              <p className="text-xs text-stone-500 mt-1">
+                Each run is another independent Rr × Rr with 100 offspring — same parents, same biology,
+                different random sample.
+              </p>
+            </div>
+            <button
+              onClick={runReplicates}
+              className="rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg"
+            >
+              {replicates.length > 0 ? 'Run 10 more times' : 'Run this cross 10 more times'}
+            </button>
+          </div>
+
+          {replicates.length > 0 && (
+            <>
+              {/* Compact bar plot: x = replicate index, y = red fraction 0..1.
+                  Shaded band covers the textbook 3:1 zone (~0.70-0.80 red). */}
+              <div className="relative rounded-xl bg-stone-50 border border-stone-200 p-4">
+                <div className="relative h-40">
+                  {/* 3:1 zone shaded band — 0.70 to 0.80, which spans roughly 1 SE on either
+                      side of 0.75 at n=100 (SE = sqrt(.75*.25/100) = 0.043). */}
+                  <div
+                    className="absolute left-0 right-0 bg-emerald-100 border-y border-dashed border-emerald-300"
+                    style={{ top: `${(1 - 0.80) * 100}%`, height: `${(0.80 - 0.70) * 100}%` }}
+                    aria-hidden
+                  />
+                  {/* y-axis ticks */}
+                  {[0, 0.25, 0.5, 0.75, 1].map(y => (
+                    <div
+                      key={y}
+                      className="absolute left-0 right-0 border-t border-stone-200"
+                      style={{ top: `${(1 - y) * 100}%` }}
+                      aria-hidden
+                    >
+                      <span className="absolute -left-6 -top-2 text-[9px] text-stone-400">{(y * 100).toFixed(0)}%</span>
+                    </div>
+                  ))}
+                  {/* Dashed line at 0.75 target */}
+                  <div
+                    className="absolute left-0 right-0 border-t-2 border-dashed border-emerald-500"
+                    style={{ top: `${(1 - 0.75) * 100}%` }}
+                    aria-hidden
+                  />
+                  {/* Bars */}
+                  <div className="absolute inset-0 flex items-end justify-around gap-1 pl-2">
+                    {replicates.map((frac, i) => (
+                      <div
+                        key={i}
+                        className="flex flex-col items-center flex-1 max-w-[32px] group"
+                        title={`Run ${i + 1}: ${(frac * 100).toFixed(0)}% red`}
+                      >
+                        <div
+                          className="w-full rounded-t"
+                          style={{
+                            height: `${frac * 100}%`,
+                            backgroundColor: FLOWER_COLOR.colorMap['Red'],
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {/* 0.75 target label */}
+                  <span
+                    className="absolute right-0 text-[10px] font-semibold text-emerald-700 bg-white/80 px-1 rounded"
+                    style={{ top: `${(1 - 0.75) * 100 - 8}%` }}
+                  >
+                    3:1 target = 75%
+                  </span>
+                </div>
+                <div className="mt-2 text-center text-[10px] text-stone-500">
+                  10 independent replicates of Rr × Rr (100 offspring each) · y-axis: % red offspring
+                </div>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                <strong>Every one of these is 3:1.</strong> Real experiments have sampling variation —
+                72:28 is still 3:1, so is 82:18. Don't panic when your numbers aren't exact. The biology
+                is the same in every run; what changes is which 100 offspring you happened to measure.
+              </p>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -190,6 +314,21 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
             sampleSize={100} label="Test Cross: Rr × rr" showGenotypes
           />
         </>
+      )}
+
+      {/* Law of Segregation — named callout at end of Exp 2. */}
+      {crossResult && (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm">
+          <p className="text-sm font-bold text-stone-800 mb-2">
+            Law of Segregation (Mendel's First Law)
+          </p>
+          <p className="text-sm text-stone-700 leading-relaxed">
+            In diploid organisms, the two alleles at a locus separate (segregate) into
+            different gametes during meiosis. Each gamete carries exactly one allele.
+            When gametes fuse at fertilization, the offspring gets one allele from each
+            parent.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -423,11 +562,29 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   const [f2Result, setF2Result] = useState<CrossResult | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [linkAnswer, setLinkAnswer] = useState('');
+  const [linkCorrect, setLinkCorrect] = useState<boolean | null>(null);
 
   const parentAABB = useMemo(() => makeOrganism({ color: ['R', 'R'], shape: ['S', 'S'] }, 'RRSS'), []);
   const parentaabb = useMemo(() => makeOrganism({ color: ['r', 'r'], shape: ['s', 's'] }, 'rrss'), []);
 
   const f1Child = f1Result?.offspring[0];
+
+  // Look colors up deterministically by phenotype label using the same gene
+  // colorMap RatioBar uses — never by index/sort order.
+  const phenotypeFill = useCallback((colorLabel: string, shapeLabel: string) => ({
+    color: FLOWER_COLOR.colorMap[colorLabel] ?? '#999',
+    shape: SEED_SHAPE.colorMap[shapeLabel] ?? '#999',
+  }), []);
+
+  // Auto-advance once the student answers the final linkage tease correctly.
+  // Using useEffect (not setTimeout from render) keeps React and timers sane.
+  useEffect(() => {
+    if (linkCorrect === true) {
+      const t = setTimeout(onComplete, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [linkCorrect, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -449,6 +606,92 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             All F1 are Red/Round (as expected — both dominant). Now cross two F1 plants.
             With <strong>two genes segregating</strong>, how many phenotypic classes do you predict?
           </p>
+
+          {/* Derivation of 9:3:3:1 from (3:1) x (3:1) — before the F2 cross runs. */}
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-6 shadow-sm space-y-4">
+            <p className="text-sm font-bold text-violet-900">Before you run the cross — predict the ratio from first principles.</p>
+            <p className="text-sm text-violet-800 leading-relaxed">
+              Each F1 parent is <strong>Rr Ss</strong>. Think about one gene at a time:
+            </p>
+            <ul className="text-sm text-violet-800 list-disc ml-5 space-y-1">
+              <li>Gene 1 (flower color) Rr × Rr gives <strong>3 red : 1 white</strong> — so P(red) = 3/4, P(white) = 1/4.</li>
+              <li>Gene 2 (seed shape) Ss × Ss gives <strong>3 round : 1 wrinkled</strong> — so P(round) = 3/4, P(wrinkled) = 1/4.</li>
+            </ul>
+            <p className="text-sm text-violet-800 leading-relaxed">
+              If the two genes are <strong>independent</strong>, the probability of any combination is just the
+              product of the individual probabilities. Multiply across the 2×2 grid:
+            </p>
+
+            {/* 2x2 probability grid — phenotype colors looked up deterministically by label. */}
+            <div className="rounded-xl bg-white border border-violet-200 p-3">
+              <div className="grid grid-cols-[auto_1fr_1fr] gap-2 text-xs">
+                <div />
+                <div className="text-center font-semibold text-violet-900">Round (3/4)</div>
+                <div className="text-center font-semibold text-violet-900">Wrinkled (1/4)</div>
+
+                <div className="flex items-center justify-end font-semibold text-violet-900 pr-2">Red (3/4)</div>
+                {(() => {
+                  const { color, shape } = phenotypeFill('Red', 'Round');
+                  return (
+                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                      <div className="flex gap-1">
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
+                      </div>
+                      <div className="text-[10px] font-semibold text-stone-700">Red, Round</div>
+                      <div className="text-[11px] font-bold text-violet-900">3/4 × 3/4 = 9/16</div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const { color, shape } = phenotypeFill('Red', 'Wrinkled');
+                  return (
+                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                      <div className="flex gap-1">
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
+                      </div>
+                      <div className="text-[10px] font-semibold text-stone-700">Red, Wrinkled</div>
+                      <div className="text-[11px] font-bold text-violet-900">3/4 × 1/4 = 3/16</div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex items-center justify-end font-semibold text-violet-900 pr-2">White (1/4)</div>
+                {(() => {
+                  const { color, shape } = phenotypeFill('White', 'Round');
+                  return (
+                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                      <div className="flex gap-1">
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
+                      </div>
+                      <div className="text-[10px] font-semibold text-stone-700">White, Round</div>
+                      <div className="text-[11px] font-bold text-violet-900">1/4 × 3/4 = 3/16</div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const { color, shape } = phenotypeFill('White', 'Wrinkled');
+                  return (
+                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                      <div className="flex gap-1">
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
+                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
+                      </div>
+                      <div className="text-[10px] font-semibold text-stone-700">White, Wrinkled</div>
+                      <div className="text-[11px] font-bold text-violet-900">1/4 × 1/4 = 1/16</div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <p className="text-sm text-violet-900 font-semibold">
+              Predicted ratio: 9 : 3 : 3 : 1. Now run the cross and see if the data agree.
+            </p>
+          </div>
+
           <CrossWorkbench
             parentA={f1Child} parentB={f1Result!.offspring[1] ?? f1Child}
             genes={[FLOWER_COLOR, SEED_SHAPE]}
@@ -456,6 +699,17 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             sampleSize={200} label="F2: Dihybrid F1 × F1"
           />
         </>
+      )}
+
+      {step >= 2 && f2Result && (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-6 shadow-sm">
+          <p className="text-sm font-bold text-emerald-900">You just derived the Law of Independent Assortment.</p>
+          <p className="text-sm text-emerald-800 leading-relaxed mt-1">
+            The bars above match the 9:3:3:1 you predicted by multiplying (3:1) × (3:1). You didn't
+            memorize this ratio — you built it from the product rule applied to two independent
+            monohybrid segregations.
+          </p>
+        </div>
       )}
 
       {step >= 2 && f2Result && (
@@ -474,7 +728,6 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
                 setAnswer(opt);
                 const isCorrect = opt === '9:3:3:1';
                 setCorrect(isCorrect);
-                if (isCorrect) setTimeout(onComplete, 2000);
               }}
                 className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
                   answer === opt
@@ -486,6 +739,75 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             ))}
           </div>
         </QuestionPanel>
+      )}
+
+      {/* Law of Independent Assortment — named callout + warning that the law can break. */}
+      {correct === true && (
+        <>
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm space-y-3">
+            <p className="text-sm font-bold text-stone-800">
+              Law of Independent Assortment (Mendel's Second Law)
+            </p>
+            <p className="text-sm text-stone-700 leading-relaxed">
+              When two (or more) genes are on <em>different chromosomes</em>, their alleles segregate
+              into gametes independently. This is why dihybrid crosses give 9:3:3:1 instead of 3:1.
+            </p>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-900">
+                <strong>⚠ This law can break.</strong> When two genes are close together on the same
+                chromosome, they tend to travel together in gametes — this is called <strong>linkage</strong>,
+                and the 9:3:3:1 ratio is distorted.{' '}
+                <a
+                  href="/breeding-game/linkage.html"
+                  className="font-bold text-emerald-700 hover:text-emerald-800 underline"
+                >
+                  Find out in the Linkage module →
+                </a>
+              </p>
+            </div>
+          </div>
+
+          {/* Linkage tease question — all four options must read as plausible; no telegraphs. */}
+          <QuestionPanel
+            question="Mendel's 7 traits were all on different chromosomes — he got lucky. What do you think would happen if the color gene and the shape gene were right next to each other on the same chromosome?"
+            correct={linkCorrect}
+            feedback={linkCorrect !== null
+              ? "Find out for yourself in the Linkage module →"
+              : undefined}
+          >
+            <div className="flex gap-2 flex-wrap flex-col">
+              {[
+                'The same 9:3:3:1 ratio would still appear.',
+                'The parental combinations would be over-represented, not 9:3:3:1.',
+                'All offspring would be the same.',
+                'The genes would fail to assort at all.',
+              ].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    setLinkAnswer(opt);
+                    setLinkCorrect(opt === 'The parental combinations would be over-represented, not 9:3:3:1.');
+                  }}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold text-left transition-all ${
+                    linkAnswer === opt
+                      ? linkCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+            {linkCorrect !== null && (
+              <a
+                href="/breeding-game/linkage.html"
+                className="block mt-3 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg"
+              >
+                Open the Linkage module →
+              </a>
+            )}
+          </QuestionPanel>
+        </>
       )}
     </div>
   );
