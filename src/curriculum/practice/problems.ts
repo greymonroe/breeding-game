@@ -25,6 +25,8 @@ export type PracticeProblemType =
   | 'forward-monohybrid'
   | 'forward-dihybrid'
   | 'backward-monohybrid'
+  | 'backward-dihybrid'
+  | 'trihybrid'
   | 'noise-recognition'
   | 'incomplete-dominance';
 
@@ -291,6 +293,160 @@ function explainDihybrid(c: DihybridCase): string {
   return `P(rr) = P(r from A) \u00d7 P(r from B) = ${prA} \u00d7 ${prB}. P(ss) = ${psA} \u00d7 ${psB}. Multiply the two gene probabilities \u2014 independent assortment lets you factor \u2014 to get ${fractionLabel(num, denom)} (\u2248 ${fractionDecimal(num, denom)}).`;
 }
 
+// ── Problem 2b: trihybrid multiplication rule ───────────────────────────
+//
+// Extends the multiplication rule from 2 genes to 3. Given a
+// trihybrid × trihybrid cross with all genes independently assorting,
+// compute the probability of a specified triple-locus offspring genotype.
+// The canonical case is P(aa bb cc) = 1/4 × 1/4 × 1/4 = 1/64, which is
+// Success Criterion #8 in the Mendelian v2 plan.
+//
+// Several case variants are provided so Practice Mode doesn't repeat:
+//  - aa bb cc target (1/64)
+//  - AA bb Cc target mixes homozygous-dominant with homozygous-recessive
+//    with heterozygous to force a student to think about each gene.
+//  - At least one plant-themed variant (pea shape/color/pod using the
+//    module's R/S convention) to anchor abstract gene letters.
+//
+// Plausible distractors come from common misconceptions:
+//  - 1/4  → only counted one gene (forgot to multiply)
+//  - 1/16 → only counted two genes (forgot the third)
+//  - 1/64 → correct when all three genes contribute a 1/4 factor
+//  - 1/256 → over-counted to four genes (or used 1/4^4)
+
+interface TrihybridCase {
+  /** Display parents, e.g. 'Aa Bb Cc'. */
+  parents: [string, string];
+  /** Target offspring genotype string for display, e.g. 'aa bb cc'. */
+  target: string;
+  /** Human-readable per-gene probability derivation. */
+  derivation: string;
+  /** Canonical probability numerator / denominator. */
+  p: { num: number; denom: number };
+  /** Optional plant scenario prose to anchor the letters. */
+  scenario?: string;
+}
+
+// For parent-pair × target, we compute P(target gene class) per gene and
+// multiply. Each gene contributes one of:
+//   Aa × Aa → P(AA)=1/4  P(Aa)=1/2  P(aa)=1/4
+//   AA × Aa → P(AA)=1/2  P(Aa)=1/2  P(aa)=0
+//   AA × aa → P(Aa)=1    everything else 0
+//   Aa × aa → P(Aa)=1/2  P(aa)=1/2  P(AA)=0
+//   aa × aa → P(aa)=1    everything else 0
+// We hand-derive each case below rather than building a general solver —
+// the case set is small and the derivation prose must be exact.
+const TRIHYBRID_CASES: readonly TrihybridCase[] = [
+  {
+    parents: ['Aa Bb Cc', 'Aa Bb Cc'],
+    target: 'aa bb cc',
+    derivation:
+      'P(aa) = 1/4, P(bb) = 1/4, P(cc) = 1/4. Multiply: 1/4 \u00d7 1/4 \u00d7 1/4 = 1/64.',
+    p: { num: 1, denom: 64 },
+  },
+  {
+    parents: ['Aa Bb Cc', 'Aa Bb Cc'],
+    target: 'AA BB CC',
+    derivation:
+      'P(AA) = 1/4, P(BB) = 1/4, P(CC) = 1/4. Multiply: 1/4 \u00d7 1/4 \u00d7 1/4 = 1/64.',
+    p: { num: 1, denom: 64 },
+  },
+  {
+    parents: ['Aa Bb Cc', 'Aa Bb Cc'],
+    target: 'AA bb Cc',
+    derivation:
+      'P(AA) = 1/4, P(bb) = 1/4, P(Cc) = 1/2. Multiply: 1/4 \u00d7 1/4 \u00d7 1/2 = 1/32.',
+    p: { num: 1, denom: 32 },
+  },
+  {
+    parents: ['Aa Bb Cc', 'aa bb cc'],
+    target: 'aa bb cc',
+    derivation:
+      'From Aa \u00d7 aa: P(aa) = 1/2. From Bb \u00d7 bb: P(bb) = 1/2. From Cc \u00d7 cc: P(cc) = 1/2. Multiply: 1/2 \u00d7 1/2 \u00d7 1/2 = 1/8.',
+    p: { num: 1, denom: 8 },
+  },
+  {
+    parents: ['Aa Bb Cc', 'Aa Bb cc'],
+    target: 'aa bb cc',
+    derivation:
+      'P(aa) from Aa \u00d7 Aa = 1/4. P(bb) from Bb \u00d7 Bb = 1/4. P(cc) from Cc \u00d7 cc = 1/2. Multiply: 1/4 \u00d7 1/4 \u00d7 1/2 = 1/32.',
+    p: { num: 1, denom: 32 },
+  },
+  {
+    // Pea scenario — anchors the abstract letters in the module's
+    // established plant examples. Uses R (red), S (round), P (yellow pod —
+    // third Mendel trait). We don't use lowercase p for the allele to avoid
+    // confusion with "probability p" in student prose; instead the
+    // derivation text writes it out.
+    parents: ['Rr Ss Pp', 'Rr Ss Pp'],
+    target: 'rr ss pp',
+    derivation:
+      'Each gene is a dihybrid cross: P(rr) = 1/4 (white), P(ss) = 1/4 (wrinkled), P(pp) = 1/4 (green pod). Multiply: 1/4 \u00d7 1/4 \u00d7 1/4 = 1/64.',
+    p: { num: 1, denom: 64 },
+    scenario:
+      'Three pea genes segregate independently on different chromosomes: R/r (flower color), S/s (seed shape), and P/p (pod color, dominant yellow).',
+  },
+];
+
+function trihybridLabel(c: TrihybridCase): string {
+  return fractionLabel(c.p.num, c.p.denom);
+}
+
+export function generateTrihybrid(rng: Rng = Math.random): PracticeProblem {
+  const chosen = pick(TRIHYBRID_CASES, rng);
+
+  // Build distractors. The correct answer is always 1/(2^k) or similar —
+  // we use canonical "probability" fractions that a student could plausibly
+  // compute by dropping a gene or adding an extra one.
+  const correctLabel = trihybridLabel(chosen);
+  const distractorPool = ['1/4', '1/8', '1/16', '1/32', '1/64', '1/256'];
+  const distractorLabels = shuffle(
+    distractorPool.filter(d => d !== correctLabel),
+    rng,
+  ).slice(0, 3);
+
+  const optionLabels = shuffle([correctLabel, ...distractorLabels], rng);
+
+  const prompt = chosen.scenario
+    ? `${chosen.scenario} In the cross ${chosen.parents[0]} \u00d7 ${chosen.parents[1]}, what is the probability that an offspring has genotype ${chosen.target}?`
+    : `In the cross ${chosen.parents[0]} \u00d7 ${chosen.parents[1]} (three independently assorting genes, all with complete dominance), what is the probability that an offspring has genotype ${chosen.target}?`;
+
+  const options: PracticeOption[] = optionLabels.map(label => ({
+    label,
+    isCorrect: label === correctLabel,
+    feedback:
+      label === correctLabel
+        ? `Correct. ${chosen.derivation} The multiplication rule extends naturally from two genes to three (and to any number) as long as they assort independently.`
+        : whyWrongTrihybrid(label, correctLabel),
+  }));
+
+  return {
+    id: `tri-${uid(rng)}`,
+    type: 'trihybrid',
+    concept: 'multiplication-rule',
+    difficulty: 3,
+    prompt,
+    options,
+    explanation: `${chosen.derivation} Independent assortment lets you factor the joint probability into a product of per-gene probabilities.`,
+  };
+}
+
+function whyWrongTrihybrid(picked: string, correct: string): string {
+  if (picked === '1/4')
+    return 'That\u2019s the probability for a single gene only. You need to multiply the per-gene probabilities across all three genes.';
+  if (picked === '1/16')
+    return 'That\u2019s the probability for two genes. You forgot to include the third gene\u2019s 1/4 (or 1/2) factor.';
+  if (picked === '1/256')
+    return `That\u2019s 1/4\u2074 \u2014 the probability for FOUR independently assorting genes. This cross has three. The correct answer is ${correct}.`;
+  if (picked === '1/32' && correct === '1/64')
+    return 'Close \u2014 you may have used 1/2 for one of the genes instead of 1/4. All three genes here contribute a 1/4 factor.';
+  if (picked === '1/64' && correct !== '1/64')
+    return '1/64 is the canonical triple-recessive answer for a fully heterozygous trihybrid cross \u2014 but this cross isn\u2019t fully heterozygous at every gene. Work out each gene separately.';
+  if (picked === '1/8' && correct !== '1/8')
+    return 'That\u2019s three 1/2 factors multiplied together, which would be the answer for a testcross-style setup where each gene contributes 1/2. Check each gene: how many of the three parents are heterozygous?';
+  return `Not quite \u2014 multiply the per-gene probabilities. The correct answer is ${correct}.`;
+}
+
 // ── Problem 3: backward monohybrid ──────────────────────────────────────
 //
 // Given an observed ratio, infer the parent genotypes. The truth table
@@ -389,6 +545,179 @@ function monoCrossRatio(a: string, b: string): MonoRatio | null {
       (c.parents[0] === b && c.parents[1] === a),
   );
   return match?.ratioKey ?? null;
+}
+
+// ── Problem 3b: backward dihybrid ───────────────────────────────────────
+//
+// Given an observed two-gene phenotype ratio (9:3:3:1, 1:1:1:1, all one
+// class, etc.), identify the parent genotype pair that produces it. Forces
+// the student to invert the multiplication rule: which per-gene ratios
+// multiply to give the observed dihybrid ratio?
+//
+// Canonical cases:
+//   9:3:3:1  → Rr Ss × Rr Ss (two dihybrids, both heterozygous at both
+//              loci — the textbook dihybrid cross)
+//   1:1:1:1  → Rr Ss × rr ss (dihybrid testcross)
+//   3:1 (one gene visible, all dominant for the other) → various traps
+//   all dominant (e.g. all Red Round) → at least one parent is homozygous
+//     dominant at every gene
+
+interface BackwardDihybridCase {
+  /** Prose description of the observed offspring pattern. */
+  observed: string;
+  /** Correct parent pair display string. */
+  correctParents: string;
+  /** Distractor parent pairs, each with a short reason they are wrong. */
+  distractors: ReadonlyArray<{ label: string; reason: string }>;
+  /** Full explanation of why the correct pair produces the observed pattern. */
+  explanation: string;
+}
+
+const BACKWARD_DIHYBRID_CASES: readonly BackwardDihybridCase[] = [
+  {
+    observed: 'a 9 : 3 : 3 : 1 phenotype ratio in the F2 offspring',
+    correctParents: 'Rr Ss \u00d7 Rr Ss',
+    distractors: [
+      {
+        label: 'RR SS \u00d7 rr ss',
+        reason:
+          'RR SS \u00d7 rr ss produces F1 that are all Rr Ss (all dominant for both genes) \u2014 a uniform, not 9:3:3:1, ratio. You\u2019d have to self the F1 to get 9:3:3:1.',
+      },
+      {
+        label: 'Rr Ss \u00d7 rr ss',
+        reason:
+          'Rr Ss \u00d7 rr ss is a dihybrid testcross and produces 1:1:1:1, not 9:3:3:1. Only when BOTH parents can contribute four kinds of gametes (RS, Rs, rS, rs) do you get 9:3:3:1.',
+      },
+      {
+        label: 'RR Ss \u00d7 Rr SS',
+        reason:
+          'Neither parent here can contribute both r and s \u2014 the R/r parent is Ss only at one gene, and the S/s parent has no recessive S allele to give. The F1 would be all red-round (all dominant for both), not 9:3:3:1.',
+      },
+    ],
+    explanation:
+      '9:3:3:1 factors as (3:1) \u00d7 (3:1), one per gene. Each 3:1 requires both parents to be heterozygous at that gene. So both parents must be Rr AND Ss \u2014 i.e. both Rr Ss. This is Mendel\u2019s canonical dihybrid cross.',
+  },
+  {
+    observed: 'a 1 : 1 : 1 : 1 phenotype ratio in the offspring',
+    correctParents: 'Rr Ss \u00d7 rr ss',
+    distractors: [
+      {
+        label: 'Rr Ss \u00d7 Rr Ss',
+        reason:
+          'Rr Ss \u00d7 Rr Ss gives 9:3:3:1, not 1:1:1:1. Both parents here contribute four kinds of gametes, so the dominant classes multiply up.',
+      },
+      {
+        label: 'RR Ss \u00d7 rr Ss',
+        reason:
+          'Neither parent can contribute r AND s together to the point where the recessive class appears in 1/4 of the offspring. RR cannot give r at all \u2014 every offspring is Rr, so no white class exists.',
+      },
+      {
+        label: 'rr ss \u00d7 rr ss',
+        reason:
+          'rr ss \u00d7 rr ss gives all white-wrinkled offspring \u2014 a single phenotype class, not four. Neither parent carries a dominant allele.',
+      },
+    ],
+    explanation:
+      'A 1:1:1:1 ratio is the signature of a dihybrid testcross: one parent is fully heterozygous (Rr Ss, gives four gamete types RS Rs rS rs at 1/4 each), the other is homozygous recessive (rr ss, gives only rs). The four offspring classes appear in equal numbers.',
+  },
+  {
+    observed:
+      'all F1 offspring are red-round \u2014 every one, no exceptions, no other phenotypes appear',
+    correctParents: 'RR SS \u00d7 rr ss',
+    distractors: [
+      {
+        label: 'Rr Ss \u00d7 Rr Ss',
+        reason:
+          'Rr Ss \u00d7 Rr Ss gives 9:3:3:1 \u2014 you would see white and wrinkled offspring in the F1, not all red-round.',
+      },
+      {
+        label: 'RR Ss \u00d7 Rr SS',
+        reason:
+          'This cross would give all red (both parents contribute R or pass through RR) but the Ss \u00d7 SS side gives all round only because one parent is SS \u2014 fine, but the setup question asks what cross MOST likely produced a uniform F1, and the canonical answer is homozygous \u00d7 homozygous recessive.',
+      },
+      {
+        label: 'Rr Ss \u00d7 rr ss',
+        reason:
+          'Rr Ss \u00d7 rr ss gives a 1:1:1:1 testcross ratio, not a uniform F1. You would see white-wrinkled offspring immediately.',
+      },
+    ],
+    explanation:
+      'A uniform F1 with no recessive phenotypes ever appearing is the classic "P cross" — homozygous dominant at every gene crossed with homozygous recessive at every gene. Every offspring inherits one dominant and one recessive allele per gene, so every offspring is Rr Ss and shows both dominant phenotypes.',
+  },
+  {
+    observed:
+      'a 3 : 1 ratio at the color gene (3 red : 1 white) AND every offspring is round (no wrinkled seeds appear at all)',
+    correctParents: 'Rr SS \u00d7 Rr SS',
+    distractors: [
+      {
+        label: 'Rr Ss \u00d7 Rr Ss',
+        reason:
+          'Rr Ss \u00d7 Rr Ss gives 9:3:3:1 \u2014 you would see wrinkled offspring in the F2 (the "3" and "1" classes), which contradicts the observation.',
+      },
+      {
+        label: 'Rr SS \u00d7 Rr ss',
+        reason:
+          'This gives 3:1 at the color gene (good) but Ss heterozygotes at the shape gene, which still all show Round. Close \u2014 but selfing an Ss parent in the NEXT generation would reveal wrinkled, so this isn\u2019t the cleanest description of "every offspring is round" as a stable property.',
+      },
+      {
+        label: 'RR Ss \u00d7 rr Ss',
+        reason:
+          'This gives all red offspring (RR provides an R to every child), not 3:1. The 3:1 signature at the color gene requires both parents to be Rr.',
+      },
+    ],
+    explanation:
+      'The 3:1 at color tells you both parents are Rr. The absence of wrinkled offspring at all tells you neither parent contributes an s allele \u2014 both must be SS. So the parents are Rr SS \u00d7 Rr SS: one gene segregating, one gene fixed.',
+  },
+  {
+    observed:
+      'a 1 : 1 ratio at the color gene (1 red : 1 white) AND a 1 : 1 ratio at the shape gene (1 round : 1 wrinkled), with all four combinations appearing in equal numbers',
+    correctParents: 'Rr Ss \u00d7 rr ss',
+    distractors: [
+      {
+        label: 'Rr Ss \u00d7 Rr ss',
+        reason:
+          'Rr Ss \u00d7 Rr ss gives 3:1 at color (not 1:1), so this doesn\u2019t match the color-gene observation.',
+      },
+      {
+        label: 'RR Ss \u00d7 rr ss',
+        reason:
+          'Every offspring gets R from the RR parent, so every offspring is red \u2014 no white, no 1:1 ratio at the color gene.',
+      },
+      {
+        label: 'Rr Ss \u00d7 Rr Ss',
+        reason:
+          'Selfing two dihybrids gives 9:3:3:1, which is 3:1 at each gene marginally \u2014 not 1:1 at each gene.',
+      },
+    ],
+    explanation:
+      '1:1 at each gene simultaneously means each gene is a testcross: one parent heterozygous, the other homozygous recessive, for BOTH genes. That\u2019s Rr Ss \u00d7 rr ss \u2014 the canonical dihybrid testcross, which also gives the 1:1:1:1 combination ratio.',
+  },
+];
+
+export function generateBackwardDihybrid(rng: Rng = Math.random): PracticeProblem {
+  const chosen = pick(BACKWARD_DIHYBRID_CASES, rng);
+
+  const correct: PracticeOption = {
+    label: chosen.correctParents,
+    isCorrect: true,
+    feedback: `Correct. ${chosen.explanation}`,
+  };
+  const distractors: PracticeOption[] = chosen.distractors.map(d => ({
+    label: d.label,
+    isCorrect: false,
+    feedback: d.reason,
+  }));
+  const options = shuffle([correct, ...distractors], rng);
+
+  return {
+    id: `bwd-di-${uid(rng)}`,
+    type: 'backward-dihybrid',
+    concept: 'parental-genotype-inference',
+    difficulty: 3,
+    prompt: `You observe ${chosen.observed}. What are the most likely parent genotypes? (R/r = red/white flower color; S/s = round/wrinkled seed shape; two independently assorting genes, both complete dominance.)`,
+    options,
+    explanation: chosen.explanation,
+  };
 }
 
 // ── Problem 4: noise recognition ────────────────────────────────────────
@@ -624,6 +953,8 @@ const GENERATORS: Record<PracticeProblemType, (rng: Rng) => PracticeProblem> = {
   'forward-monohybrid': generateForwardMonohybrid,
   'forward-dihybrid': generateForwardDihybrid,
   'backward-monohybrid': generateBackwardMonohybrid,
+  'backward-dihybrid': generateBackwardDihybrid,
+  'trihybrid': generateTrihybrid,
   'noise-recognition': generateNoiseRecognition,
   'incomplete-dominance': generateIncompleteDominance,
 };
@@ -632,17 +963,25 @@ export const ALL_PROBLEM_TYPES: readonly PracticeProblemType[] = [
   'forward-monohybrid',
   'forward-dihybrid',
   'backward-monohybrid',
+  'backward-dihybrid',
+  'trihybrid',
   'noise-recognition',
   'incomplete-dominance',
 ];
 
-/** Map a concept to the problem type that exercises it. v2.1 is 1:1. */
-export const CONCEPT_TO_TYPE: Record<PracticeConcept, PracticeProblemType> = {
-  'monohybrid-ratio': 'forward-monohybrid',
-  'multiplication-rule': 'forward-dihybrid',
-  'parental-genotype-inference': 'backward-monohybrid',
-  'sampling-variation': 'noise-recognition',
-  'incomplete-dominance': 'incomplete-dominance',
+/** Map a concept to the problem type(s) that exercise it. A concept may
+ *  map to more than one problem type so the practice session interleaves
+ *  them \u2014 e.g. 'multiplication-rule' now covers both the two-gene
+ *  `forward-dihybrid` and the three-gene `trihybrid` generator, and
+ *  'parental-genotype-inference' covers both monohybrid and dihybrid
+ *  backward problems. When a concept has multiple types, `generateProblem
+ *  ForConcept` picks one uniformly at random from the list. */
+export const CONCEPT_TO_TYPE: Record<PracticeConcept, readonly PracticeProblemType[]> = {
+  'monohybrid-ratio': ['forward-monohybrid'],
+  'multiplication-rule': ['forward-dihybrid', 'trihybrid'],
+  'parental-genotype-inference': ['backward-monohybrid', 'backward-dihybrid'],
+  'sampling-variation': ['noise-recognition'],
+  'incomplete-dominance': ['incomplete-dominance'],
 };
 
 export const ALL_CONCEPTS: readonly PracticeConcept[] = [
@@ -672,7 +1011,9 @@ export function generateProblemForConcept(
   concept: PracticeConcept,
   rng: Rng = Math.random,
 ): PracticeProblem {
-  return generateProblem(CONCEPT_TO_TYPE[concept], rng);
+  const types = CONCEPT_TO_TYPE[concept];
+  const chosenType = types[Math.floor(rng() * types.length)];
+  return generateProblem(chosenType, rng);
 }
 
 export function generateRandomProblem(rng: Rng = Math.random): PracticeProblem {

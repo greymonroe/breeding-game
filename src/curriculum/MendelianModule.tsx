@@ -23,7 +23,7 @@ import {
   type CrossResult, type Organism, type GeneDefinition,
 } from './genetics-engine';
 import {
-  ModuleShell, QuestionPanel, CrossWorkbench, HistogramChart, GameteVisualizer,
+  ModuleShell, QuestionPanel, CrossWorkbench, HistogramChart, GameteVisualizer, RatioBar,
   type ModuleDefinition,
 } from './components';
 
@@ -1617,6 +1617,21 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [linkAnswer, setLinkAnswer] = useState('');
+  // Trihybrid-style transfer probe (F-008 Part 1): applies the
+  // multiplication rule the student just derived on the 2\u00d72 grid to a
+  // non-trivially-matched class (red-wrinkled = 3/16 in the Rr Ss \u00d7
+  // Rr Ss cross). Must be answered before the F2 cross reveals data, so
+  // the student can't pattern-match the answer off the observed ratio.
+  const [transferAnswer, setTransferAnswer] = useState<string | null>(null);
+  const transferCorrect = transferAnswer === null ? null : transferAnswer === '3/16';
+  // Latched "transfer probe ever answered" gate so the F2 cross appears
+  // after the student has committed to an answer (right or wrong). A
+  // wrong answer still reveals the cross so they can use the data to
+  // check their reasoning \u2014 this is a transfer test, not a mastery gate.
+  const [transferEverAnswered, setTransferEverAnswered] = useState(false);
+  useEffect(() => {
+    if (transferAnswer !== null) setTransferEverAnswered(true);
+  }, [transferAnswer]);
   // Latched "forward-ever-correct" gate for the Law of Independent Assortment
   // callout, linkage tease, and backward problem. Once the student picks
   // 9:3:3:1 correctly, these panels must stay visible even if they click a
@@ -1728,16 +1743,55 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             </div>
 
             <p className="text-sm text-violet-900 font-semibold">
-              Predicted ratio: 9 : 3 : 3 : 1. Now run the cross and see if the data agree.
+              Predicted ratio: 9 : 3 : 3 : 1. Before you run the cross, use the rule on a different class.
             </p>
           </div>
 
-          <CrossWorkbench
-            parentA={f1Child} parentB={f1Result!.offspring[1] ?? f1Child}
-            genes={[FLOWER_COLOR, SEED_SHAPE]}
-            onCross={(r) => { setF2Result(r); setStep(2); }} crossResult={f2Result}
-            sampleSize={200} label="F2: Dihybrid F1 × F1"
-          />
+          {/* F-008 (Part 1): Trihybrid-style transfer probe. The 2\u00d72
+              grid above derives the multiplication rule from scratch;
+              this probe immediately transfers the rule to a non-focal
+              class (red AND wrinkled = 3/4 \u00d7 1/4 = 3/16) before the
+              student can read the answer off the F2 RatioBar. A correct
+              answer confirms the rule is portable; a wrong answer still
+              advances so the student can self-check against the data. */}
+          <QuestionPanel
+            question="Using the same multiplication rule, what fraction of F2 offspring should be red AND wrinkled in this Rr Ss × Rr Ss cross?"
+            correct={transferCorrect}
+            feedback={
+              transferCorrect === true
+                ? 'Exactly. P(red) \u00d7 P(wrinkled) = 3/4 \u00d7 1/4 = 3/16. The multiplication rule works for any specific class \u2014 not just the focal "both dominant" or "both recessive" ones \u2014 as long as the genes assort independently.'
+                : transferCorrect === false
+                ? 'Check the grid above and pick the cell for Red \u00d7 Wrinkled. P(red) = 3/4 and P(wrinkled) = 1/4, so the joint probability is 3/4 \u00d7 1/4. Try again, or run the cross and compare.'
+                : undefined
+            }
+          >
+            <div className="flex gap-2 flex-wrap">
+              {['9/16', '3/16', '1/16', '1/4'].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setTransferAnswer(opt)}
+                  className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
+                    transferAnswer === opt
+                      ? transferCorrect
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </QuestionPanel>
+
+          {transferEverAnswered && (
+            <CrossWorkbench
+              parentA={f1Child} parentB={f1Result!.offspring[1] ?? f1Child}
+              genes={[FLOWER_COLOR, SEED_SHAPE]}
+              onCross={(r) => { setF2Result(r); setStep(2); }} crossResult={f2Result}
+              sampleSize={200} label="F2: Dihybrid F1 × F1"
+            />
+          )}
 
           {/* F-037: predicted-vs-observed side-by-side. The derivation
               grid (above the cross) shows 9/16, 3/16, 3/16, 1/16 from
@@ -1894,6 +1948,68 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
               were right next to each other on the same chromosome? Pick whichever option feels
               most likely to you — you'll find out for sure in the Linkage module.
             </p>
+
+            {/* F-009: 7:1:1:7 vs 1:1:1:1 linkage preview. Closes Success
+                Criterion #6 ("recognize linkage from a 7:1:1:7 testcross").
+                Two hardcoded RatioBars \u2014 this is a preview, not a
+                simulation. Counts are 100 total per panel, scaled from
+                the canonical 1:1:1:1 and 7:1:1:7 ratios. Dihybrid
+                testcross context: Rr Ss \u00d7 rr ss.
+                Colors come from FLOWER_COLOR + SEED_SHAPE via the genes
+                prop so the swatches match the rest of Exp 5. No
+                QuestionPanel, no correct/wrong feedback \u2014 it's a
+                visual teaser that sits alongside the wonder prompt. */}
+            <div className="rounded-xl bg-white border border-violet-200 p-3 space-y-3">
+              <p className="text-[11px] font-bold tracking-wider text-violet-900 uppercase">
+                Preview: two testcross outcomes, side by side
+              </p>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Both panels show a dihybrid testcross (Rr Ss &times; rr ss), 100 offspring each.
+                The only difference is whether the two genes sit on different chromosomes (top)
+                or tightly linked on the same chromosome (bottom).
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-semibold text-stone-700 mb-1">
+                    Unlinked &mdash; different chromosomes (1 : 1 : 1 : 1)
+                  </p>
+                  <RatioBar
+                    counts={{
+                      'Red, Round': 25,
+                      'Red, Wrinkled': 25,
+                      'White, Round': 25,
+                      'White, Wrinkled': 25,
+                    }}
+                    genes={[FLOWER_COLOR, SEED_SHAPE]}
+                    order={['Red, Round', 'Red, Wrinkled', 'White, Round', 'White, Wrinkled']}
+                  />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-stone-700 mb-1">
+                    Tightly linked &mdash; same chromosome, close together (7 : 1 : 1 : 7)
+                  </p>
+                  <RatioBar
+                    counts={{
+                      'Red, Round': 44,
+                      'Red, Wrinkled': 6,
+                      'White, Round': 6,
+                      'White, Wrinkled': 44,
+                    }}
+                    genes={[FLOWER_COLOR, SEED_SHAPE]}
+                    order={['Red, Round', 'Red, Wrinkled', 'White, Round', 'White, Wrinkled']}
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-stone-600 leading-relaxed">
+                When two genes are on <strong>different chromosomes</strong>, they assort independently
+                &mdash; the four offspring classes appear in roughly equal numbers. When they're
+                <strong> tightly linked on the same chromosome</strong>, the parental combinations
+                (here Red&ndash;Round and White&ndash;Wrinkled, the gamete pair the dihybrid parent
+                inherited together) dominate; the recombinant classes are rare. The Linkage module
+                measures this directly with maize chromosome 9.
+              </p>
+            </div>
+
             <div className="flex gap-2 flex-wrap flex-col">
               {[
                 'The same 9:3:3:1 ratio would still appear.',
