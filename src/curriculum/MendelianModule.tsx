@@ -610,7 +610,7 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
             </div>
             <button
               onClick={runReplicates}
-              className="rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg"
+              className="rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg"
             >
               {replicates.length > 0 ? 'Run 10 more times' : 'Run this cross 10 more times'}
             </button>
@@ -1337,7 +1337,7 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
           whiteCount is read from crossResult.phenotypeCounts['White'], so the text
           always reflects what the student actually saw on screen. */}
       {step >= 3 && crossResult && (
-        <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800 space-y-2">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm text-sm text-emerald-800 space-y-2">
           {whiteCount > 0 ? (
             <>
               <p>
@@ -1715,7 +1715,7 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             {linkCorrect !== null && (
               <a
                 href="/breeding-game/linkage.html"
-                className="block mt-3 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg"
+                className="block mt-3 rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg"
               >
                 Open the Linkage module →
               </a>
@@ -2079,7 +2079,7 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
           <strong>Small-fruited parent</strong>: all unfavorable alleles (fruit weight = 0)
         </div>
         <button onClick={doF2}
-          className="ml-auto rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg">
+          className="ml-auto rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg">
           Make F2 (500 fruits)
         </button>
       </div>
@@ -2136,9 +2136,11 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
           {/* Backwards problem — given a continuous bell-shaped F2
               distribution, infer polygenic additive architecture. Gated
               on the latched `forwardEverCorrect` so re-clicking a wrong
-              forward option doesn't erase progress. onComplete fires
-              from the backward state. */}
-          {forwardEverCorrect && (
+              forward option doesn't erase progress AND on nGenes >= 5
+              so a student who dials back to n=1 after answering doesn't
+              see a question about a bell curve they can't currently see
+              on screen (F-038). onComplete fires from the backward state. */}
+          {forwardEverCorrect && nGenes >= 5 && (
             <QuestionPanel
               question="You observe a continuous, bell-shaped distribution of F2 tomato fruit weights (most fruits near the middle, few at the extremes — tiny or giant). What does this tell you about the genes controlling fruit weight?"
               correct={backCorrect}

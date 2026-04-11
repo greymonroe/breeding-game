@@ -4,6 +4,7 @@ import {
   getEpistasisPhenotype, PIGMENT_GENE, AGOUTI_GENE,
   type GeneDefinition, type Organism,
 } from '../genetics-engine';
+import { epistasisColors } from './colors';
 
 export function OrganismCard({
   org, genes, label, size = 'md', showGenotype = false, epistasis = false,
@@ -20,19 +21,18 @@ export function OrganismCard({
   if (epistasis) {
     const ep = getEpistasisPhenotype(org, PIGMENT_GENE, AGOUTI_GENE);
     displayLabel = ep;
-    // Maize aleurone palette: purple anthocyanin, red pigment, pale cream colorless.
-    displayColor = ep === 'Colorless' ? '#fef3c7' : ep === 'Purple' ? '#6b21a8' : '#c2410c';
+    // Maize aleurone palette — single source of truth in ./colors.ts.
+    displayColor = epistasisColors(ep) ?? '#ccc';
   }
 
   const px = size === 'sm' ? 'p-1.5' : 'p-2';
 
-  return (
-    <div
-      onClick={onClick}
-      className={`inline-flex flex-col items-center gap-1 rounded-lg border-2 ${px} transition-all
-        ${selected ? 'border-amber-500 bg-amber-50 shadow-md' : 'border-stone-200 bg-white'}
-        ${onClick ? 'cursor-pointer hover:border-amber-300' : ''}`}
-    >
+  const commonClassName = `inline-flex flex-col items-center gap-1 rounded-lg border-2 ${px} transition-all
+    ${selected ? 'border-amber-500 bg-amber-50 shadow-md' : 'border-stone-200 bg-white'}
+    ${onClick ? 'cursor-pointer hover:border-amber-300' : ''}`;
+
+  const inner = (
+    <>
       <OrganismIcon type="plant" color={displayColor} size={size} />
       {genes.length > 1 && !epistasis && (
         <div className="flex gap-0.5">
@@ -51,6 +51,18 @@ export function OrganismCard({
         </div>
       )}
       {label && <div className="text-[9px] text-stone-400">{label}</div>}
-    </div>
+    </>
   );
+
+  // When onClick is provided, render as a real <button> so keyboard-only
+  // users can activate it (Enter/Space) and it gets focus-ring semantics.
+  // When not, a plain <div> avoids introducing an extraneous tab stop.
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={commonClassName}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={commonClassName}>{inner}</div>;
 }

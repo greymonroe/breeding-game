@@ -52,6 +52,14 @@ export function PracticeMode() {
   const [currentProblem, setCurrentProblem] = useState<PracticeProblem | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
+  // Guard against rapid-Enter double-commits (F-003). The global Enter
+  // handler fires synchronously for every keydown; a hold-Enter or two
+  // presses within one frame would otherwise call `advance()` twice with
+  // the same `selectedIdx`, record the answer twice, and push a duplicate
+  // SessionResult. Set on entry, check-and-bail if already set, cleared
+  // whenever the next problem mounts.
+  const inFlightRef = useRef(false);
+
   const reducedMotion = usePrefersReducedMotion();
 
   const startSession = useCallback(() => {
@@ -65,6 +73,8 @@ export function PracticeMode() {
 
   const advance = useCallback(() => {
     if (!currentProblem || selectedIdx === null) return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     const correct = currentProblem.options[selectedIdx]?.isCorrect === true;
     const newResult: SessionResult = {
       problem: currentProblem,
@@ -103,6 +113,13 @@ export function PracticeMode() {
     setCurrentProblem(null);
     setSelectedIdx(null);
   }, []);
+
+  // Reset the in-flight guard whenever the current problem changes (either
+  // the session started, advanced, or was torn down). Pairs with the guard
+  // set in `advance()` to prevent double-commits on rapid Enter.
+  useEffect(() => {
+    inFlightRef.current = false;
+  }, [currentProblem]);
 
   // Keyboard shortcuts: 1-4 select options; Enter advances after answered.
   useEffect(() => {
@@ -201,7 +218,7 @@ function LandingCard({
         <button
           type="button"
           onClick={onStart}
-          className="w-full rounded-xl px-5 py-3 font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md transition-all"
+          className="w-full rounded-xl px-5 py-3 font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md transition-all"
         >
           Start a 10-question session
         </button>
@@ -321,7 +338,11 @@ function SessionCard({
         </p>
       </div>
 
-      <div className="grid gap-2">
+      <div
+        className="grid gap-2"
+        role="radiogroup"
+        aria-label="Answer choices"
+      >
         {problem.options.map((opt, i) => (
           <OptionButton
             key={`${problem.id}-${i}`}
@@ -349,7 +370,7 @@ function SessionCard({
           disabled={!answered}
           className={`rounded-xl px-5 py-2.5 font-semibold text-sm transition-all ${
             answered
-              ? 'text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md'
+              ? 'text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md'
               : 'text-stone-400 bg-stone-100 cursor-not-allowed'
           }`}
         >
@@ -402,7 +423,8 @@ function OptionButton({
       className={`w-full rounded-xl border-2 px-4 py-3 text-left text-sm transition-all flex items-center gap-3 ${cls} ${
         answered ? 'cursor-default' : 'cursor-pointer'
       }`}
-      aria-pressed={selected}
+      role="radio"
+      aria-checked={selected}
     >
       <span
         className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${markCls}`}
@@ -589,7 +611,7 @@ function Scorecard({
         <button
           type="button"
           onClick={onPracticeAgain}
-          className="flex-1 min-w-[160px] rounded-xl px-5 py-2.5 font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md transition-all"
+          className="flex-1 min-w-[160px] rounded-xl px-5 py-2.5 font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md transition-all"
         >
           Practice again
         </button>

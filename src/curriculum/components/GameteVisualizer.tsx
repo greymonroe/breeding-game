@@ -245,14 +245,27 @@ export function GameteVisualizer({
     }
   }, [built, population.offspring.length, onComplete]);
 
-  // Keyboard: space bar advances in step-through
+  // Keyboard: space bar advances in step-through.
+  // Skip handling when the user is typing into any editable element so we
+  // don't swallow page-wide input or clobber browser find-in-page. This
+  // matches the F-023 fix — no tabIndex rewiring, just a defensive guard.
   useEffect(() => {
     if (!stepThrough) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        stepForward();
+      if (e.code !== 'Space') return;
+      const active = document.activeElement;
+      if (active) {
+        const tag = active.tagName;
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          (active as HTMLElement).isContentEditable
+        ) {
+          return;
+        }
       }
+      e.preventDefault();
+      stepForward();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -417,7 +430,7 @@ export function GameteVisualizer({
               <button
                 type="button"
                 onClick={stepForward}
-                className="rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-4 py-1.5 text-xs font-bold text-white shadow-md hover:shadow-lg active:from-emerald-600 transition-all"
+                className="rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-4 py-1.5 text-xs font-bold text-white shadow-md hover:shadow-lg active:from-emerald-700 transition-all"
               >
                 {beat === 'idle' ? 'Start cycle' : beat === 'reveal' ? 'Keep →' : 'Next beat'}
               </button>

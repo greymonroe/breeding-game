@@ -40,7 +40,8 @@ export function CrossWorkbench({
         <OrganismCard org={parentB} genes={genes} label="Parent 2"
           showGenotype={showGenotypes} epistasis={epistasis} />
         <button onClick={doCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-emerald-600 transition-all">
+          aria-label={`Run cross: ${label ?? 'current parents'}`}
+          className="ml-4 rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-emerald-700 transition-all">
           Cross!
         </button>
       </div>

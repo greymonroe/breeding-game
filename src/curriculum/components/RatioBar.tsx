@@ -52,11 +52,9 @@ export function RatioBar({ counts, colorMap, genes, epistasis = false, order }: 
                   aria-hidden
                 />
               )}
-              {(count / total) > 0.1 && (
-                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-sm">
-                  {count}
-                </span>
-              )}
+              {/* Count labels moved to the legend row below (see F-021):
+                  white-on-cream failed WCAG AA contrast on light phenotype
+                  fills. The legend already carries the per-class count. */}
             </div>
           );
         })}

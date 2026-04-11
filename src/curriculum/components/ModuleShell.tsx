@@ -2,6 +2,8 @@ import {
   useState,
   useCallback,
   useContext,
+  useEffect,
+  useRef,
   createContext,
   type ComponentType,
   type ReactNode,
@@ -71,7 +73,9 @@ const THEME = {
     light: 'text-emerald-200',
     active: 'bg-emerald-100 border-2 border-emerald-400 font-bold text-emerald-800',
     done: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-    button: 'bg-emerald-500',
+    // Primary CTA surface — emerald-700 against white text measures ~4.82:1,
+    // comfortably above WCAG AA 4.5:1. Emerald-500 (prior value) was ~2.40:1.
+    button: 'bg-emerald-700',
     complete: 'bg-emerald-100 text-emerald-700',
   },
   cyan: {
@@ -79,7 +83,7 @@ const THEME = {
     light: 'text-cyan-200',
     active: 'bg-cyan-100 border-2 border-cyan-400 font-bold text-cyan-800',
     done: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100',
-    button: 'bg-cyan-500',
+    button: 'bg-cyan-700',
     complete: 'bg-cyan-100 text-cyan-700',
   },
   violet: {
@@ -87,7 +91,7 @@ const THEME = {
     light: 'text-violet-200',
     active: 'bg-violet-100 border-2 border-violet-400 font-bold text-violet-800',
     done: 'bg-violet-50 text-violet-700 hover:bg-violet-100',
-    button: 'bg-violet-500',
+    button: 'bg-violet-700',
     complete: 'bg-violet-100 text-violet-700',
   },
 } as const;
@@ -96,13 +100,104 @@ const THEME = {
 
 type View = 'experiment' | 'practice';
 
+// ── Persistence: sidebar progress (F-019) ───────────────────────────────
+//
+// A page refresh used to wipe `completed` and re-lock every experiment
+// past the first. We persist the minimum (the set of completed indices
+// and the current experiment) to localStorage keyed by module id, with a
+// defensive try/catch + schema version so a quota error, malformed blob,
+// or future schema bump never crashes the shell or strands a user on a
+// locked experiment. Follows the same pattern as spaced-repetition.ts.
+
+const PROGRESS_SCHEMA_VERSION = 1 as const;
+
+interface PersistedProgress {
+  schemaVersion: typeof PROGRESS_SCHEMA_VERSION;
+  completed: number[];
+  currentExp: number;
+}
+
+function progressStorageKey(moduleId: string): string {
+  return `${moduleId}-module-progress-v1`;
+}
+
+function loadProgress(
+  moduleId: string,
+  experimentCount: number,
+): { completed: Set<number>; currentExp: number } {
+  const fallback = { completed: new Set<number>(), currentExp: 0 };
+  if (typeof localStorage === 'undefined') return fallback;
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(progressStorageKey(moduleId));
+  } catch {
+    return fallback;
+  }
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PersistedProgress>;
+    if (!parsed || parsed.schemaVersion !== PROGRESS_SCHEMA_VERSION) {
+      return fallback;
+    }
+    const completedArray = Array.isArray(parsed.completed)
+      ? parsed.completed.filter(
+          (i): i is number =>
+            typeof i === 'number' && i >= 0 && i < experimentCount,
+        )
+      : [];
+    const currentExp =
+      typeof parsed.currentExp === 'number' &&
+      parsed.currentExp >= 0 &&
+      parsed.currentExp < experimentCount
+        ? parsed.currentExp
+        : 0;
+    return { completed: new Set(completedArray), currentExp };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveProgress(
+  moduleId: string,
+  completed: Set<number>,
+  currentExp: number,
+): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const blob: PersistedProgress = {
+      schemaVersion: PROGRESS_SCHEMA_VERSION,
+      completed: Array.from(completed).sort((a, b) => a - b),
+      currentExp,
+    };
+    localStorage.setItem(progressStorageKey(moduleId), JSON.stringify(blob));
+  } catch (err) {
+    // Quota or security error — the shell keeps working, persistence is
+    // silently dropped for this write.
+    // eslint-disable-next-line no-console
+    console.warn('[module-shell] failed to persist progress:', err);
+  }
+}
+
 export function ModuleShell({ module }: { module: ModuleDefinition }) {
-  const [currentExp, setCurrentExp] = useState(0);
-  const [completed, setCompleted] = useState<Set<number>>(() => new Set());
+  const experiments = module.experiments;
+  const theme = THEME[module.color];
+
+  // Lazy init reads from localStorage once on mount. Defaults to {} / 0
+  // for first-time users or any error path in `loadProgress`. Using lazy
+  // initializers so we don't re-parse on every render.
+  const [currentExp, setCurrentExp] = useState<number>(
+    () => loadProgress(module.id, experiments.length).currentExp,
+  );
+  const [completed, setCompleted] = useState<Set<number>>(
+    () => loadProgress(module.id, experiments.length).completed,
+  );
   const [view, setView] = useState<View>('experiment');
 
-  const theme = THEME[module.color];
-  const experiments = module.experiments;
+  // Persist any change to progress. Runs after render; no debounce needed
+  // because these updates are already user-driven and infrequent.
+  useEffect(() => {
+    saveProgress(module.id, completed, currentExp);
+  }, [module.id, completed, currentExp]);
 
   // Practice mode comes from either the module definition directly OR the
   // optional `ModuleShellPracticeProvider` context override. Context wins
@@ -112,20 +207,40 @@ export function ModuleShell({ module }: { module: ModuleDefinition }) {
   const practiceMode: ReactNode = contextPractice ?? module.practiceMode ?? null;
   const hasPractice = practiceMode != null;
 
+  // Auto-advance timer: wrapped in a ref so a second completion or a
+  // sidebar click inside the 1s window cancels the pending snap-back,
+  // and StrictMode double-invokes don't stack two timers (F-004).
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearAdvanceTimer = useCallback(() => {
+    if (advanceTimerRef.current !== null) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearAdvanceTimer, [clearAdvanceTimer]);
+
   const handleComplete = useCallback(() => {
     setCompleted(prev => new Set(prev).add(currentExp));
-    // Auto-advance after a delay
-    setTimeout(() => {
+    // Auto-advance after a delay.
+    clearAdvanceTimer();
+    advanceTimerRef.current = setTimeout(() => {
+      advanceTimerRef.current = null;
       setCurrentExp(cur => (cur < experiments.length - 1 ? cur + 1 : cur));
     }, 1000);
-  }, [currentExp, experiments.length]);
+  }, [currentExp, experiments.length, clearAdvanceTimer]);
 
   const selectExperiment = useCallback((i: number) => {
+    // Any manual navigation cancels a pending auto-advance so the student
+    // isn't snapped away from the experiment they just clicked.
+    clearAdvanceTimer();
     setView('experiment');
     setCurrentExp(i);
-  }, []);
+  }, [clearAdvanceTimer]);
 
-  const selectPractice = useCallback(() => setView('practice'), []);
+  const selectPractice = useCallback(() => {
+    clearAdvanceTimer();
+    setView('practice');
+  }, [clearAdvanceTimer]);
 
   const exp = experiments[currentExp];
 
