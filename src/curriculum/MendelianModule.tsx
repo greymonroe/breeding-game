@@ -435,6 +435,14 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
   const [answer1Correct, setAnswer1Correct] = useState<boolean | null>(null);
   const [answer2, setAnswer2] = useState('');
   const [answer2Correct, setAnswer2Correct] = useState<boolean | null>(null);
+  // Latched "forward-ever-correct" gate for the backward question panel.
+  // Once the student has answered the forward ratio question correctly even
+  // once, the backward panel must stay visible even if they re-click a wrong
+  // forward option out of curiosity. This is monotonic — never reset to false.
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  useEffect(() => {
+    if (answer2Correct === true) setForwardEverCorrect(true);
+  }, [answer2Correct]);
   const [backKey, setBackKey] = useState<string | null>(null);
   const backOpt = EXP1_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
   const backCorrect = backOpt ? backOpt.correct : null;
@@ -682,8 +690,10 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
           flips it to "given a 3:1, what were the parents?" Real genetics
           almost always runs in this direction: you observe offspring ratios
           and infer parental genotypes. onComplete fires from the backward
-          state, not the forward one — this is the mastery gate. */}
-      {answer2Correct === true && (
+          state, not the forward one — this is the mastery gate. Gated on
+          the latched `forwardEverCorrect` so re-clicking a wrong forward
+          option doesn't erase progress. */}
+      {forwardEverCorrect && (
         <QuestionPanel
           question="You see a 3:1 red : white ratio in offspring. What must the parents have been?"
           correct={backCorrect}
@@ -938,6 +948,13 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [f2Answer, setF2Answer] = useState('');
   const [f2Correct, setF2Correct] = useState<boolean | null>(null);
+  // Latched "forward-ever-correct" gate — see Exp 1 for rationale. Once the
+  // F2 ratio is identified once, the backward panel stays visible even if
+  // the student re-clicks a wrong forward option. Monotonic.
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  useEffect(() => {
+    if (f2Correct === true) setForwardEverCorrect(true);
+  }, [f2Correct]);
   const [backKey, setBackKey] = useState<string | null>(null);
   const backOpt = EXP3_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
   const backCorrect = backOpt ? backOpt.correct : null;
@@ -1051,9 +1068,10 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
       )}
 
       {/* Backwards problem — given a 1:2:1 three-class ratio, infer
-          incomplete dominance. Gated on the forward F2 answer being
-          correct. onComplete now fires from the backward state. */}
-      {f2Correct === true && (
+          incomplete dominance. Gated on the latched `forwardEverCorrect`
+          so re-clicking a wrong forward option doesn't erase progress.
+          onComplete now fires from the backward state. */}
+      {forwardEverCorrect && (
         <QuestionPanel
           question="You observe a 1:2:1 ratio of three distinct phenotypes (e.g. red, pink, white) in the F2 of a self-crossed F1. What does this tell you about the inheritance of color?"
           correct={backCorrect}
@@ -1091,11 +1109,18 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// Backwards options for Exp 4 — hypothetical: suppose the test cross
-// (mystery × rr) produced all 40 red, zero white. What's the most likely
-// mystery genotype? This is a *hypothetical* observation, not the
-// student's actual data (which depends on the randomized mystery plant).
-const EXP4_BACKWARD_OPTIONS = [
+// Backwards options for Exp 4 — TWO variants, chosen at runtime based on
+// what the student actually observed in their test cross.
+//
+// Variant A (whiteCount === 0): the student saw all red, so the real data
+// is the "all-40-red" case. Answer: RR.
+// Variant B (whiteCount > 0): the student saw at least one white offspring,
+// which rules out RR entirely. Answer: Rr.
+//
+// Using the student's actual data (instead of a fixed hypothetical) makes
+// the backward question consume the same observation the forward beat
+// produced, per the "consume the student's own data" rule in CLAUDE.md.
+const EXP4_BACKWARD_OPTIONS_ALLRED = [
   {
     key: 'RR',
     label: 'RR (homozygous dominant)',
@@ -1123,6 +1148,37 @@ const EXP4_BACKWARD_OPTIONS = [
     correct: false,
     feedback:
       'You actually can. With 40 offspring all red and zero white, the math heavily favors RR over Rr (a million-million to one). That\u2019s high enough confidence to call it.',
+  },
+] as const;
+
+const EXP4_BACKWARD_OPTIONS_SOMEWHITE = [
+  {
+    key: 'RR',
+    label: 'RR (homozygous dominant)',
+    correct: false,
+    feedback:
+      'An RR parent can only contribute R alleles. Crossed with rr (which only contributes r), every offspring would be Rr — red. The moment you see even one white (rr) offspring, RR is ruled out: an RR parent literally cannot produce an rr offspring.',
+  },
+  {
+    key: 'Rr',
+    label: 'Rr (heterozygous)',
+    correct: true,
+    feedback:
+      'Correct. An Rr parent contributes R half the time and r half the time. Crossed with rr (which only contributes r), the offspring are roughly 1/2 Rr (red) : 1/2 rr (white) — exactly what you observed. The presence of any white offspring is the smoking gun for a heterozygous mystery parent.',
+  },
+  {
+    key: 'rr',
+    label: 'rr (homozygous recessive)',
+    correct: false,
+    feedback:
+      'An rr parent would contribute only r. Crossed with rr, every offspring would be rr — all white. You saw red offspring too, so the mystery plant cannot be rr.',
+  },
+  {
+    key: 'unknown',
+    label: 'Cannot tell from this data.',
+    correct: false,
+    feedback:
+      'You actually can. The presence of even one white (rr) offspring means the mystery parent contributed an r allele — so it must carry at least one r. Combined with its red phenotype (which requires at least one R), the mystery plant must be Rr.',
   },
 ] as const;
 
@@ -1166,8 +1222,6 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
   const [backKey, setBackKey] = useState<string | null>(null);
-  const backOpt = EXP4_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
-  const backCorrect = backOpt ? backOpt.correct : null;
 
   // Mystery plant — randomized once at mount, could be RR (homozygous) or Rr (heterozygous).
   // useState lazy initializer guarantees this runs exactly once for the lifetime of the component.
@@ -1182,17 +1236,6 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   });
   const tester = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'tester'), []);
 
-  // Auto-advance once the student answers the BACKWARD hypothetical
-  // correctly. The forward beats (picking the informative cross + running
-  // it) are discovery; the backward question ("suppose you saw 40 red / 0
-  // white — what's the mystery genotype?") is the mastery gate.
-  useEffect(() => {
-    if (backCorrect === true) {
-      const t = setTimeout(() => onComplete(), 1500);
-      return () => clearTimeout(t);
-    }
-  }, [backCorrect, onComplete]);
-
   const selected = EXP4_OPTIONS.find(o => o.key === selectedKey) ?? null;
   const selectedCorrect = selected ? selected.correct : null;
   const whiteCount = crossResult?.phenotypeCounts?.['White'] ?? 0;
@@ -1201,6 +1244,38 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   const mysteryAlleles = mystery.genotype.color;
   const mysteryIsHetero = mysteryAlleles[0] !== mysteryAlleles[1];
   const mysteryGenotypeLabel = mysteryIsHetero ? 'Rr' : 'RR';
+
+  // Backward-question variant is chosen by what the student actually
+  // observed: if they saw any white offspring, the data rules out RR and
+  // the correct answer is Rr; if every offspring was red, the data makes
+  // RR overwhelmingly likely. Consuming the student's own observation
+  // here avoids the "suppose…" hypothetical and aligns with the
+  // "consume the student's own data" rule in CLAUDE.md.
+  const sawWhite = whiteCount > 0;
+  const backOptions = sawWhite
+    ? EXP4_BACKWARD_OPTIONS_SOMEWHITE
+    : EXP4_BACKWARD_OPTIONS_ALLRED;
+  const backOpt = backOptions.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
+
+  // Auto-advance once the student answers the BACKWARD question correctly.
+  // The forward beats (picking the informative cross + running it) are
+  // discovery; the backward question (grounded in the student's actual
+  // observed offspring) is the mastery gate. useEffect with cleanup —
+  // never setTimeout from a click handler.
+  useEffect(() => {
+    if (backCorrect === true) {
+      const t = setTimeout(() => onComplete(), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [backCorrect, onComplete]);
+
+  // Reset the backward selection when the student changes which branch
+  // they're in (e.g. after a re-run). A key picked from the other variant
+  // would otherwise look like an already-answered question.
+  useEffect(() => {
+    setBackKey(null);
+  }, [sawWhite]);
 
   return (
     <div className="space-y-6">
@@ -1313,13 +1388,20 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
         </div>
       )}
 
-      {/* Backwards problem — hypothetical observation (not the student's
-          actual run, because the mystery plant is randomized). Gated on
-          the forward test cross having completed. onComplete now fires
-          from the backward state. */}
+      {/* Backwards problem — question text and option set both branch on
+          the student's own observed data (whiteCount). If they saw white
+          offspring, the correct answer is Rr; if they saw all red, the
+          correct answer is RR. Gated on the forward test cross having
+          completed; step-based gating is already monotonic (step only
+          increases, crossResult only gets set), so no separate latch is
+          needed here. onComplete fires from the backward state. */}
       {step >= 3 && crossResult && (
         <QuestionPanel
-          question="You did a test cross (mystery × rr). Suppose you saw all 40 offspring are red, zero white. What's the most likely genotype of the mystery plant?"
+          question={
+            sawWhite
+              ? `You did a test cross (mystery × rr) and saw ${whiteCount} white offspring out of ${crossResult.total}. What's the most likely genotype of the mystery plant?`
+              : `You did a test cross (mystery × rr) and saw all ${crossResult.total} offspring red — zero white. What's the most likely genotype of the mystery plant?`
+          }
           correct={backCorrect}
           feedback={backOpt ? backOpt.feedback : undefined}
         >
@@ -1330,7 +1412,7 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
             Working backward
           </div>
           <div className="flex flex-col gap-2">
-            {EXP4_BACKWARD_OPTIONS.map(opt => {
+            {backOptions.map(opt => {
               const picked = backKey === opt.key;
               return (
                 <button
@@ -1396,6 +1478,14 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [linkAnswer, setLinkAnswer] = useState('');
   const [linkCorrect, setLinkCorrect] = useState<boolean | null>(null);
+  // Latched "forward-ever-correct" gate for the Law of Independent Assortment
+  // callout, linkage tease, and backward problem. Once the student picks
+  // 9:3:3:1 correctly, these panels must stay visible even if they click a
+  // wrong forward option afterwards. Monotonic — never reset to false.
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  useEffect(() => {
+    if (correct === true) setForwardEverCorrect(true);
+  }, [correct]);
   const [backKey, setBackKey] = useState<string | null>(null);
   const backOpt = EXP5_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
   const backCorrect = backOpt ? backOpt.correct : null;
@@ -1566,7 +1656,7 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
       )}
 
       {/* Law of Independent Assortment — named callout + warning that the law can break. */}
-      {correct === true && (
+      {forwardEverCorrect && (
         <>
           <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm space-y-3">
             <p className="text-sm font-bold text-stone-800">
@@ -1635,10 +1725,10 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
       )}
 
       {/* Backwards problem — given a 9:3:3:1 ratio, infer both parental
-          genotypes AND the (un)linked arrangement. Gated on the forward
-          9:3:3:1 ratio answer being correct. onComplete now fires from
-          the backward state. */}
-      {correct === true && (
+          genotypes AND the (un)linked arrangement. Gated on the latched
+          `forwardEverCorrect` so re-clicking a wrong forward option doesn't
+          erase progress. onComplete now fires from the backward state. */}
+      {forwardEverCorrect && (
         <QuestionPanel
           question="You observe a 9:3:3:1 ratio in the offspring of a cross. What does this tell you about the parents and the genes?"
           correct={backCorrect}
@@ -1715,6 +1805,13 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
   const [f2Result, setF2Result] = useState<CrossResult | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  // Latched "forward-ever-correct" gate for the backward problem. Once the
+  // student identifies 9:3:4 once, the backward panel must stay visible
+  // even if they re-click a wrong forward option. Monotonic.
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  useEffect(() => {
+    if (correct === true) setForwardEverCorrect(true);
+  }, [correct]);
   const [backKey, setBackKey] = useState<string | null>(null);
   const backOpt = EXP6_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
   const backCorrect = backOpt ? backOpt.correct : null;
@@ -1799,10 +1896,11 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
       )}
 
       {/* Backwards problem — given a 9:3:4 ratio (9 purple : 3 red : 4
-          colorless), infer recessive epistasis. Gated on the forward
-          ratio answer being correct. onComplete now fires from the
-          backward state. */}
-      {correct === true && (
+          colorless), infer recessive epistasis. Gated on the latched
+          `forwardEverCorrect` so re-clicking a wrong forward option
+          doesn't erase progress. onComplete now fires from the backward
+          state. */}
+      {forwardEverCorrect && (
         <QuestionPanel
           question="You observe a 9 purple : 3 red : 4 colorless ratio in F2. What does this tell you?"
           correct={backCorrect}
@@ -1840,39 +1938,40 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// Backwards options for Exp 7 — given a continuous bell-shaped F2
-// distribution, infer polygenic architecture. Exp 7's existing forward
-// setup uses an abstract additive trait value (sum of '+' alleles) with
-// a selectable number of genes, so the question is framed in terms of a
-// generic quantitative trait rather than one specific plant organ.
+// Backwards options for Exp 7 — given a continuous bell-shaped F2 fruit
+// weight distribution, infer polygenic architecture. Exp 7 is themed on
+// tomato fruit weight (Yule 1902; the canonical textbook polygenic plant
+// trait), but the underlying engine is a generic additive model — each
+// gene contributes +0/+1/+2 favorable alleles that sum to the plant's
+// fruit weight. Re-theming is prose/labels only; the math is unchanged.
 const EXP7_BACKWARD_OPTIONS = [
   {
     key: 'single_triallele',
-    label: 'The trait is controlled by a single gene with three alleles.',
+    label: 'Fruit weight is controlled by a single gene with three alleles.',
     correct: false,
     feedback:
-      'A single gene with three alleles would give at most 6 distinct genotype classes, producing a step-shaped distribution with discrete peaks — not a smooth bell curve. The smoothness implies many genes.',
+      'A single gene with three alleles would give at most 6 distinct genotype classes, producing a step-shaped distribution with discrete peaks — not a smooth bell curve. The smooth, continuous F2 fruit weight distribution implies many genes contributing together.',
   },
   {
     key: 'polygenic',
-    label: 'The trait is controlled by many genes, each contributing a small additive effect.',
+    label: 'Fruit weight is controlled by many genes, each contributing a small additive effect.',
     correct: true,
     feedback:
-      'Correct. When a trait is the sum of contributions from many genes (polygenic), the central limit theorem produces a roughly normal (bell-shaped) distribution in the F2. Each gene contributes a small fraction, and most plants get a roughly average mix of \u201c+\u201d/\u201c\u2212\u201d alleles. Few inherit all \u201c+\u201d or all \u201c\u2212\u201d.',
+      'Correct. When fruit weight is the sum of contributions from many genes (polygenic), the central limit theorem produces a roughly normal (bell-shaped) distribution in the F2. Each gene contributes a small fraction, and most plants inherit a roughly average mix of \u201c+\u201d/\u201c\u2212\u201d alleles. Very few inherit all \u201c+\u201d (giant fruit) or all \u201c\u2212\u201d (tiny fruit). This is exactly what real tomato QTL studies have found for fruit weight.',
   },
   {
     key: 'linked',
-    label: 'The trait is controlled by linked genes.',
+    label: 'Fruit weight is controlled by linked genes on one chromosome.',
     correct: false,
     feedback:
-      'Linkage doesn\u2019t create the bell shape — it can affect which combinations of alleles travel together, but the underlying distribution still depends on how many independent loci contribute.',
+      'Linkage doesn\u2019t create the bell shape — it affects which combinations of alleles travel together, but the underlying distribution still depends on how many independent loci contribute. A dozen loci scattered across several chromosomes will give you the same bell curve.',
   },
   {
     key: 'environmental',
-    label: 'The trait is purely environmental, not genetic.',
+    label: 'Fruit weight is purely environmental, not genetic.',
     correct: false,
     feedback:
-      'If it were purely environmental you\u2019d see no relationship between parent and offspring values at all — but in F2 the mean matches the F1 mean, which is what you\u2019d expect for an additive polygenic trait. Environment contributes variance on top of genetics, but the bell shape itself comes from the polygenic architecture.',
+      'If fruit weight were purely environmental you\u2019d see no relationship between parent and offspring values at all — but in F2 the mean matches the F1 mean, which is what you\u2019d expect for an additive polygenic trait. Environment contributes variance on top of genetics, but the bell shape itself comes from the polygenic architecture.',
   },
 ] as const;
 
@@ -1881,6 +1980,13 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
   const [classAnswer, setClassAnswer] = useState('');
   const [classCorrect, setClassCorrect] = useState<boolean | null>(null);
+  // Latched "forward-ever-correct" gate for the backward problem. Once the
+  // student picks 2n+1 once, the backward panel stays visible even if they
+  // re-click a wrong forward option afterwards. Monotonic — never false.
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  useEffect(() => {
+    if (classCorrect === true) setForwardEverCorrect(true);
+  }, [classCorrect]);
   const [backKey, setBackKey] = useState<string | null>(null);
   const backOpt = EXP7_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
   const backCorrect = backOpt ? backOpt.correct : null;
@@ -1938,8 +2044,16 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        What happens when a trait is controlled by <strong>many genes</strong>, each with a small additive effect?
-        Each gene contributes +1 per favorable allele. Watch the distribution change as you add more genes.
+        Mendel's 3:1 and 9:3:3:1 ratios work beautifully for traits with a handful of discrete classes — flower color, seed shape, kernel color.
+        But most of the traits a plant breeder actually cares about — <strong>tomato fruit weight</strong>, maize kernel number, wheat yield — vary
+        <em> continuously</em>. A tomato can weigh anywhere from under a gram (wild ancestors) to more than a kilogram (modern cultivars), with every value in between.
+        Yule (1902) first argued that continuous variation was perfectly compatible with Mendel's laws if many genes each contributed a small additive effect.
+        We now know tomato fruit weight is controlled by ~30 quantitative trait loci (QTLs), each adding a little to the total.
+      </p>
+      <p className="text-sm text-stone-600">
+        Let's test Yule's idea. Cross a <strong>large-fruited</strong> parent (all favorable alleles) with a <strong>small-fruited</strong> parent (all unfavorable alleles),
+        then self the F1 to get an F2 and plot the fruit-weight distribution. Each gene contributes +1 per favorable allele to the plant's final fruit weight.
+        Watch how the distribution changes as you dial up the number of genes.
       </p>
 
       <div className="flex items-center gap-4">
@@ -1958,15 +2072,15 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
 
       <div className="flex items-center gap-3">
         <div className="text-xs text-stone-500">
-          <strong>Parent 1</strong>: all favorable alleles (value = {nGenes * 2})
+          <strong>Large-fruited parent</strong>: all favorable alleles (fruit weight = {nGenes * 2})
         </div>
         <span className="text-stone-400">×</span>
         <div className="text-xs text-stone-500">
-          <strong>Parent 2</strong>: all unfavorable alleles (value = 0)
+          <strong>Small-fruited parent</strong>: all unfavorable alleles (fruit weight = 0)
         </div>
         <button onClick={doF2}
           className="ml-auto rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg">
-          Make F2 (500 offspring)
+          Make F2 (500 fruits)
         </button>
       </div>
 
@@ -1974,29 +2088,29 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
         <div className="space-y-3">
           <HistogramChart
             bins={histogram}
-            title="F2 Distribution — Trait Value (sum of favorable alleles)"
+            title="F2 distribution — tomato fruit weight (sum of favorable alleles)"
           />
-          <div className="text-center text-xs text-stone-400">Trait value →</div>
+          <div className="text-center text-xs text-stone-400">Fruit weight (relative units) →</div>
 
           {nGenes >= 5 && (
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
-              <strong>Notice the bell curve!</strong> With {nGenes} genes, each adding a small effect,
-              the F2 distribution approaches a normal (Gaussian) distribution. This is how
-              <strong> quantitative traits</strong> like yield, height, and weight work in real organisms —
-              many genes, each with small effects, producing continuous variation.
+              <strong>Notice the bell curve!</strong> With {nGenes} genes, each adding a small effect to fruit weight,
+              the F2 distribution approaches a normal (Gaussian) distribution. This is how <strong>quantitative traits</strong> —
+              fruit weight in tomato, kernel number in maize, rosette diameter in Arabidopsis — work in real plants: many genes,
+              each contributing a small effect, producing continuous variation.
               {nGenes >= 8 && (
-                <span> You're now looking at the genetic basis of complex traits.
-                This is why quantitative genetics uses statistics instead of counting ratios!</span>
+                <span> You're now looking at the genetic basis of real plant-breeding targets.
+                This is why quantitative genetics uses statistics (means, variances, heritabilities) instead of counting ratios.</span>
               )}
             </div>
           )}
 
           {nGenes >= 8 && (
             <QuestionPanel
-              question="How many phenotypic classes do you see for a trait controlled by n genes with additive effects (each contributing 0, 1, or 2 favorable alleles)?"
+              question="How many distinct fruit-weight classes are possible when fruit weight is controlled by n genes with additive effects (each contributing 0, 1, or 2 favorable alleles)?"
               correct={classCorrect}
               feedback={classCorrect === true
-                ? "Right — 2n + 1. Each of the n loci contributes 0, 1, or 2 favorable alleles, so the total dose ranges from 0 to 2n. That gives 2n + 1 possible additive values, and as n grows, the binomial distribution over those classes approaches a Gaussian — the foundation of quantitative genetics."
+                ? "Right — 2n + 1. Each of the n loci contributes 0, 1, or 2 favorable alleles, so the total dose ranges from 0 to 2n. That gives 2n + 1 possible fruit-weight values, and as n grows, the binomial distribution over those classes approaches a Gaussian — the foundation of quantitative genetics and of modern plant breeding."
                 : classCorrect === false
                 ? "Each gene contributes 0, 1, or 2 favorable alleles. What's the range of possible totals across n genes — and how many integer values does that range cover?"
                 : undefined}
@@ -2021,11 +2135,12 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
 
           {/* Backwards problem — given a continuous bell-shaped F2
               distribution, infer polygenic additive architecture. Gated
-              on the forward 2n + 1 answer being correct. onComplete now
-              fires from the backward state. */}
-          {classCorrect === true && (
+              on the latched `forwardEverCorrect` so re-clicking a wrong
+              forward option doesn't erase progress. onComplete fires
+              from the backward state. */}
+          {forwardEverCorrect && (
             <QuestionPanel
-              question="You observe a continuous, bell-shaped distribution of F2 trait values (most plants near the middle, few at the extremes). What does this tell you about the genes controlling the trait?"
+              question="You observe a continuous, bell-shaped distribution of F2 tomato fruit weights (most fruits near the middle, few at the extremes — tiny or giant). What does this tell you about the genes controlling fruit weight?"
               correct={backCorrect}
               feedback={backOpt ? backOpt.feedback : undefined}
             >
@@ -2073,7 +2188,7 @@ const EXPERIMENTS = [
   { id: 'test_cross', title: '5. The Test Cross', subtitle: 'Unmask hidden genotypes', Component: Exp4_TestCross },
   { id: 'two_genes', title: '6. Two Genes', subtitle: 'Independent assortment and 9:3:3:1', Component: Exp5_TwoGenes },
   { id: 'epistasis', title: '7. Epistasis', subtitle: 'When one gene masks another', Component: Exp6_Epistasis },
-  { id: 'quantitative', title: '8. Many Genes', subtitle: 'From Mendelian to quantitative', Component: Exp7_Quantitative },
+  { id: 'quantitative', title: '8. Many Genes — Tomato Fruit Weight', subtitle: 'From Mendelian ratios to continuous variation', Component: Exp7_Quantitative },
 ];
 
 const MENDELIAN_MODULE: ModuleDefinition = {
