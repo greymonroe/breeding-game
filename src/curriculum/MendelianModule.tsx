@@ -447,14 +447,50 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+// Exp 4 option keys and their per-option teaching feedback.
+// Each option reads as plausible at first glance; the feedback prose is where
+// the teaching happens. No option is annotated as "correct" in its label —
+// the student has to reason from the factual genotype to gamete contribution.
+const EXP4_OPTIONS = [
+  {
+    key: 'unknown_red',
+    label: 'Another red plant (genotype unknown)',
+    correct: false,
+    feedback:
+      "You don't know the other plant's genotype either — any offspring ratio you see could come from many combinations (RR × RR, RR × Rr, Rr × Rr all give mostly-red broods). To diagnose the mystery plant you need a tester whose genotype is already known.",
+  },
+  {
+    key: 'rr_dominant',
+    label: 'A red plant confirmed to be RR',
+    correct: false,
+    feedback:
+      'An RR parent contributes an R allele to every gamete. Your mystery plant is either RR or Rr — in both cases, every offspring inherits at least one R from the tester, so every offspring is red. The cross can never distinguish the two possibilities: you get the same all-red brood either way.',
+  },
+  {
+    key: 'rr_hetero',
+    label: 'A red plant confirmed to be Rr',
+    correct: false,
+    feedback:
+      "An Rr tester gives 50% R and 50% r gametes. If the mystery plant is RR, you'd see all red offspring. If it's Rr, you'd see roughly 3:1 red to white. That almost works — but any red offspring in the 3:1 case is still ambiguous (RR or Rr?), and the 3:1 vs all-red distinction leans on sampling variation. There's a cleaner tester that removes the ambiguity entirely.",
+  },
+  {
+    key: 'white',
+    label: 'A white plant (rr)',
+    correct: true,
+    feedback:
+      "Exactly. An rr tester contributes only r to every gamete, so each offspring's phenotype is determined entirely by what the mystery plant contributed. Red offspring → mystery plant gave R. White offspring → mystery plant gave r. If you see even one white offspring, the mystery plant must carry at least one r allele and is therefore Rr. If every offspring is red, the mystery plant must be RR. A clean, unambiguous diagnostic.",
+  },
+] as const;
+
 function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
-  const [answer, setAnswer] = useState('');
-  const [correct, setCorrect] = useState<boolean | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
 
   // Mystery plant — randomized once at mount, could be RR (homozygous) or Rr (heterozygous).
   // useState lazy initializer guarantees this runs exactly once for the lifetime of the component.
+  // DO NOT hardcode — the conditional conclusion below depends on this being genuinely random
+  // so students can't memorize a fixed "answer".
   const [mystery] = useState(() => {
     const isHomozygous = Math.random() < 0.5;
     return makeOrganism(
@@ -466,90 +502,129 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
 
   // Auto-advance after the cross has been displayed long enough to read.
   useEffect(() => {
-    if (step >= 2 && crossResult) {
+    if (step >= 3 && crossResult) {
       const t = setTimeout(() => onComplete(), 2500);
       return () => clearTimeout(t);
     }
   }, [step, crossResult, onComplete]);
 
+  const selected = EXP4_OPTIONS.find(o => o.key === selectedKey) ?? null;
+  const selectedCorrect = selected ? selected.correct : null;
   const whiteCount = crossResult?.phenotypeCounts?.['White'] ?? 0;
+  // Derive the mystery plant's true genotype from its stored alleles — never
+  // from a separate state variable that could drift out of sync.
+  const mysteryAlleles = mystery.genotype.color;
+  const mysteryIsHetero = mysteryAlleles[0] !== mysteryAlleles[1];
+  const mysteryGenotypeLabel = mysteryIsHetero ? 'Rr' : 'RR';
 
   return (
     <div className="space-y-6">
+      {/* Beat 1 — setup */}
       <p className="text-sm text-stone-600">
-        You have a red-flowered plant but don't know if it's <strong>RR</strong> (homozygous) or <strong>Rr</strong> (heterozygous).
-        Both look red! How can you find out? (You've actually done a cross like this before, in Experiment 2 — now we'll
-        use it on an unknown genotype, where it's called <em>the test cross</em>.)
+        You have a red-flowered plant. By eye it looks exactly like any other red plant, but its genotype could
+        be <strong>RR</strong> (homozygous dominant) or <strong>Rr</strong> (heterozygous) — the dominant red
+        phenotype hides the difference. Your task: design a cross whose result will tell you which.
       </p>
 
+      {/* Beat 2 — informative-cross selection (the reasoning puzzle) */}
       <QuestionPanel
-        question="What cross would reveal the mystery plant's genotype?"
-        correct={correct}
-        feedback={correct === true
-          ? "Yes — crossing the unknown red against a white (rr) tester is the test cross. If the mystery plant is RR, all offspring will be red (Rr). If it's Rr, you'll get roughly half red and half white."
-          : correct === false
-          ? "Think about which cross would give different results depending on the unknown genotype..."
-          : undefined}
+        question="Which plant should you cross the mystery red with to reveal its genotype?"
+        correct={selectedCorrect}
+        feedback={selected ? selected.feedback : undefined}
       >
-        <div className="flex gap-2 flex-wrap">
-          {['Cross it with a white plant', 'Cross it with another red plant', 'Self-pollinate it'].map(opt => (
-            <button key={opt} onClick={() => {
-              setAnswer(opt);
-              const isCorrect = opt === 'Cross it with a white plant';
-              setCorrect(isCorrect);
-              if (isCorrect) setStep(1);
-            }}
-              className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
-                answer === opt
-                  ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
-                  : 'border-stone-200 bg-white hover:border-stone-300'
-              }`}>
-              {opt}
-            </button>
-          ))}
+        <div className="flex flex-col gap-2">
+          {EXP4_OPTIONS.map(opt => {
+            const isSelected = selectedKey === opt.key;
+            const borderClass = isSelected
+              ? opt.correct
+                ? 'border-emerald-400 bg-emerald-50'
+                : 'border-red-300 bg-red-50'
+              : 'border-stone-200 bg-white hover:border-stone-300';
+            return (
+              <button
+                key={opt.key}
+                onClick={() => {
+                  setSelectedKey(opt.key);
+                  if (opt.correct && step < 2) setStep(2);
+                }}
+                className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${borderClass}`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </QuestionPanel>
 
-      {step >= 1 && (
+      {/* Beat 3 — run the cross, only after correct choice. The mystery plant's
+          genotype is NOT yet revealed in prose — the student should infer it from
+          the observed offspring in Beat 4, not read it off a label. */}
+      {step >= 2 && (
         <>
           <p className="text-sm text-stone-600">
-            Cross the mystery red plant with a white (rr) tester:
+            Cross the mystery red plant with a white (<strong>rr</strong>) tester and see what the
+            offspring reveal.
           </p>
           <CrossWorkbench
             parentA={mystery} parentB={tester} genes={[FLOWER_COLOR]}
-            onCross={(r) => { setCrossResult(r); setStep(2); }} crossResult={crossResult}
-            sampleSize={40} label="Test Cross: Mystery Red × White"
+            onCross={(r) => { setCrossResult(r); setStep(3); }} crossResult={crossResult}
+            sampleSize={40} label="Test Cross: Mystery Red × White (rr)"
           />
         </>
       )}
 
-      {step >= 2 && crossResult && (
+      {/* Beat 4 — conditional conclusion driven by observed offspring (not genotype).
+          whiteCount is read from crossResult.phenotypeCounts['White'], so the text
+          always reflects what the student actually saw on screen. */}
+      {step >= 3 && crossResult && (
         <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800 space-y-2">
           {whiteCount > 0 ? (
             <>
               <p>
                 <strong>White offspring appeared</strong> ({whiteCount} of {crossResult.total}).
                 Only an Rr plant crossed with rr can produce rr (white) offspring, so the mystery plant
-                must be <strong>Rr</strong> — heterozygous.
+                must be <strong>Rr</strong> — heterozygous. The dominant red phenotype was hiding a
+                heterozygous genotype.
               </p>
               <p>
                 If it were RR, it could only contribute R alleles, so every offspring would be Rr (red).
                 Since we see rr offspring, the mystery parent must have contributed an r allele.
               </p>
+              <p className="text-xs text-emerald-700">
+                (Confirming: the mystery plant's true genotype was <strong>{mysteryGenotypeLabel}</strong>.)
+              </p>
             </>
           ) : (
             <>
               <p>
-                <strong>No white offspring appeared.</strong> If the mystery plant were Rr, about half of the
-                {' '}{crossResult.total} offspring would be white (rr). Since all of them are red, the mystery
-                plant must be <strong>RR</strong> — homozygous dominant.
+                <strong>No white offspring appeared.</strong> All {crossResult.total} offspring are red.
+                If the mystery plant were Rr, about half of the offspring would be white (rr) — and with
+                {' '}{crossResult.total} offspring the probability of seeing zero white by chance is
+                essentially zero. So the mystery plant must be <strong>RR</strong> — homozygous dominant.
               </p>
               <p>
-                An RR parent can only contribute R alleles, so every offspring is Rr and red. The absence of
-                any white offspring is the evidence.
+                An RR parent can only contribute R alleles, so every offspring is Rr and red. The absence
+                of any white offspring is the evidence.
+              </p>
+              <p className="text-xs text-emerald-700">
+                (Confirming: the mystery plant's true genotype was <strong>{mysteryGenotypeLabel}</strong>.)
               </p>
             </>
           )}
+        </div>
+      )}
+
+      {/* Beat 5 — name the technique (stone-neutral callout, matching Exp 2 / Exp 5 law callouts) */}
+      {step >= 3 && crossResult && (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm">
+          <p className="text-sm font-bold text-stone-800 mb-2">Test cross</p>
+          <p className="text-sm text-stone-700 leading-relaxed">
+            Crossing an individual of unknown genotype with a <strong>homozygous recessive tester</strong>.
+            The tester contributes only recessive alleles to every gamete, so each offspring's phenotype
+            directly reveals what the unknown individual contributed. It is one of the most powerful
+            diagnostic tools in classical genetics — used to infer genotype from phenotype without
+            sequencing.
+          </p>
         </div>
       )}
     </div>
