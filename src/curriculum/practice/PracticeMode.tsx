@@ -336,6 +336,11 @@ function SessionCard({
         <p className="text-base text-stone-800 leading-relaxed">
           {problem.prompt}
         </p>
+        {problem.hint && (
+          <p className="mt-1 text-xs italic text-stone-500 leading-snug">
+            Hint: {problem.hint}
+          </p>
+        )}
       </div>
 
       <div

@@ -51,6 +51,12 @@ export interface PracticeProblem {
   concept: PracticeConcept;
   difficulty: 1 | 2 | 3;
   prompt: string;
+  /** Optional scaffolding hint shown under the prompt before the student
+   *  answers. Used for problems where a student entering practice mode cold
+   *  (without having walked the narrative experiment first) has no reminder
+   *  of the strategy — e.g. the multiplication rule for forward-dihybrid /
+   *  trihybrid. Kept optional so existing problem types don't need updates. */
+  hint?: string;
   options: PracticeOption[];
   explanation: string;
 }
@@ -260,6 +266,7 @@ export function generateForwardDihybrid(rng: Rng = Math.random): PracticeProblem
     concept: 'multiplication-rule',
     difficulty: 2,
     prompt: `${chosen.parentA} \u00d7 ${chosen.parentB}. What is P(rr ss) in the offspring? (R/r and S/s are on different chromosomes, both complete dominance.)`,
+    hint: 'Think about one gene at a time — find P(rr) and P(ss) separately, then multiply.',
     options,
     explanation: explainDihybrid(chosen),
   };
@@ -426,6 +433,7 @@ export function generateTrihybrid(rng: Rng = Math.random): PracticeProblem {
     concept: 'multiplication-rule',
     difficulty: 3,
     prompt,
+    hint: 'One gene at a time: find P(target) for each gene, then multiply the three probabilities.',
     options,
     explanation: `${chosen.derivation} Independent assortment lets you factor the joint probability into a product of per-gene probabilities.`,
   };

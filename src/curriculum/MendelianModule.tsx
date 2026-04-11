@@ -83,7 +83,9 @@ function GameteToggle({
           <p className="text-sm font-bold text-stone-800">See the mechanism: gametes</p>
           {!show && (
             <p className="text-xs text-stone-500 mt-0.5">
-              Watch how each parent's alleles segregate into gametes and fuse to make offspring.
+              Gametes are the reproductive cells (pollen and egg) — each carries exactly one
+              allele per gene. Watch how each parent's alleles segregate into gametes and fuse
+              to make offspring.
             </p>
           )}
         </div>
@@ -191,7 +193,7 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
         'Because each F1 parent carries one hidden r allele, and 1/4 of the time both parents pass r to the offspring.',
       state: 'correct',
       feedback:
-        "Exactly — and this is the Law of Segregation stated mechanistically. Every F1 parent is Rr. When it makes gametes, half carry R and half carry r. When two F1 plants cross, the probability that both contribute r is 1/2 × 1/2 = 1/4. That's the 1/4 white. Coming up in Experiment 2: you'll work this out at the gamete level and see it animate.",
+        "Exactly — and this is the Law of Segregation stated mechanistically. Every F1 parent is Rr. When it makes gametes (the reproductive cells — pollen and egg — each carrying just one allele per gene), half of those gametes carry R and half carry r. When two F1 plants cross, the probability that both contribute r is 1/2 × 1/2 = 1/4. That's the 1/4 white. Coming up in Experiment 2: you'll work this out at the gamete level and see it animate.",
     },
     {
       key: 'hook',
@@ -563,6 +565,23 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
         What happens when you cross them?
       </p>
 
+      {/* Notation primer — introduced once, at first use in Exp 1, so later
+          experiments can rely on it. Violet teaching-callout styling matches
+          other inline definitions in the module. Also defines homozygous /
+          heterozygous here since they're core vocabulary that gets referenced
+          in graded feedback throughout the module. */}
+      <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
+        <p className="text-sm font-bold text-violet-900 mb-1">A note on notation</p>
+        <p className="text-sm text-violet-800 leading-relaxed">
+          We'll write each gene as two letters, one per allele. Uppercase for the
+          dominant allele, lowercase for the recessive — so <strong>RR</strong> means
+          "both alleles are R" (called <strong>homozygous</strong> — "same alleles"),{' '}
+          <strong>rr</strong> means "both alleles are r" (also homozygous), and{' '}
+          <strong>Rr</strong> means "one R allele and one r allele" — one of each —
+          which is called <strong>heterozygous</strong> ("different alleles").
+        </p>
+      </div>
+
       {/* Step 1: P cross */}
       <CrossWorkbench
         parentA={parentRR} parentB={parentrr} genes={[FLOWER_COLOR]}
@@ -898,8 +917,10 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
         You know from Experiment 2 that <strong>R</strong> is dominant over <strong>r</strong>.
-        Now let's predict: if you cross a heterozygous red plant (<strong>Rr</strong>) with a white plant (<strong>rr</strong>),
-        what ratio of red to white do you expect?
+        Now let's predict: if you cross a heterozygous red plant (<em>Rr</em>) with a
+        homozygous white plant (<em>rr</em>), what ratio of red to white do you expect?
+        The key is to think about <strong>gametes</strong> — the reproductive cells
+        (pollen and egg) each carrying exactly one allele per gene.
       </p>
 
       <QuestionPanel
@@ -1664,9 +1685,13 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Now we track <strong>two genes at once</strong>: flower color (Rr) and seed shape (Ss, where S = Round is dominant).
-        We'll write the dihybrid genotype with a space — <strong>Rr Ss</strong> — to keep the two genes visually distinct.
-        Cross a <strong>Red/Round</strong> plant with a <strong>White/Wrinkled</strong> plant.
+        Now we track <strong>two genes at once</strong>: flower color (Rr) and seed shape
+        (Ss, where S = Round is dominant). When writing two genes together, we separate
+        them with a space: <strong>Rr Ss</strong> means "heterozygous at both genes"
+        (one R, one r, one S, one s); <strong>rr ss</strong> means "homozygous recessive
+        at both." A plant that is heterozygous at two genes like this is called a{' '}
+        <strong>dihybrid</strong> ("di-" = two). Cross a <strong>Red/Round</strong> plant
+        with a <strong>White/Wrinkled</strong> plant.
       </p>
 
       <CrossWorkbench
@@ -2101,10 +2126,10 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
 const EXP6_BACKWARD_OPTIONS = [
   {
     key: 'recessive_epistasis',
-    label: 'Recessive epistasis — cc masks the R gene.',
+    label: 'Recessive epistasis — cc masks the R-gene.',
     correct: true,
     feedback:
-      'Correct. The 9:3:4 ratio is the signature of recessive epistasis. Without the C gene\u2019s product (when cc), the R gene can\u2019t produce its colored pigment — so all cc offspring (3+1 of the 16 = 4) are colorless regardless of R/r genotype. Purple = R_C_ (9), red = rrC_ (3), colorless = anything-cc (4).',
+      'Correct. The 9:3:4 ratio is the signature of recessive epistasis. Without the C-gene\u2019s product (when cc), the R-gene can\u2019t produce its colored pigment — so all cc offspring (3+1 of the 16 = 4) are colorless regardless of R/r genotype. Purple = R_C_ (9), red = rrC_ (3), colorless = anything-cc (4).',
   },
   {
     key: 'linked',
@@ -2172,22 +2197,47 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        In maize kernels, the color of the <strong>aleurone</strong> (the outer pigmented layer of the seed) depends on
-        <strong> two interacting genes</strong>:
+        In maize kernels, the color of the <strong>aleurone</strong> (the outer pigmented
+        layer of the maize seed) depends on <strong>two interacting genes</strong>:
       </p>
       <ul className="text-sm text-stone-600 list-disc ml-5 space-y-1">
-        <li><strong>Gene C</strong>: controls whether <em>any</em> pigment is deposited at all (C = colored, c = colorless).</li>
-        <li><strong>Gene R</strong>: controls <em>which</em> pigment forms when C is present (R = purple anthocyanin, r = red).</li>
+        <li>
+          The <strong>C-gene</strong> (alleles <em>C</em> and <em>c</em>): controls whether{' '}
+          <em>any</em> pigment is deposited at all (<em>C</em> = colored, <em>c</em> = colorless).
+        </li>
+        <li>
+          The <strong>R-gene</strong> (alleles <em>R</em> and <em>r</em>): controls{' '}
+          <em>which</em> pigment forms when C is present (<em>R</em> = purple anthocyanin,{' '}
+          <em>r</em> = red).
+        </li>
       </ul>
       <p className="text-sm text-stone-600">
-        Here's the catch: a <strong>cc</strong> kernel is always colorless, regardless of the R gene — without C
-        there is no precursor for R to act on. This is <strong>epistasis</strong>: the recessive cc genotype
-        <em> masks</em> whatever the R gene would otherwise produce.
+        Here's the catch: a <strong>cc</strong> kernel is always colorless, regardless of the
+        R-gene genotype — without a functional C product there is no pigment precursor for R
+        to act on. This is <strong>epistasis</strong>: the recessive cc genotype{' '}
+        <em>masks</em> whatever the R-gene would otherwise produce.
       </p>
 
+      {/* Notation primer for the underscore-wildcard convention. The forward
+          and backward feedback in this experiment both use `R_C_`, `rrC_`, etc.
+          to describe epistatic genotype classes — this is the first time the
+          student sees that notation in the module, so define it before they
+          encounter it in graded feedback. (F-006 CRITICAL) */}
+      <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
+        <p className="text-sm font-bold text-violet-900 mb-1">A note on notation</p>
+        <p className="text-sm text-violet-800 leading-relaxed">
+          We'll write <strong>R_</strong> as shorthand for "any genotype carrying at least one
+          R allele" — so <strong>R_</strong> groups <em>RR</em> and <em>Rr</em> together. By the
+          same convention, <strong>R_C_</strong> means "has at least one R <em>and</em> at least
+          one C" (dominant for both), and <strong>rrC_</strong> means "homozygous rr but carrying
+          at least one C." The underscore is a wildcard for "either allele." This shorthand makes
+          epistatic ratios easier to read when phenotype classes collapse several genotypes.
+        </p>
+      </div>
+
       <p className="text-sm text-stone-600">
-        Cross two F1 kernels (both <strong>Cc Rr</strong>). A vanilla dihybrid would give 9:3:3:1, but with cc masking R
-        the ratio is modified. Count the classes and decide what you see.
+        Cross two F1 kernels (both <strong>Cc Rr</strong>). A vanilla dihybrid would give 9:3:3:1,
+        but with cc masking R the ratio is modified. Count the classes and decide what you see.
       </p>
 
       <CrossWorkbench
@@ -2201,7 +2251,7 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
           question="Count the phenotypic classes on the bar. Which ratio fits the observed counts?"
           correct={correct}
           feedback={correct === true
-            ? "9 purple : 3 red : 4 colorless. The colorless class (4) absorbs what would have been two separate classes in a normal dihybrid (3 ccR_ + 1 ccrr), because cc is epistatic to R. Without the C-encoded precursor, the R gene's effect is invisible. This is recessive epistasis."
+            ? "9 purple : 3 red : 4 colorless. The colorless class (4) absorbs what would have been two separate classes in a normal dihybrid (3 ccR_ + 1 ccrr), because cc is epistatic to R. Without the C-encoded precursor, the R-gene's effect is invisible. This is recessive epistasis."
             : correct === false
             ? "Three classes appear: purple, red, and colorless. The colorless class is bigger than you'd expect from a vanilla dihybrid — what ratio does that point to?"
             : undefined}
