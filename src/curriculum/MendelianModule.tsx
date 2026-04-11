@@ -389,6 +389,41 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
   );
 }
 
+// Backwards ("working backward") options for Exp 1. Given a 3:1 offspring
+// ratio, which cross must have produced it? All four options are plausible
+// parental combinations — students have to reason from the transmission
+// rules, not spot a flagged label.
+const EXP1_BACKWARD_OPTIONS = [
+  {
+    key: 'RR_RR',
+    label: 'RR × RR',
+    correct: false,
+    feedback:
+      'RR × RR can only contribute R alleles — every offspring would be red. Zero white. That\u2019s not 3:1.',
+  },
+  {
+    key: 'RR_rr',
+    label: 'RR × rr',
+    correct: false,
+    feedback:
+      'RR × rr produces only Rr offspring — every offspring is red (heterozygous, but red is dominant). That\u2019s the F1 generation, not 3:1.',
+  },
+  {
+    key: 'Rr_Rr',
+    label: 'Rr × Rr',
+    correct: true,
+    feedback:
+      'Correct. Rr × Rr is the F1 self-cross. Each parent contributes R or r with equal probability, so offspring genotype is 1 RR : 2 Rr : 1 rr → 3 red : 1 white.',
+  },
+  {
+    key: 'Rr_rr',
+    label: 'Rr × rr',
+    correct: false,
+    feedback:
+      'Rr × rr (a test cross) gives 1 Rr : 1 rr offspring — that\u2019s 1:1 red : white, not 3:1.',
+  },
+] as const;
+
 function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
   const parentRR = useMemo(() => makeOrganism({ color: ['R', 'R'] }, 'p1'), []);
   const parentrr = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'p2'), []);
@@ -400,6 +435,9 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
   const [answer1Correct, setAnswer1Correct] = useState<boolean | null>(null);
   const [answer2, setAnswer2] = useState('');
   const [answer2Correct, setAnswer2Correct] = useState<boolean | null>(null);
+  const [backKey, setBackKey] = useState<string | null>(null);
+  const backOpt = EXP1_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
 
   // Replicate panel (noise literacy): each entry is the red fraction of one
   // independent Rr x Rr cross of sampleSize offspring. We reuse the engine's
@@ -422,14 +460,16 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
     setReplicates(fractions);
   }, [f1Child, f1Result]);
 
-  // Auto-advance after the student answers the F2 ratio question correctly.
+  // Auto-advance once the student answers the BACKWARD question correctly.
+  // The forward ratio question is the discovery beat; the backward question
+  // ("given 3:1, what must the parents have been?") is the mastery gate.
   // useEffect with cleanup — never setTimeout from a click handler.
   useEffect(() => {
-    if (answer2Correct === true) {
+    if (backCorrect === true) {
       const t = setTimeout(onComplete, 1500);
       return () => clearTimeout(t);
     }
-  }, [answer2Correct, onComplete]);
+  }, [backCorrect, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -637,9 +677,83 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
           )}
         </div>
       )}
+
+      {/* Backwards problem — forward asked "what ratio from Rr × Rr?"; this
+          flips it to "given a 3:1, what were the parents?" Real genetics
+          almost always runs in this direction: you observe offspring ratios
+          and infer parental genotypes. onComplete fires from the backward
+          state, not the forward one — this is the mastery gate. */}
+      {answer2Correct === true && (
+        <QuestionPanel
+          question="You see a 3:1 red : white ratio in offspring. What must the parents have been?"
+          correct={backCorrect}
+          feedback={backOpt ? backOpt.feedback : undefined}
+        >
+          <div
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
+            style={{ fontFamily: '"Patrick Hand", cursive' }}
+          >
+            Working backward
+          </div>
+          <div className="flex flex-col gap-2">
+            {EXP1_BACKWARD_OPTIONS.map(opt => {
+              const picked = backKey === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setBackKey(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${
+                    picked
+                      ? opt.correct
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
+
+// Backwards options for Exp 2 — given 1:1 and one parent is rr, what must
+// the other parent be? Every option must read as a genuine guess; the
+// feedback strings are where reasoning is taught.
+const EXP2_BACKWARD_OPTIONS = [
+  {
+    key: 'RR',
+    label: 'RR (homozygous red)',
+    correct: false,
+    feedback:
+      'An RR parent contributes only R alleles. With an rr parent contributing only r, every offspring would be Rr — all red, no white. You wouldn\u2019t see 1:1.',
+  },
+  {
+    key: 'Rr',
+    label: 'Rr (heterozygous red)',
+    correct: true,
+    feedback:
+      'Correct. An Rr parent contributes R half the time and r half the time. Crossed with rr (which contributes only r), offspring are 1/2 Rr (red) : 1/2 rr (white). That\u2019s 1:1.',
+  },
+  {
+    key: 'rr',
+    label: 'rr (homozygous white)',
+    correct: false,
+    feedback:
+      'Two rr parents would produce only rr offspring — all white. Not 1:1.',
+  },
+  {
+    key: 'unknown',
+    label: 'Cannot tell from a 1:1 ratio',
+    correct: false,
+    feedback:
+      'You actually can. A 1:1 ratio with one rr parent is the signature of a test cross with a heterozygote. That\u2019s what makes the test cross diagnostic.',
+  },
+] as const;
 
 function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
@@ -647,19 +761,23 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [done, setDone] = useState(false);
+  const [backKey, setBackKey] = useState<string | null>(null);
+  const backOpt = EXP2_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
 
   const parentRr = useMemo(() => makeOrganism({ color: ['R', 'r'] }, 'Rr'), []);
   const parentrr = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'rr'), []);
 
-  // Auto-advance once the test cross has produced data. useEffect with
-  // cleanup — never setTimeout from a callback body (same bug class as
-  // setTimeout-from-render: timer leaks if the user navigates away mid-cross).
+  // Auto-advance once the student answers the BACKWARD question correctly.
+  // The test cross result (`done`) is the discovery beat; the backward
+  // question ("given 1:1 and one rr parent, what's the other?") is the
+  // mastery gate. useEffect with cleanup — never setTimeout from render.
   useEffect(() => {
-    if (done) {
-      const t = setTimeout(onComplete, 2000);
+    if (backCorrect === true) {
+      const t = setTimeout(onComplete, 1500);
       return () => clearTimeout(t);
     }
-  }, [done, onComplete]);
+  }, [backCorrect, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -736,9 +854,81 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
           </p>
         </div>
       )}
+
+      {/* Backwards problem — given a 1:1 ratio and a known rr parent, infer
+          the other parent. Gated on the forward test cross having run
+          (`done`). onComplete now fires from the backward state. */}
+      {done && (
+        <QuestionPanel
+          question="You see a 1:1 red : white ratio in offspring. One parent is white (rr). What must the other parent be?"
+          correct={backCorrect}
+          feedback={backOpt ? backOpt.feedback : undefined}
+        >
+          <div
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
+            style={{ fontFamily: '"Patrick Hand", cursive' }}
+          >
+            Working backward
+          </div>
+          <div className="flex flex-col gap-2">
+            {EXP2_BACKWARD_OPTIONS.map(opt => {
+              const picked = backKey === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setBackKey(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${
+                    picked
+                      ? opt.correct
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
+
+// Backwards options for Exp 3 — given a 1:2:1 three-class ratio, what
+// inheritance mode does this imply? Every option must feel like a
+// plausible hypothesis on first read.
+const EXP3_BACKWARD_OPTIONS = [
+  {
+    key: 'complete',
+    label: 'The two alleles show classical (complete) dominance.',
+    correct: false,
+    feedback:
+      'With complete dominance you\u2019d see 3:1 (only two phenotypes), not 1:2:1 (three phenotypes). The fact that you see three distinct phenotypes is the giveaway.',
+  },
+  {
+    key: 'incomplete',
+    label: 'The two alleles show incomplete dominance — heterozygotes have an intermediate phenotype.',
+    correct: true,
+    feedback:
+      'Correct. The heterozygote (Rr) has its own visible phenotype — pink — distinct from both homozygotes. So genotype 1:2:1 (RR:Rr:rr) maps directly to phenotype 1:2:1 (red:pink:white). This is incomplete dominance.',
+  },
+  {
+    key: 'linked',
+    label: 'The genes are linked.',
+    correct: false,
+    feedback:
+      'Linkage affects how often two genes are inherited together — it doesn\u2019t create a third phenotype. With one gene and two alleles you can\u2019t get linkage.',
+  },
+  {
+    key: 'multiallele',
+    label: 'There must be more than two alleles at this locus.',
+    correct: false,
+    feedback:
+      'A third allele could in principle create a third phenotype, but you\u2019d expect different ratios. The 1:2:1 with the heterozygote between the two homozygotes is the signature of incomplete dominance, not multi-allelism.',
+  },
+] as const;
 
 function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
@@ -748,20 +938,23 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [f2Answer, setF2Answer] = useState('');
   const [f2Correct, setF2Correct] = useState<boolean | null>(null);
+  const [backKey, setBackKey] = useState<string | null>(null);
+  const backOpt = EXP3_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
 
   const parentRR = useMemo(() => makeOrganism({ color_inc: ['R', 'R'] }, 'RR'), []);
   const parentrr = useMemo(() => makeOrganism({ color_inc: ['r', 'r'] }, 'rr'), []);
 
   const f1Child = f1Result?.offspring[0];
 
-  // Auto-advance once the student answers the F2 ratio correctly.
+  // Auto-advance once the student answers the BACKWARD question correctly.
   // useEffect with cleanup — never setTimeout from a click handler.
   useEffect(() => {
-    if (f2Correct === true) {
+    if (backCorrect === true) {
       const t = setTimeout(onComplete, 1500);
       return () => clearTimeout(t);
     }
-  }, [f2Correct, onComplete]);
+  }, [backCorrect, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -856,9 +1049,82 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
           </div>
         </QuestionPanel>
       )}
+
+      {/* Backwards problem — given a 1:2:1 three-class ratio, infer
+          incomplete dominance. Gated on the forward F2 answer being
+          correct. onComplete now fires from the backward state. */}
+      {f2Correct === true && (
+        <QuestionPanel
+          question="You observe a 1:2:1 ratio of three distinct phenotypes (e.g. red, pink, white) in the F2 of a self-crossed F1. What does this tell you about the inheritance of color?"
+          correct={backCorrect}
+          feedback={backOpt ? backOpt.feedback : undefined}
+        >
+          <div
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
+            style={{ fontFamily: '"Patrick Hand", cursive' }}
+          >
+            Working backward
+          </div>
+          <div className="flex flex-col gap-2">
+            {EXP3_BACKWARD_OPTIONS.map(opt => {
+              const picked = backKey === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setBackKey(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${
+                    picked
+                      ? opt.correct
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
+
+// Backwards options for Exp 4 — hypothetical: suppose the test cross
+// (mystery × rr) produced all 40 red, zero white. What's the most likely
+// mystery genotype? This is a *hypothetical* observation, not the
+// student's actual data (which depends on the randomized mystery plant).
+const EXP4_BACKWARD_OPTIONS = [
+  {
+    key: 'RR',
+    label: 'RR (homozygous dominant)',
+    correct: true,
+    feedback:
+      'Correct. If the mystery plant were Rr, an Rr × rr cross would produce roughly 50% white offspring. With 40 offspring and zero white, the probability that an Rr parent gave you that result by chance is 0.5^40 ≈ 10^-12 — vanishingly small. The mystery plant must be RR.',
+  },
+  {
+    key: 'Rr',
+    label: 'Rr (heterozygous)',
+    correct: false,
+    feedback:
+      'Possible in principle, but extraordinarily unlikely. An Rr × rr cross produces 50% white offspring on average. The chance that Rr would give you 40 reds in a row by sampling luck is 0.5^40 ≈ one in a trillion. RR is far more likely.',
+  },
+  {
+    key: 'rr',
+    label: 'rr (homozygous recessive)',
+    correct: false,
+    feedback:
+      'An rr parent contributes only r to its gametes. Crossed with rr, every offspring would be rr — all white. You saw all red, so the mystery plant cannot be rr.',
+  },
+  {
+    key: 'unknown',
+    label: 'Cannot tell from this data.',
+    correct: false,
+    feedback:
+      'You actually can. With 40 offspring all red and zero white, the math heavily favors RR over Rr (a million-million to one). That\u2019s high enough confidence to call it.',
+  },
+] as const;
 
 // Exp 4 option keys and their per-option teaching feedback.
 // Each option reads as plausible at first glance; the feedback prose is where
@@ -899,6 +1165,9 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
+  const [backKey, setBackKey] = useState<string | null>(null);
+  const backOpt = EXP4_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
 
   // Mystery plant — randomized once at mount, could be RR (homozygous) or Rr (heterozygous).
   // useState lazy initializer guarantees this runs exactly once for the lifetime of the component.
@@ -913,13 +1182,16 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   });
   const tester = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'tester'), []);
 
-  // Auto-advance after the cross has been displayed long enough to read.
+  // Auto-advance once the student answers the BACKWARD hypothetical
+  // correctly. The forward beats (picking the informative cross + running
+  // it) are discovery; the backward question ("suppose you saw 40 red / 0
+  // white — what's the mystery genotype?") is the mastery gate.
   useEffect(() => {
-    if (step >= 3 && crossResult) {
-      const t = setTimeout(() => onComplete(), 2500);
+    if (backCorrect === true) {
+      const t = setTimeout(() => onComplete(), 1500);
       return () => clearTimeout(t);
     }
-  }, [step, crossResult, onComplete]);
+  }, [backCorrect, onComplete]);
 
   const selected = EXP4_OPTIONS.find(o => o.key === selectedKey) ?? null;
   const selectedCorrect = selected ? selected.correct : null;
@@ -1040,9 +1312,81 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
           </p>
         </div>
       )}
+
+      {/* Backwards problem — hypothetical observation (not the student's
+          actual run, because the mystery plant is randomized). Gated on
+          the forward test cross having completed. onComplete now fires
+          from the backward state. */}
+      {step >= 3 && crossResult && (
+        <QuestionPanel
+          question="You did a test cross (mystery × rr). Suppose you saw all 40 offspring are red, zero white. What's the most likely genotype of the mystery plant?"
+          correct={backCorrect}
+          feedback={backOpt ? backOpt.feedback : undefined}
+        >
+          <div
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
+            style={{ fontFamily: '"Patrick Hand", cursive' }}
+          >
+            Working backward
+          </div>
+          <div className="flex flex-col gap-2">
+            {EXP4_BACKWARD_OPTIONS.map(opt => {
+              const picked = backKey === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setBackKey(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${
+                    picked
+                      ? opt.correct
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
+
+// Backwards options for Exp 5 — given a 9:3:3:1 ratio, what does it tell
+// you about parental genotypes and gene arrangement?
+const EXP5_BACKWARD_OPTIONS = [
+  {
+    key: 'dihybrid_unlinked',
+    label: 'Both parents are dihybrid (heterozygous for both genes), AND the two genes are unlinked.',
+    correct: true,
+    feedback:
+      'Correct. 9:3:3:1 is the signature of two heterozygous parents whose genes assort independently. If the genes were linked, parental combinations would be over-represented and the ratio would be skewed.',
+  },
+  {
+    key: 'dihybrid_eitherway',
+    label: 'Both parents are dihybrid, but the genes might be linked or unlinked — you can\u2019t tell from this ratio.',
+    correct: false,
+    feedback:
+      'Linkage actually distorts the 9:3:3:1 ratio — closely linked genes give more parental combinations than recombinants, which shifts the proportions. Seeing exactly 9:3:3:1 is positive evidence for unlinked genes.',
+  },
+  {
+    key: 'testcross',
+    label: 'One parent is dihybrid, the other is homozygous recessive for both genes.',
+    correct: false,
+    feedback:
+      'A dihybrid × homozygous-recessive test cross gives 1:1:1:1, not 9:3:3:1. The 9:3:3:1 ratio specifically requires both parents to contribute four kinds of gametes (RS, Rs, rS, rs for each gene), which only happens when both are dihybrid.',
+  },
+  {
+    key: 'tight_linkage',
+    label: 'The genes are on the same chromosome, very close together.',
+    correct: false,
+    feedback:
+      'Tightly linked genes would give fewer recombinant phenotypes than expected, distorting the ratio away from 9:3:3:1. Seeing the textbook 9:3:3:1 is evidence the genes are not tightly linked.',
+  },
+] as const;
 
 function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
@@ -1052,20 +1396,26 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [linkAnswer, setLinkAnswer] = useState('');
   const [linkCorrect, setLinkCorrect] = useState<boolean | null>(null);
+  const [backKey, setBackKey] = useState<string | null>(null);
+  const backOpt = EXP5_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
 
   const parentAABB = useMemo(() => makeOrganism({ color: ['R', 'R'], shape: ['S', 'S'] }, 'RRSS'), []);
   const parentaabb = useMemo(() => makeOrganism({ color: ['r', 'r'], shape: ['s', 's'] }, 'rrss'), []);
 
   const f1Child = f1Result?.offspring[0];
 
-  // Auto-advance once the student answers the final linkage tease correctly.
-  // Using useEffect (not setTimeout from render) keeps React and timers sane.
+  // Auto-advance once the student answers the BACKWARD question correctly.
+  // The forward ratio + linkage tease are discovery; the backward
+  // question ("given 9:3:3:1, what must the parents / arrangement be?")
+  // is the mastery gate. useEffect with cleanup — never setTimeout from
+  // render.
   useEffect(() => {
-    if (linkCorrect === true) {
+    if (backCorrect === true) {
       const t = setTimeout(onComplete, 1500);
       return () => clearTimeout(t);
     }
-  }, [linkCorrect, onComplete]);
+  }, [backCorrect, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -1283,24 +1633,102 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
           </QuestionPanel>
         </>
       )}
+
+      {/* Backwards problem — given a 9:3:3:1 ratio, infer both parental
+          genotypes AND the (un)linked arrangement. Gated on the forward
+          9:3:3:1 ratio answer being correct. onComplete now fires from
+          the backward state. */}
+      {correct === true && (
+        <QuestionPanel
+          question="You observe a 9:3:3:1 ratio in the offspring of a cross. What does this tell you about the parents and the genes?"
+          correct={backCorrect}
+          feedback={backOpt ? backOpt.feedback : undefined}
+        >
+          <div
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
+            style={{ fontFamily: '"Patrick Hand", cursive' }}
+          >
+            Working backward
+          </div>
+          <div className="flex flex-col gap-2">
+            {EXP5_BACKWARD_OPTIONS.map(opt => {
+              const picked = backKey === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setBackKey(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${
+                    picked
+                      ? opt.correct
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
+
+// Backwards options for Exp 6 — given 9:3:4, what does it tell you about
+// gene interaction? Uses the maize aleurone labels the forward experiment
+// teaches: Purple (R_C_) / Red (rrC_) / Colorless (anything cc).
+const EXP6_BACKWARD_OPTIONS = [
+  {
+    key: 'recessive_epistasis',
+    label: 'Two genes assort independently and there is recessive epistasis: one gene\u2019s recessive homozygote (cc) masks the other gene\u2019s effect entirely.',
+    correct: true,
+    feedback:
+      'Correct. The 9:3:4 ratio is the signature of recessive epistasis. Without the C gene\u2019s product (when cc), the R gene can\u2019t produce its colored pigment — so all cc offspring (3+1 of the 16 = 4) are colorless regardless of R/r genotype. Purple = R_C_ (9), red = rrC_ (3), colorless = anything-cc (4).',
+  },
+  {
+    key: 'linked',
+    label: 'The two genes are linked.',
+    correct: false,
+    feedback:
+      'Linkage would distort the ratio away from a clean 16-part split. The 9:3:4 still adds to 16, so it\u2019s still independent assortment — what changed is that two of the four phenotype classes (colorless from R_cc and rrcc) collapsed into one because of recessive epistasis.',
+  },
+  {
+    key: 'incomplete',
+    label: 'There\u2019s incomplete dominance at one of the loci.',
+    correct: false,
+    feedback:
+      'Incomplete dominance affects a single gene\u2019s heterozygotes — it would create a third intermediate phenotype like pink. Epistasis is about one gene masking another gene\u2019s effect, which is what 9:3:4 tells you.',
+  },
+  {
+    key: 'noise',
+    label: 'The colorless class is a sampling artifact.',
+    correct: false,
+    feedback:
+      'Nope — the colorless class is exactly 4/16 = 25% of offspring, which is far too consistent to be sampling noise. It\u2019s a real biological signal.',
+  },
+] as const;
 
 function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [f2Result, setF2Result] = useState<CrossResult | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [backKey, setBackKey] = useState<string | null>(null);
+  const backOpt = EXP6_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
 
-  // Auto-advance once the student picks the 9:3:4 epistatic ratio. useEffect
-  // with cleanup — never setTimeout from a click handler.
+  // Auto-advance once the student answers the BACKWARD question correctly.
+  // The forward 9:3:4 ratio answer is the discovery beat; the backward
+  // question ("what does 9:3:4 tell you about the genes?") is the mastery
+  // gate. useEffect with cleanup — never setTimeout from a click handler.
   useEffect(() => {
-    if (correct === true) {
-      const t = setTimeout(onComplete, 2000);
+    if (backCorrect === true) {
+      const t = setTimeout(onComplete, 1500);
       return () => clearTimeout(t);
     }
-  }, [correct, onComplete]);
+  }, [backCorrect, onComplete]);
 
   // F1 dihybrid for maize aleurone color: Cc Rr × Cc Rr.
   // Use the gene objects' id fields directly so this stays consistent if the engine renames them.
@@ -1369,24 +1797,104 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
           </div>
         </QuestionPanel>
       )}
+
+      {/* Backwards problem — given a 9:3:4 ratio (9 purple : 3 red : 4
+          colorless), infer recessive epistasis. Gated on the forward
+          ratio answer being correct. onComplete now fires from the
+          backward state. */}
+      {correct === true && (
+        <QuestionPanel
+          question="You observe a 9 purple : 3 red : 4 colorless ratio in F2. What does this tell you?"
+          correct={backCorrect}
+          feedback={backOpt ? backOpt.feedback : undefined}
+        >
+          <div
+            className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
+            style={{ fontFamily: '"Patrick Hand", cursive' }}
+          >
+            Working backward
+          </div>
+          <div className="flex flex-col gap-2">
+            {EXP6_BACKWARD_OPTIONS.map(opt => {
+              const picked = backKey === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setBackKey(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${
+                    picked
+                      ? opt.correct
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
+
+// Backwards options for Exp 7 — given a continuous bell-shaped F2
+// distribution, infer polygenic architecture. Exp 7's existing forward
+// setup uses an abstract additive trait value (sum of '+' alleles) with
+// a selectable number of genes, so the question is framed in terms of a
+// generic quantitative trait rather than one specific plant organ.
+const EXP7_BACKWARD_OPTIONS = [
+  {
+    key: 'single_triallele',
+    label: 'The trait is controlled by a single gene with three alleles.',
+    correct: false,
+    feedback:
+      'A single gene with three alleles would give at most 6 distinct genotype classes, producing a step-shaped distribution with discrete peaks — not a smooth bell curve. The smoothness implies many genes.',
+  },
+  {
+    key: 'polygenic',
+    label: 'The trait is controlled by many genes, each contributing a small additive effect.',
+    correct: true,
+    feedback:
+      'Correct. When a trait is the sum of contributions from many genes (polygenic), the central limit theorem produces a roughly normal (bell-shaped) distribution in the F2. Each gene contributes a small fraction, and most plants get a roughly average mix of \u201c+\u201d/\u201c\u2212\u201d alleles. Few inherit all \u201c+\u201d or all \u201c\u2212\u201d.',
+  },
+  {
+    key: 'linked',
+    label: 'The trait is controlled by linked genes.',
+    correct: false,
+    feedback:
+      'Linkage doesn\u2019t create the bell shape — it can affect which combinations of alleles travel together, but the underlying distribution still depends on how many independent loci contribute.',
+  },
+  {
+    key: 'environmental',
+    label: 'The trait is purely environmental, not genetic.',
+    correct: false,
+    feedback:
+      'If it were purely environmental you\u2019d see no relationship between parent and offspring values at all — but in F2 the mean matches the F1 mean, which is what you\u2019d expect for an additive polygenic trait. Environment contributes variance on top of genetics, but the bell shape itself comes from the polygenic architecture.',
+  },
+] as const;
 
 function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
   const [nGenes, setNGenes] = useState(1);
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
   const [classAnswer, setClassAnswer] = useState('');
   const [classCorrect, setClassCorrect] = useState<boolean | null>(null);
+  const [backKey, setBackKey] = useState<string | null>(null);
+  const backOpt = EXP7_BACKWARD_OPTIONS.find(o => o.key === backKey) ?? null;
+  const backCorrect = backOpt ? backOpt.correct : null;
 
-  // Auto-advance once the student picks the 2n + 1 answer. useEffect with
-  // cleanup — never setTimeout from a click handler.
+  // Auto-advance once the student answers the BACKWARD question correctly.
+  // The forward 2n+1 answer is the discovery beat; the backward question
+  // ("given a bell curve, infer the genetic architecture") is the mastery
+  // gate. useEffect with cleanup — never setTimeout from a click handler.
   useEffect(() => {
-    if (classCorrect === true) {
-      const t = setTimeout(onComplete, 2000);
+    if (backCorrect === true) {
+      const t = setTimeout(onComplete, 1500);
       return () => clearTimeout(t);
     }
-  }, [classCorrect, onComplete]);
+  }, [backCorrect, onComplete]);
 
   const genes = useMemo(() =>
     Array.from({ length: nGenes }, (_, i) => makeAdditiveGene(`qtl${i}`, i)),
@@ -1507,6 +2015,45 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
                     {opt}
                   </button>
                 ))}
+              </div>
+            </QuestionPanel>
+          )}
+
+          {/* Backwards problem — given a continuous bell-shaped F2
+              distribution, infer polygenic additive architecture. Gated
+              on the forward 2n + 1 answer being correct. onComplete now
+              fires from the backward state. */}
+          {classCorrect === true && (
+            <QuestionPanel
+              question="You observe a continuous, bell-shaped distribution of F2 trait values (most plants near the middle, few at the extremes). What does this tell you about the genes controlling the trait?"
+              correct={backCorrect}
+              feedback={backOpt ? backOpt.feedback : undefined}
+            >
+              <div
+                className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1"
+                style={{ fontFamily: '"Patrick Hand", cursive' }}
+              >
+                Working backward
+              </div>
+              <div className="flex flex-col gap-2">
+                {EXP7_BACKWARD_OPTIONS.map(opt => {
+                  const picked = backKey === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      onClick={() => setBackKey(opt.key)}
+                      className={`rounded-lg border-2 px-3 py-2 text-left text-xs font-semibold transition-all ${
+                        picked
+                          ? opt.correct
+                            ? 'border-emerald-400 bg-emerald-50'
+                            : 'border-red-300 bg-red-50'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             </QuestionPanel>
           )}
