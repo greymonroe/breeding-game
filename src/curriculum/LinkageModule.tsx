@@ -57,10 +57,10 @@ function ChromosomeDiagram({ genes, chrom1, chrom2, label }: {
             <g key={g.id}>
               {/* Marks on chrom 1 */}
               <line x1={x} y1={barY1 - 2} x2={x} y2={barY1 + 10} stroke="#1e5a7a" strokeWidth={2} />
-              <text x={x} y={barY1 - 5} textAnchor="middle" className="text-[9px] font-bold fill-sky-900">{a1}</text>
+              <text x={x} y={barY1 - 5} textAnchor="middle" className="text-[9px] font-bold fill-cyan-900">{a1}</text>
               {/* Marks on chrom 2 */}
               <line x1={x} y1={barY2 - 2} x2={x} y2={barY2 + 10} stroke="#1e5a7a" strokeWidth={2} />
-              <text x={x} y={barY2 + 22} textAnchor="middle" className="text-[9px] font-bold fill-sky-900">{a2}</text>
+              <text x={x} y={barY2 + 22} textAnchor="middle" className="text-[9px] font-bold fill-cyan-900">{a2}</text>
               {/* Gene name */}
               <text x={x} y={barY1 + 28} textAnchor="middle" className="text-[7px] fill-stone-400">{g.name}</text>
             </g>
@@ -135,7 +135,7 @@ function LinkageCrossWorkbench({ parentA, parentB, genes, recombFreqs, onCross, 
         <span className="text-2xl font-bold text-stone-400">&times;</span>
         <ChromosomeDiagram genes={genes} chrom1={parentB.chromosome1} chrom2={parentB.chromosome2} label="Parent 2" />
         <button onClick={doCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-sky-500 to-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-sky-600 transition-all">
+          className="ml-4 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
           Cross!
         </button>
       </div>
@@ -346,7 +346,7 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
 
       {crossResult && (
         <div className="space-y-4">
-          <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm text-sky-800 space-y-2">
+          <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-sm text-cyan-800 space-y-2">
             <p><strong>Parental classes</strong> (most common): the allele combos that match the parent chromosomes.</p>
             <p><strong>Recombinant classes</strong> (less common): new allele combos from crossing over.</p>
             <p className="font-mono text-xs">
@@ -369,7 +369,7 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
                 value={rfInput}
                 onChange={e => setRfInput(e.target.value)}
                 placeholder="Enter RF%"
-                className="rounded-lg border-2 border-stone-200 px-3 py-2 text-sm w-24 focus:border-sky-400 focus:outline-none"
+                className="rounded-lg border-2 border-stone-200 px-3 py-2 text-sm w-24 focus:border-cyan-400 focus:outline-none"
               />
               <span className="text-sm text-stone-500">%</span>
               <button
@@ -379,7 +379,7 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
                   setRfCorrect(isCorrect);
                   if (isCorrect) setTimeout(onComplete, 1500);
                 }}
-                className="rounded-lg border-2 border-sky-400 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
               >
                 Check
               </button>
@@ -407,7 +407,7 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
         In genetics, <strong>1% RF = 1 centiMorgan (cM)</strong> of map distance.
       </p>
 
-      <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm text-sky-800">
+      <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-sm text-cyan-800">
         <strong>RF% = map distance in cM</strong>. This is Alfred Sturtevant's insight from 1913 —
         recombination frequency between genes reflects their physical distance on the chromosome.
       </div>
@@ -463,7 +463,7 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
               })}
               {/* Body color gene (fixed at 0) */}
               <circle cx="30" cy="30" r="6" fill="#2d6080" />
-              <text x="30" y="72" textAnchor="middle" className="text-[8px] font-bold fill-sky-900">Body</text>
+              <text x="30" y="72" textAnchor="middle" className="text-[8px] font-bold fill-cyan-900">Body</text>
               {/* Wing type gene (draggable) */}
               <circle cx={30 + (mapInput / 50) * 340} cy="30" r="6" fill="#e8a060" />
               <text x={30 + (mapInput / 50) * 340} y="72" textAnchor="middle" className="text-[8px] font-bold fill-amber-700">Wing</text>
@@ -487,7 +487,7 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
                 setTimeout(() => setStep(1), 1500);
               }
             }}
-            className="rounded-lg border-2 border-sky-400 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+            className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
           >
             Place Gene
           </button>
@@ -572,7 +572,7 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
         <span className="text-2xl font-bold text-stone-400">&times;</span>
         <ChromosomeDiagram genes={threeGenes} chrom1={tester.chromosome1} chrom2={tester.chromosome2} label="Tester" />
         <button onClick={handleCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-sky-500 to-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-sky-600 transition-all">
+          className="ml-4 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
           Cross!
         </button>
       </div>
@@ -587,12 +587,12 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
-                <tr className="bg-sky-50">
-                  <th className="border border-sky-200 px-2 py-1 text-left">Class</th>
-                  <th className="border border-sky-200 px-2 py-1">Body</th>
-                  <th className="border border-sky-200 px-2 py-1">Wing</th>
-                  <th className="border border-sky-200 px-2 py-1">Eye</th>
-                  <th className="border border-sky-200 px-2 py-1">Count</th>
+                <tr className="bg-cyan-50">
+                  <th className="border border-cyan-200 px-2 py-1 text-left">Class</th>
+                  <th className="border border-cyan-200 px-2 py-1">Body</th>
+                  <th className="border border-cyan-200 px-2 py-1">Wing</th>
+                  <th className="border border-cyan-200 px-2 py-1">Eye</th>
+                  <th className="border border-cyan-200 px-2 py-1">Count</th>
                 </tr>
               </thead>
               <tbody>
@@ -601,7 +601,7 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
                   const isDCO = idx >= Object.entries(classData).length - 2 && count < 20;
                   return (
                     <tr key={pattern} className={
-                      isParental ? 'bg-sky-50' :
+                      isParental ? 'bg-cyan-50' :
                       isDCO ? 'bg-amber-50' :
                       'bg-white'
                     }>
@@ -722,11 +722,11 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-collapse">
           <thead>
-            <tr className="bg-sky-50">
-              <th className="border border-sky-200 px-2 py-1 text-left">Phenotype</th>
-              <th className="border border-sky-200 px-2 py-1">Observed (O)</th>
-              <th className="border border-sky-200 px-2 py-1">Expected (E)</th>
-              <th className="border border-sky-200 px-2 py-1">(O-E)²/E</th>
+            <tr className="bg-cyan-50">
+              <th className="border border-cyan-200 px-2 py-1 text-left">Phenotype</th>
+              <th className="border border-cyan-200 px-2 py-1">Observed (O)</th>
+              <th className="border border-cyan-200 px-2 py-1">Expected (E)</th>
+              <th className="border border-cyan-200 px-2 py-1">(O-E)²/E</th>
             </tr>
           </thead>
           <tbody>
@@ -746,7 +746,7 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
                       setInputs(next);
                     }}
                     placeholder="?"
-                    className="w-16 rounded border border-stone-200 px-1 py-0.5 text-center text-xs focus:border-sky-400 focus:outline-none"
+                    className="w-16 rounded border border-stone-200 px-1 py-0.5 text-center text-xs focus:border-cyan-400 focus:outline-none"
                   />
                 </td>
               </tr>
@@ -775,7 +775,7 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
             setTimeout(() => setStep(0), 2000);
           }
         }}
-        className="rounded-lg border-2 border-sky-400 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+        className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
       >
         Calculate Chi-Square
       </button>
@@ -788,7 +788,7 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
 
       {step >= 1 && chiResult && (
         <div className="space-y-4">
-          <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm text-sky-800 space-y-1">
+          <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-sm text-cyan-800 space-y-1">
             <p><strong>Chi-square = {chiResult.statistic.toFixed(2)}</strong>, df = {chiResult.df}</p>
             <p>Critical value at p=0.05 with {chiResult.df} df = <strong>7.815</strong></p>
             <p>Your chi-square ({chiResult.statistic.toFixed(2)}) is {chiResult.statistic > 7.815 ? 'GREATER' : 'LESS'} than the critical value.</p>
@@ -885,7 +885,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
         <span className="text-2xl font-bold text-stone-400">&times;</span>
         <span className="text-sm text-stone-500">tester (all recessive)</span>
         <button onClick={handleCross}
-          className="ml-4 rounded-xl bg-gradient-to-b from-sky-500 to-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-sky-600 transition-all">
+          className="ml-4 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
           Cross! (2000 offspring)
         </button>
       </div>
@@ -895,9 +895,9 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
-                <tr className="bg-sky-50">
-                  <th className="border border-sky-200 px-2 py-1">Class</th>
-                  <th className="border border-sky-200 px-2 py-1">Count</th>
+                <tr className="bg-cyan-50">
+                  <th className="border border-cyan-200 px-2 py-1">Class</th>
+                  <th className="border border-cyan-200 px-2 py-1">Count</th>
                 </tr>
               </thead>
               <tbody>
@@ -909,7 +909,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
             </table>
           </div>
 
-          <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm text-sky-800 space-y-2">
+          <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-sm text-cyan-800 space-y-2">
             <p><strong>Map distances:</strong></p>
             <p>Region I (body — eye): ~{analysis.distances[0].toFixed(1)} cM</p>
             <p>Region II (eye — wing): ~{analysis.distances[1].toFixed(1)} cM</p>
@@ -927,14 +927,14 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
                 <input type="number" step="0.01" value={coincInput}
                   onChange={e => setCoinInput(e.target.value)}
                   placeholder="?"
-                  className="w-20 rounded border-2 border-stone-200 px-2 py-1 text-xs focus:border-sky-400 focus:outline-none" />
+                  className="w-20 rounded border-2 border-stone-200 px-2 py-1 text-xs focus:border-cyan-400 focus:outline-none" />
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-xs text-stone-600">Interference (1 - coincidence):</span>
                 <input type="number" step="0.01" value={intInput}
                   onChange={e => setIntInput(e.target.value)}
                   placeholder="?"
-                  className="w-20 rounded border-2 border-stone-200 px-2 py-1 text-xs focus:border-sky-400 focus:outline-none" />
+                  className="w-20 rounded border-2 border-stone-200 px-2 py-1 text-xs focus:border-cyan-400 focus:outline-none" />
               </div>
             </div>
             <button
@@ -946,7 +946,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
                 setCorrect(cClose && iClose);
                 if (cClose && iClose) setStep(2);
               }}
-              className="rounded-lg border-2 border-sky-400 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+              className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
             >
               Check
             </button>
@@ -966,7 +966,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
                 <p>This means one crossover <strong>inhibits</strong> a second crossover nearby. This is a real biological phenomenon — the physical mechanics of chromosome crossing over make nearby double events less likely.</p>
               </div>
               <button onClick={onComplete}
-                className="w-full rounded-xl bg-gradient-to-b from-sky-500 to-sky-600 py-3 text-sm font-bold text-white shadow-md">
+                className="w-full rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 py-3 text-sm font-bold text-white shadow-md">
                 Complete Module
               </button>
             </div>
@@ -993,7 +993,7 @@ const LINKAGE_MODULE: ModuleDefinition = {
   id: 'linkage',
   title: 'Linkage & Recombination',
   subtitle: 'Project 2: Gene Mapping',
-  color: 'sky',
+  color: 'cyan',
   backLink: { href: '/breeding-game/modules.html', label: '\u2190 Back to Hub' },
   experiments: EXPERIMENTS,
 };

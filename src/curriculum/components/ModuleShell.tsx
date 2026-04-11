@@ -13,7 +13,7 @@ export interface ModuleDefinition {
   id: string;
   title: string;
   subtitle: string;
-  color: 'emerald' | 'sky' | 'violet';
+  color: 'emerald' | 'cyan' | 'violet';
   backLink?: { href: string; label: string };
   experiments: ExperimentDefinition[];
 }
@@ -29,13 +29,13 @@ const THEME = {
     button: 'bg-emerald-500',
     complete: 'bg-emerald-100 text-emerald-700',
   },
-  sky: {
-    gradient: 'from-sky-800 to-sky-700',
-    light: 'text-sky-200',
-    active: 'bg-sky-100 border-2 border-sky-400 font-bold text-sky-800',
-    done: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
-    button: 'bg-sky-500',
-    complete: 'bg-sky-100 text-sky-700',
+  cyan: {
+    gradient: 'from-cyan-800 to-cyan-700',
+    light: 'text-cyan-200',
+    active: 'bg-cyan-100 border-2 border-cyan-400 font-bold text-cyan-800',
+    done: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100',
+    button: 'bg-cyan-500',
+    complete: 'bg-cyan-100 text-cyan-700',
   },
   violet: {
     gradient: 'from-violet-800 to-violet-700',

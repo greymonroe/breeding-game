@@ -8,7 +8,7 @@ export function QuestionPanel({ question, children, correct, feedback }: {
     <div className={`rounded-xl border-2 p-4 space-y-3 ${
       correct === true ? 'border-emerald-400 bg-emerald-50' :
       correct === false ? 'border-red-300 bg-red-50' :
-      'border-sky-300 bg-sky-50'
+      'border-cyan-300 bg-cyan-50'
     }`}>
       <p className="text-sm font-semibold text-stone-700">{question}</p>
       {children}
