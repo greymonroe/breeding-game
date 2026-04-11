@@ -33,22 +33,49 @@ import {
 // Exp 1 (Rr × Rr), Exp 2 (Rr × rr), and Exp 5 (dihybrid). Same component,
 // different parents/genes — this is Phase 2 item 2.1 of MENDELIAN_V2_PLAN.md.
 //
-// The toggle defaults to collapsed so students aren't overwhelmed with
-// animation on first view. When expanded, GameteVisualizer's own internal
-// controls (speed, view toggle, step-through) take over. When collapsed, the
-// visualizer is UNMOUNTED so each show starts with a fresh cycle.
+// F-036: default is now EXPANDED on first mount (mechanism is the north
+// star — hiding it undercuts the pedagogy). If the student manually
+// collapses it, the collapse is persisted in sessionStorage so subsequent
+// mounts respect their preference within the session. A `storageKey` is
+// required so different experiments (Exp 1 Rr×Rr vs Exp 5 dihybrid) can
+// remember independently. When collapsed, the visualizer is UNMOUNTED so
+// each show starts with a fresh cycle.
 function GameteToggle({
   parentA,
   parentB,
   genes,
   sampleSize = 16,
+  storageKey,
 }: {
   parentA: Organism;
   parentB: Organism;
   genes: GeneDefinition[];
   sampleSize?: number;
+  storageKey: string;
 }) {
-  const [show, setShow] = useState(false);
+  const sessionKey = `mendelian-gameteToggle-${storageKey}`;
+  const [show, setShow] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const stored = window.sessionStorage.getItem(sessionKey);
+      if (stored === 'collapsed') return false;
+      if (stored === 'expanded') return true;
+    } catch {
+      /* sessionStorage unavailable — fall through to default */
+    }
+    return true; // default expanded on first mount
+  });
+  const toggle = useCallback(() => {
+    setShow(prev => {
+      const next = !prev;
+      try {
+        window.sessionStorage.setItem(sessionKey, next ? 'expanded' : 'collapsed');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, [sessionKey]);
   return (
     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 my-6 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -62,10 +89,10 @@ function GameteToggle({
         </div>
         <button
           type="button"
-          onClick={() => setShow(v => !v)}
+          onClick={toggle}
           className={`rounded-xl px-4 py-2 text-xs font-bold border-2 transition-all ${
             show
-              ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
+              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
               : 'bg-white text-emerald-700 border-emerald-400 hover:bg-emerald-50'
           }`}
         >
@@ -115,7 +142,15 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
   const [f1Result, setF1Result] = useState<CrossResult | null>(null);
   const [f2Result, setF2Result] = useState<CrossResult | null>(null);
   const [exitAnswer, setExitAnswer] = useState<string | null>(null);
-  const [exitCorrect, setExitCorrect] = useState<boolean | null>(null);
+  // Tri-state: `correct` = student articulated the mechanism; `acknowledged`
+  // = student picked the honest "take me to Exp 2" hook (advances but doesn't
+  // claim mastery); `incorrect` = genuine wrong answer; null = unanswered.
+  // The hook branch used to be flagged `correct: true` (F-002 CRITICAL),
+  // which gave it the same emerald "you got it right" feedback as a student
+  // who had actually stated the Law of Segregation — letting students
+  // advance without committing to a mental model.
+  const [exitState, setExitState] =
+    useState<'correct' | 'incorrect' | 'acknowledged' | null>(null);
 
   // Use the first two F1 siblings as the F1 × F1 cross. Both are Rr by
   // construction (RR × rr → every offspring is Rr), so this is a genuine
@@ -123,21 +158,30 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
   const f1ParentA = f1Result?.offspring[0] ?? null;
   const f1ParentB = f1Result?.offspring[1] ?? f1ParentA;
 
-  // Exit-question options. `correct: true` means "get emerald success and
-  // advance". (c) is the mechanistic answer; (d) is an honest "I want to
-  // learn more" that hooks into Exp 1 — both are accepted per spec.
-  const EXIT_OPTIONS = [
+  // Exit-question options. Per-option `state` tag drives the feedback
+  // styling: `correct` = emerald "you got it"; `acknowledged` = neutral
+  // stone/violet "advancing — come learn the mechanism"; `incorrect` = red
+  // teaching feedback. Both `correct` and `acknowledged` trigger the
+  // advance effect, but they render differently so the student sees the
+  // distinction between "I understood the mechanism" and "I want to go
+  // learn the mechanism now."
+  const EXIT_OPTIONS: readonly {
+    key: string;
+    label: string;
+    state: 'correct' | 'incorrect' | 'acknowledged';
+    feedback: string;
+  }[] = [
     {
       key: 'chance',
       label: 'By chance — 1/4 is just a round number.',
-      correct: false,
+      state: 'incorrect',
       feedback:
         "Chance alone doesn't explain a consistent 3:1 across every replicate. Flip a coin 40 times and you won't always get exactly 20 heads, but you will always get roughly half. The 3:1 ratio is reproducible because there's a mechanism generating it — not because 1/4 is a convenient fraction.",
     },
     {
       key: 'law',
       label: 'Because of the 3:1 ratio, which is a universal law.',
-      correct: false,
+      state: 'incorrect',
       feedback:
         "The 3:1 ratio is a consequence, not a cause. Something about how the F1 parents make gametes produces 1/4 white offspring — and the 3:1 ratio is the observable shadow of that mechanism. The real answer is about what each F1 parent carries and transmits.",
     },
@@ -145,27 +189,33 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
       key: 'gametes',
       label:
         'Because each F1 parent carries one hidden r allele, and 1/4 of the time both parents pass r to the offspring.',
-      correct: true,
+      state: 'correct',
       feedback:
         "Exactly — and this is the Law of Segregation stated mechanistically. Every F1 parent is Rr. When it makes gametes, half carry R and half carry r. When two F1 plants cross, the probability that both contribute r is 1/2 × 1/2 = 1/4. That's the 1/4 white. Coming up in Experiment 2: you'll work this out at the gamete level and see it animate.",
     },
     {
       key: 'hook',
       label: "I want to learn how — take me to Experiment 2.",
-      correct: true,
+      state: 'acknowledged',
       feedback:
-        "Perfect — that's the right instinct. You've observed the pattern (3:1), and now you want the mechanism that generates it. Experiment 2 builds on exactly this moment: every F1 parent (Rr) makes two kinds of gametes, half R and half r, and 1/2 × 1/2 = 1/4 is where the 1/4 white comes from. That's the Law of Segregation.",
+        "Honest answer — and we'll get there. You've observed the pattern but haven't committed to a mechanism yet; Experiment 2 builds exactly that. Every F1 parent is Rr, each makes two kinds of gametes, and 1/2 × 1/2 = 1/4 is where the 1/4 white comes from. Head into Experiment 2 to see the Law of Segregation at work.",
     },
   ] as const;
 
-  // Handoff: once the student picks a correct (or hook) exit answer, advance
-  // after a short read-through delay. useEffect, not setTimeout-from-render.
+  const selectedExitOpt = exitAnswer
+    ? EXIT_OPTIONS.find(o => o.key === exitAnswer) ?? null
+    : null;
+
+  // Handoff: once the student picks either a correct answer (mechanism
+  // articulated) OR the acknowledged hook ("take me to Exp 2"), advance
+  // after a short read-through delay. An incorrect answer does NOT advance.
+  // useEffect, not setTimeout-from-render.
   useEffect(() => {
-    if (exitCorrect === true) {
+    if (exitState === 'correct' || exitState === 'acknowledged') {
       const t = setTimeout(() => onComplete(), 2200);
       return () => clearTimeout(t);
     }
-  }, [exitCorrect, onComplete]);
+  }, [exitState, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -347,34 +397,48 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
         </div>
       )}
 
-      {/* Beat 5 — Exit question. Hooks into Exp 1. Both the mechanistic
-          answer (c) and the honest "take me to Exp 1" hook (d) are accepted;
-          (a) and (b) each get specific teaching feedback. */}
+      {/* Beat 5 — Exit question. Hooks into Exp 1. The mechanistic answer
+          ('gametes') gets emerald "correct" feedback; the honest "take me
+          to Exp 2" hook ('hook') gets a neutral violet "acknowledged"
+          state — both advance, but only the mechanistic answer claims
+          mastery. Wrong answers get red teaching feedback and do NOT
+          advance. This is the F-002 fix: before, `hook` was flagged
+          `correct: true` and got the same emerald "you got it" as the
+          mechanism answer. */}
       {step >= 3 && f2Result && (
-        <QuestionPanel
-          question="Why does white reappear in roughly 1/4 of the F2 offspring?"
-          correct={exitCorrect}
-          feedback={
-            exitAnswer
-              ? EXIT_OPTIONS.find(o => o.key === exitAnswer)?.feedback
-              : undefined
-          }
+        <div
+          className={`rounded-xl border-2 p-4 space-y-3 ${
+            exitState === 'correct'
+              ? 'border-emerald-400 bg-emerald-50'
+              : exitState === 'acknowledged'
+              ? 'border-violet-300 bg-violet-50'
+              : exitState === 'incorrect'
+              ? 'border-red-300 bg-red-50'
+              : 'border-stone-200 bg-stone-50'
+          }`}
         >
+          <p className="text-sm font-semibold text-stone-700">
+            Why does white reappear in roughly 1/4 of the F2 offspring?
+          </p>
           <div className="space-y-2">
             {EXIT_OPTIONS.map(opt => {
               const picked = exitAnswer === opt.key;
+              const pickedStyle =
+                opt.state === 'correct'
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
+                  : opt.state === 'acknowledged'
+                  ? 'border-violet-400 bg-violet-50 text-violet-900'
+                  : 'border-red-300 bg-red-50 text-red-900';
               return (
                 <button
                   key={opt.key}
                   onClick={() => {
                     setExitAnswer(opt.key);
-                    setExitCorrect(opt.correct);
+                    setExitState(opt.state);
                   }}
                   className={`w-full text-left rounded-lg border-2 px-4 py-3 text-sm font-semibold transition-all ${
                     picked
-                      ? opt.correct
-                        ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
-                        : 'border-red-300 bg-red-50 text-red-900'
+                      ? pickedStyle
                       : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
                   }`}
                 >
@@ -383,7 +447,20 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
               );
             })}
           </div>
-        </QuestionPanel>
+          {selectedExitOpt && (
+            <div
+              className={`text-sm rounded-lg p-3 ${
+                selectedExitOpt.state === 'correct'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : selectedExitOpt.state === 'acknowledged'
+                  ? 'bg-violet-100 text-violet-900'
+                  : 'bg-red-100 text-red-800'
+              }`}
+            >
+              {selectedExitOpt.feedback}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -499,19 +576,35 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
           question="All F1 offspring are red. What does this tell you about the inheritance of flower color?"
           correct={answer1Correct}
           feedback={answer1Correct === true
-            ? "Correct! Red is dominant over white. The F1 plants carry one allele from each parent (Rr) but show the dominant phenotype."
+            ? "Correct. Red is completely dominant: an F1 plant carries one allele from each parent (Rr), but one working R copy is enough to make the flower red. The white allele is still there — it's just phenotypically hidden."
+            : answer1 === 'F1 is actually intermediate (e.g. faint pink) \u2014 I just can\u2019t see the difference yet'
+            ? "A fair hypothesis — you're being cautious about your own eye. But Mendel looked at his F1 peas for months and couldn't find any pink tint; every F1 was indistinguishable from the red parent. What you're seeing really is a sharp, categorical difference, not a subtle blend below your detection threshold."
+            : answer1 === 'Red and white are controlled by two separate genes'
+            ? "The F1 data can't rule that out yet — but it's the wrong model. If two separate genes controlled red vs. white, you'd expect the F1 to mix them in some way. The simpler explanation is that one gene has two alleles (R and r), and one allele masks the other. You'll see this confirmed in the F2."
             : answer1Correct === false
-            ? "Not quite. Think about what it means that ALL offspring look like only one parent..."
+            ? "Not quite. A 'dosage' model would predict the F1 (Rr) to look intermediate (half the pigment of RR) — but your F1 looks identical to RR, not halfway. One working copy is already enough."
             : undefined}
         >
+          {/* Four plausible options (F-007). Former distractors "blend" and
+              "lost" were trivially eliminable by any student who paid
+              attention in Exp 0 (blending was refuted) and "lost" read
+              linguistically strange. Replacement distractors stay plausible:
+              two of them are the intermediate-phenotype-hidden hypothesis
+              and the two-gene hypothesis — both real model possibilities a
+              student could hold before seeing F2. */}
           <div className="flex gap-2 flex-wrap">
-            {['Red is dominant over white', 'Red and white blend together', 'White allele was lost'].map(opt => (
+            {[
+              'Red is completely dominant over white',
+              'F1 is actually intermediate (e.g. faint pink) — I just can\u2019t see the difference yet',
+              'Red and white are controlled by two separate genes',
+              'The red allele is producing twice as much pigment as usual',
+            ].map(opt => (
               <button key={opt} onClick={() => {
                 setAnswer1(opt);
-                setAnswer1Correct(opt === 'Red is dominant over white');
-                if (opt === 'Red is dominant over white') setStep(2);
+                setAnswer1Correct(opt === 'Red is completely dominant over white');
+                if (opt === 'Red is completely dominant over white') setStep(2);
               }}
-                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold text-left transition-all ${
                   answer1 === opt
                     ? answer1Correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                     : 'border-stone-200 bg-white hover:border-stone-300'
@@ -563,8 +656,12 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
             ? "Count carefully — about 75% are red and 25% are white."
             : undefined}
         >
+          {/* F-007: dropped the '9:3:3:1' distractor — it appears only in
+              dihybrid crosses and a student knows the question is a
+              monohybrid. Replaced with '1:1', a plausible testcross-shaped
+              expectation a confused student might pick. */}
           <div className="flex gap-2 flex-wrap">
-            {['1:1', '3:1', '2:1', '9:3:3:1'].map(opt => (
+            {['1:1', '2:1', '3:1', '1:2:1'].map(opt => (
               <button key={opt} onClick={() => {
                 setAnswer2(opt);
                 setAnswer2Correct(opt === '3:1');
@@ -592,6 +689,7 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
           parentB={f1Result!.offspring[1] ?? f1Child}
           genes={[FLOWER_COLOR]}
           sampleSize={16}
+          storageKey="exp1-f1xf1"
         />
       )}
 
@@ -731,37 +829,44 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// Backwards options for Exp 2 — given 1:1 and one parent is rr, what must
-// the other parent be? Every option must read as a genuine guess; the
-// feedback strings are where reasoning is taught.
+// Backwards options for Exp 2 — given ONLY a 1:1 red:white ratio, which
+// full parent pair must have produced it? Previously the prompt handed the
+// student "one parent is rr" as a premise, reducing the problem to
+// one-unknown forward reasoning (F-013). Now the student has to recognize
+// the test-cross signature (one heterozygote × one homozygous recessive)
+// against three other plausible pairs they have already seen in the
+// module: homozygous×homozygous (Exp 0 P cross), monohybrid × monohybrid
+// (Exp 1 F1 × F1), and double recessive (trivially ruled out by red
+// offspring). Per-pair feedback explains *what ratio that pair would
+// actually produce* so wrong answers teach.
 const EXP2_BACKWARD_OPTIONS = [
   {
-    key: 'RR',
-    label: 'RR (homozygous red)',
+    key: 'RR_rr',
+    label: 'RR × rr (homozygous red × homozygous white)',
     correct: false,
     feedback:
-      'An RR parent contributes only R alleles. With an rr parent contributing only r, every offspring would be Rr — all red, no white. You wouldn\u2019t see 1:1.',
+      'RR × rr is the P cross from Experiment 2 — it gives all-red F1 (every offspring Rr). You\u2019d see 100% red, 0% white. Not a 1:1 split.',
   },
   {
-    key: 'Rr',
-    label: 'Rr (heterozygous red)',
+    key: 'Rr_rr',
+    label: 'Rr × rr (heterozygous red × homozygous white)',
     correct: true,
     feedback:
-      'Correct. An Rr parent contributes R half the time and r half the time. Crossed with rr (which contributes only r), offspring are 1/2 Rr (red) : 1/2 rr (white). That\u2019s 1:1.',
+      'Correct. An Rr parent contributes R half the time and r half the time; an rr parent contributes only r. Offspring are 1/2 Rr (red) : 1/2 rr (white) — exactly the 1:1 you observed. This is the signature of a test cross — a diagnostic tool you\u2019ll meet by name in Experiment 5.',
   },
   {
-    key: 'rr',
-    label: 'rr (homozygous white)',
+    key: 'Rr_Rr',
+    label: 'Rr × Rr (two heterozygous reds)',
     correct: false,
     feedback:
-      'Two rr parents would produce only rr offspring — all white. Not 1:1.',
+      'Rr × Rr is the F1 self-cross from Experiment 2 — each parent contributes R or r, so offspring are 1/4 RR : 1/2 Rr : 1/4 rr, which is a 3:1 red:white ratio. That\u2019s Mendel\u2019s famous 3:1, not 1:1.',
   },
   {
-    key: 'unknown',
-    label: 'Cannot tell from a 1:1 ratio',
+    key: 'rr_rr',
+    label: 'rr × rr (two homozygous whites)',
     correct: false,
     feedback:
-      'You actually can. A 1:1 ratio with one rr parent is the signature of a test cross with a heterozygote. That\u2019s what makes the test cross diagnostic.',
+      'Two rr parents can only contribute r, so every offspring would be rr — all white, no red. You see red offspring, so this can\u2019t be right.',
   },
 ] as const;
 
@@ -845,6 +950,7 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
               parentB={parentrr}
               genes={[FLOWER_COLOR]}
               sampleSize={16}
+              storageKey="exp2-testcross"
             />
           )}
         </>
@@ -865,12 +971,16 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
         </div>
       )}
 
-      {/* Backwards problem — given a 1:1 ratio and a known rr parent, infer
-          the other parent. Gated on the forward test cross having run
-          (`done`). onComplete now fires from the backward state. */}
+      {/* Backwards problem — given ONLY the 1:1 ratio (no parent handed to
+          the student), infer the full parent pair. Gated on the forward
+          test cross having run (`done`). onComplete fires from the
+          backward state. F-013: previously the prompt said "One parent is
+          white (rr)" which reduced the problem to forward reasoning. Now
+          the student has to recognize the test-cross signature against
+          three other plausible full parent pairs they have already seen. */}
       {done && (
         <QuestionPanel
-          question="You see a 1:1 red : white ratio in offspring. One parent is white (rr). What must the other parent be?"
+          question="You see offspring in roughly a 1 red : 1 white ratio. Which parent pair must have produced this cross?"
           correct={backCorrect}
           feedback={backOpt ? backOpt.feedback : undefined}
         >
@@ -906,37 +1016,43 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// Backwards options for Exp 3 — given a 1:2:1 three-class ratio, what
-// inheritance mode does this imply? Every option must feel like a
-// plausible hypothesis on first read.
+// Backwards options for Exp 3 — dose-mapping, not label-recall (F-014).
+// Previously this asked the student to name "incomplete dominance" five
+// minutes after the term was introduced — recognition, not transfer. Now
+// it asks the student to map the middle class of the 1:2:1 ratio to a
+// specific genotype, forcing them to connect phenotype frequency to
+// allele dose (the actual mental move that makes incomplete dominance
+// computable). Every option is a real genotype with one allele-dose
+// worth of meaning; students must reason from "Rr occurs in 2/4 of
+// offspring = 50%" rather than pattern-matching a vocabulary word.
 const EXP3_BACKWARD_OPTIONS = [
   {
-    key: 'complete',
-    label: 'The two alleles show classical (complete) dominance.',
+    key: 'RR',
+    label: 'RR (two red alleles, full pigment dose)',
     correct: false,
     feedback:
-      'With complete dominance you\u2019d see 3:1 (only two phenotypes), not 1:2:1 (three phenotypes). The fact that you see three distinct phenotypes is the giveaway.',
+      'RR corresponds to the 1/4 red class (one of the small outer classes), not the 2/4 pink middle. Under incomplete dominance each dose of R adds some pigment — two R alleles give full pigment (red), one gives half (pink), zero gives none (white).',
   },
   {
-    key: 'incomplete',
-    label: 'The two alleles show incomplete dominance — heterozygotes have an intermediate phenotype.',
+    key: 'Rr',
+    label: 'Rr (one red allele, half pigment dose)',
     correct: true,
     feedback:
-      'Correct. The heterozygote (Rr) has its own visible phenotype — pink — distinct from both homozygotes. So genotype 1:2:1 (RR:Rr:rr) maps directly to phenotype 1:2:1 (red:pink:white). This is incomplete dominance.',
+      'Correct. The middle class is twice as large as either outer class because there are two ways to build a heterozygote (R from mom + r from dad, or r from mom + R from dad), versus only one way to build each homozygote. Rr gets one dose of pigment, which under incomplete dominance produces pink. 1 RR : 2 Rr : 1 rr maps cleanly to 1 red : 2 pink : 1 white.',
   },
   {
-    key: 'linked',
-    label: 'The genes are linked.',
+    key: 'rr',
+    label: 'rr (zero red alleles, no pigment)',
     correct: false,
     feedback:
-      'Linkage affects how often two genes are inherited together — it doesn\u2019t create a third phenotype. With one gene and two alleles you can\u2019t get linkage.',
+      'rr corresponds to the 1/4 white class, the other small outer class. Zero doses of R means no pigment at all — white, not pink. The pink middle class is the one with exactly one R allele.',
   },
   {
-    key: 'multiallele',
-    label: 'There must be more than two alleles at this locus.',
+    key: 'new_allele',
+    label: 'Rp (a third, pink-specific allele not present in either parent)',
     correct: false,
     feedback:
-      'A third allele could in principle create a third phenotype, but you\u2019d expect different ratios. The 1:2:1 with the heterozygote between the two homozygotes is the signature of incomplete dominance, not multi-allelism.',
+      'There is no third allele — the F1 parents only carry R and r (inherited from the RR and rr grandparents). Pink arises from the R/r heterozygote itself, not from a new allele. The 1:2:1 ratio is exactly what two alleles give when heterozygotes are visibly different from both homozygotes.',
   },
 ] as const;
 
@@ -975,10 +1091,16 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div className="space-y-6">
+      {/* F-041: framing sentence warns the student that rules can differ
+          from species to species before the snapdragon cross appears.
+          Without this, the 1:2:1 F2 looks like Experiment 2 cheated
+          rather than like a different biological system following a
+          different but consistent rule. */}
       <p className="text-sm text-stone-600">
-        Here's a <em>different species</em> of flower — the <strong>snapdragon</strong> (<em>Antirrhinum majus</em>),
-        where flower color shows a different inheritance pattern. Cross a red with a white and see what happens.
-        Is the result the same as before?
+        You've seen complete dominance in peas (Experiment 2). In a different plant species, the same kind of cross
+        can produce a different pattern — let's test this. Here's the <strong>snapdragon</strong> (<em>Antirrhinum majus</em>),
+        a different species of flower. Cross a red snapdragon with a white one, and notice whether the F1 looks like
+        the red parent, the white parent, or something else.
       </p>
 
       <div className="text-[10px] font-semibold tracking-wider text-stone-400 text-center uppercase">
@@ -996,24 +1118,35 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
           question="The F1 are PINK — not red! How is this different from complete dominance?"
           correct={correct}
           feedback={correct === true
-            ? "Exactly! This is incomplete dominance. The heterozygote Rr shows an intermediate phenotype. Neither allele fully masks the other."
+            ? "Exactly. This is incomplete dominance. The heterozygote Rr shows an intermediate phenotype because one R copy isn't enough pigment to mask the white background. Neither allele fully dominates the other. You'll see the F2 test this idea in a moment."
+            : answer.startsWith('One R and one r working together')
+            ? "That's the right intuition on direction — heterozygotes really do make less pigment than RR — but it's not about the 'working' pair. Dominance is really about whether one copy is enough to fully mask the other. The canonical name for 'one copy isn't enough' is incomplete dominance."
+            : answer.startsWith('The R and r alleles have permanently blended')
+            ? "This is literally the blending hypothesis you ruled out in the previous experiment. If blending were true, pink × pink (F1 × F1) would give pink offspring forever. Watch what happens in the F2 and see whether pink breeds true."
+            : answer.startsWith('A spontaneous new mutation')
+            ? "A mutation in one F1 plant is possible, but the same 'pink' appears in every F1 plant across every replicate. Mutations are rare and random — they can't simultaneously hit all 20 F1 plants. The simpler explanation is that Rr itself is the pink phenotype."
             : correct === false
-            ? "In complete dominance, Rr looks like RR. Here, Rr looks different from both parents..."
+            ? "In complete dominance, Rr looks like RR. Here, Rr looks different from both parents — that's the clue."
             : undefined}
         >
-          <div className="flex gap-2 flex-wrap">
+          {/* F-007: distractors rewritten to length-parity with the correct
+              answer. Each is a plausible model a student could hold: a
+              dosage model, a permanent-blending model, and a new-mutation
+              model. None can be eliminated by length or jargon alone. */}
+          <div className="flex flex-col gap-2">
             {[
-              'Neither allele is fully dominant — the heterozygote is intermediate',
-              'The alleles blended permanently',
-              'A new mutation occurred'
+              'Neither allele is fully dominant — the heterozygote (Rr) shows an intermediate phenotype.',
+              'One R and one r working together produce exactly half the pigment, so Rr looks pink.',
+              'The R and r alleles have permanently blended in the F1, and this blend will now breed true.',
+              'A spontaneous new mutation created a third allele in the F1 that produces pink pigment.',
             ].map(opt => (
               <button key={opt} onClick={() => {
                 setAnswer(opt);
-                const isCorrect = opt.includes('intermediate');
+                const isCorrect = opt.startsWith('Neither allele');
                 setCorrect(isCorrect);
                 if (isCorrect) setStep(2);
               }}
-                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold text-left transition-all ${
                   answer === opt
                     ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                     : 'border-stone-200 bg-white hover:border-stone-300'
@@ -1067,13 +1200,15 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
         </QuestionPanel>
       )}
 
-      {/* Backwards problem — given a 1:2:1 three-class ratio, infer
-          incomplete dominance. Gated on the latched `forwardEverCorrect`
-          so re-clicking a wrong forward option doesn't erase progress.
-          onComplete now fires from the backward state. */}
+      {/* Backwards problem — dose-mapping, not label-recall (F-014). The
+          student has to figure out which genotype corresponds to the
+          '2' class in the 1:2:1 ratio. Gated on the latched
+          `forwardEverCorrect` so re-clicking a wrong forward option
+          doesn't erase progress. onComplete fires from the backward
+          state. */}
       {forwardEverCorrect && (
         <QuestionPanel
-          question="You observe a 1:2:1 ratio of three distinct phenotypes (e.g. red, pink, white) in the F2 of a self-crossed F1. What does this tell you about the inheritance of color?"
+          question="In the 1 red : 2 pink : 1 white F2 ratio, the middle 'pink' class makes up half the offspring. Which genotype is producing that pink middle class?"
           correct={backCorrect}
           feedback={backOpt ? backOpt.feedback : undefined}
         >
@@ -1186,31 +1321,35 @@ const EXP4_BACKWARD_OPTIONS_SOMEWHITE = [
 // Each option reads as plausible at first glance; the feedback prose is where
 // the teaching happens. No option is annotated as "correct" in its label —
 // the student has to reason from the factual genotype to gamete contribution.
+// F-007: labels were rewritten in parallel so none of them carries "almost
+// works" / "ambiguous" caveats that quietly telegraphed the correct answer
+// by process of elimination. The teaching about why each tester is
+// diagnostic or uninformative lives in the feedback strings, not the labels.
 const EXP4_OPTIONS = [
   {
     key: 'unknown_red',
-    label: 'Another red plant (genotype unknown)',
+    label: 'Another red plant whose own genotype you haven\u2019t yet determined.',
     correct: false,
     feedback:
       "You don't know the other plant's genotype either — any offspring ratio you see could come from many combinations (RR × RR, RR × Rr, Rr × Rr all give mostly-red broods). To diagnose the mystery plant you need a tester whose genotype is already known.",
   },
   {
     key: 'rr_dominant',
-    label: 'A red plant confirmed to be RR',
+    label: 'A red plant that you have previously confirmed to be homozygous RR.',
     correct: false,
     feedback:
-      'An RR parent contributes an R allele to every gamete. Your mystery plant is either RR or Rr — in both cases, every offspring inherits at least one R from the tester, so every offspring is red. The cross can never distinguish the two possibilities: you get the same all-red brood either way.',
+      'An RR tester contributes an R allele to every gamete. Your mystery plant is either RR or Rr — in both cases, every offspring inherits at least one R from the tester, so every offspring is red. The cross can never distinguish the two possibilities: you get the same all-red brood either way.',
   },
   {
     key: 'rr_hetero',
-    label: 'A red plant confirmed to be Rr',
+    label: 'A red plant that you have previously confirmed to be heterozygous Rr.',
     correct: false,
     feedback:
-      "An Rr tester gives 50% R and 50% r gametes. If the mystery plant is RR, you'd see all red offspring. If it's Rr, you'd see roughly 3:1 red to white. That almost works — but any red offspring in the 3:1 case is still ambiguous (RR or Rr?), and the 3:1 vs all-red distinction leans on sampling variation. There's a cleaner tester that removes the ambiguity entirely.",
+      "An Rr tester gives 50% R and 50% r gametes. If the mystery plant is RR, you see all red offspring. If it's Rr, you see roughly 3:1 red to white — and the ratio depends on sample size for you to distinguish it from all-red. A cleaner tester removes that sampling-variance problem: pick a tester that can only contribute one kind of allele.",
   },
   {
     key: 'white',
-    label: 'A white plant (rr)',
+    label: 'A white plant (homozygous recessive rr) grown from pure-white stock.',
     correct: true,
     feedback:
       "Exactly. An rr tester contributes only r to every gamete, so each offspring's phenotype is determined entirely by what the mystery plant contributed. Red offspring → mystery plant gave R. White offspring → mystery plant gave r. If you see even one white offspring, the mystery plant must carry at least one r allele and is therefore Rr. If every offspring is red, the mystery plant must be RR. A clean, unambiguous diagnostic.",
@@ -1239,11 +1378,6 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
   const selected = EXP4_OPTIONS.find(o => o.key === selectedKey) ?? null;
   const selectedCorrect = selected ? selected.correct : null;
   const whiteCount = crossResult?.phenotypeCounts?.['White'] ?? 0;
-  // Derive the mystery plant's true genotype from its stored alleles — never
-  // from a separate state variable that could drift out of sync.
-  const mysteryAlleles = mystery.genotype.color;
-  const mysteryIsHetero = mysteryAlleles[0] !== mysteryAlleles[1];
-  const mysteryGenotypeLabel = mysteryIsHetero ? 'Rr' : 'RR';
 
   // Backward-question variant is chosen by what the student actually
   // observed: if they saw any white offspring, the data rules out RR and
@@ -1333,68 +1467,15 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
         </>
       )}
 
-      {/* Beat 4 — conditional conclusion driven by observed offspring (not genotype).
-          whiteCount is read from crossResult.phenotypeCounts['White'], so the text
-          always reflects what the student actually saw on screen. */}
-      {step >= 3 && crossResult && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm text-sm text-emerald-800 space-y-2">
-          {whiteCount > 0 ? (
-            <>
-              <p>
-                <strong>White offspring appeared</strong> ({whiteCount} of {crossResult.total}).
-                Only an Rr plant crossed with rr can produce rr (white) offspring, so the mystery plant
-                must be <strong>Rr</strong> — heterozygous. The dominant red phenotype was hiding a
-                heterozygous genotype.
-              </p>
-              <p>
-                If it were RR, it could only contribute R alleles, so every offspring would be Rr (red).
-                Since we see rr offspring, the mystery parent must have contributed an r allele.
-              </p>
-              <p className="text-xs text-emerald-700">
-                (Confirming: the mystery plant's true genotype was <strong>{mysteryGenotypeLabel}</strong>.)
-              </p>
-            </>
-          ) : (
-            <>
-              <p>
-                <strong>No white offspring appeared.</strong> All {crossResult.total} offspring are red.
-                If the mystery plant were Rr, about half of the offspring would be white (rr) — and with
-                {' '}{crossResult.total} offspring the probability of seeing zero white by chance is
-                essentially zero. So the mystery plant must be <strong>RR</strong> — homozygous dominant.
-              </p>
-              <p>
-                An RR parent can only contribute R alleles, so every offspring is Rr and red. The absence
-                of any white offspring is the evidence.
-              </p>
-              <p className="text-xs text-emerald-700">
-                (Confirming: the mystery plant's true genotype was <strong>{mysteryGenotypeLabel}</strong>.)
-              </p>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Beat 5 — name the technique (stone-neutral callout, matching Exp 2 / Exp 5 law callouts) */}
-      {step >= 3 && crossResult && (
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm">
-          <p className="text-sm font-bold text-stone-800 mb-2">Test cross</p>
-          <p className="text-sm text-stone-700 leading-relaxed">
-            Crossing an individual of unknown genotype with a <strong>homozygous recessive tester</strong>.
-            The tester contributes only recessive alleles to every gamete, so each offspring's phenotype
-            directly reveals what the unknown individual contributed. It is one of the most powerful
-            diagnostic tools in classical genetics — used to infer genotype from phenotype without
-            sequencing.
-          </p>
-        </div>
-      )}
-
-      {/* Backwards problem — question text and option set both branch on
-          the student's own observed data (whiteCount). If they saw white
+      {/* Backwards problem — moved BEFORE the conclusion prose (F-012).
+          Previously the conclusion spelled out "the mystery plant must be
+          Rr — heterozygous" in bold *above* this question, turning the
+          backward panel into copy-recall. Now the student has to reason
+          from the observed counts themselves before the explanation
+          appears. Question text and option set both branch on the
+          student's own observed data (whiteCount). If they saw white
           offspring, the correct answer is Rr; if they saw all red, the
-          correct answer is RR. Gated on the forward test cross having
-          completed; step-based gating is already monotonic (step only
-          increases, crossResult only gets set), so no separate latch is
-          needed here. onComplete fires from the backward state. */}
+          correct answer is RR. onComplete fires from the backward state. */}
       {step >= 3 && crossResult && (
         <QuestionPanel
           question={
@@ -1432,6 +1513,65 @@ function Exp4_TestCross({ onComplete }: { onComplete: () => void }) {
             })}
           </div>
         </QuestionPanel>
+      )}
+
+      {/* Beat 5 — data-driven conclusion, gated on the student having
+          answered the backward question correctly. Previously this lived
+          *above* the backward panel and spelled out the answer in bold
+          prose, turning the backward panel into copy-recall (F-012). Now
+          it's a post-answer "your reasoning was correct" reinforcement
+          that appears only after the student has committed. The
+          whiteCount branch still mirrors exactly what the student saw in
+          the workbench. */}
+      {backCorrect === true && crossResult && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm text-sm text-emerald-800 space-y-2">
+          <p className="text-xs font-semibold tracking-wider text-emerald-700 uppercase">
+            Your reasoning was correct
+          </p>
+          {whiteCount > 0 ? (
+            <>
+              <p>
+                <strong>White offspring appeared</strong> ({whiteCount} of {crossResult.total}).
+                Only a heterozygote crossed with rr can produce rr (white) offspring — if the
+                mystery plant were homozygous RR, it could only contribute R alleles and every
+                offspring would be red.
+              </p>
+              <p>
+                The dominant red phenotype was hiding a heterozygous genotype, and the test
+                cross pulled it into view.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                <strong>No white offspring appeared.</strong> All {crossResult.total} offspring are red.
+                If the mystery plant were Rr, about half of the offspring would be white (rr) —
+                and with {crossResult.total} offspring the probability of seeing zero white by
+                chance is essentially zero.
+              </p>
+              <p>
+                A plant that can only contribute R alleles gives every offspring at least one R,
+                so every offspring is red. The absence of any white offspring is your evidence.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Beat 6 — name the technique (stone-neutral callout, matching Exp 2 / Exp 5 law callouts).
+          Gated on backCorrect so the law appears only after the student
+          has earned it by reasoning about the cross. */}
+      {backCorrect === true && (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6 shadow-sm">
+          <p className="text-sm font-bold text-stone-800 mb-2">Test cross</p>
+          <p className="text-sm text-stone-700 leading-relaxed">
+            Crossing an individual of unknown genotype with a <strong>homozygous recessive tester</strong>.
+            The tester contributes only recessive alleles to every gamete, so each offspring's phenotype
+            directly reveals what the unknown individual contributed. It is one of the most powerful
+            diagnostic tools in classical genetics — used to infer genotype from phenotype without
+            sequencing.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -1477,7 +1617,6 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [linkAnswer, setLinkAnswer] = useState('');
-  const [linkCorrect, setLinkCorrect] = useState<boolean | null>(null);
   // Latched "forward-ever-correct" gate for the Law of Independent Assortment
   // callout, linkage tease, and backward problem. Once the student picks
   // 9:3:3:1 correctly, these panels must stay visible even if they click a
@@ -1599,6 +1738,63 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             onCross={(r) => { setF2Result(r); setStep(2); }} crossResult={f2Result}
             sampleSize={200} label="F2: Dihybrid F1 × F1"
           />
+
+          {/* F-037: predicted-vs-observed side-by-side. The derivation
+              grid (above the cross) shows 9/16, 3/16, 3/16, 1/16 from
+              first principles; then the cross produces stochastic F2
+              counts. Students were losing the derivation grid above the
+              fold by the time the F2 RatioBar rendered, so this panel
+              reproduces the predicted count next to the observed count
+              for each phenotype class so the comparison is visible
+              without scrolling. Counts are computed from the student's
+              own F2 result (`f2Result.phenotypeCounts`) — no hardcoded
+              arrays. */}
+          {f2Result && (() => {
+            const total = f2Result.total;
+            const CLASSES: { label: string; frac: number; color1: string; color2: string }[] = [
+              { label: 'Red, Round',      frac: 9 / 16, color1: FLOWER_COLOR.colorMap['Red'],   color2: SEED_SHAPE.colorMap['Round']    },
+              { label: 'Red, Wrinkled',   frac: 3 / 16, color1: FLOWER_COLOR.colorMap['Red'],   color2: SEED_SHAPE.colorMap['Wrinkled'] },
+              { label: 'White, Round',    frac: 3 / 16, color1: FLOWER_COLOR.colorMap['White'], color2: SEED_SHAPE.colorMap['Round']    },
+              { label: 'White, Wrinkled', frac: 1 / 16, color1: FLOWER_COLOR.colorMap['White'], color2: SEED_SHAPE.colorMap['Wrinkled'] },
+            ];
+            return (
+              <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-bold tracking-wider text-stone-500 uppercase mb-3">
+                  Predicted vs observed
+                </p>
+                <div className="grid grid-cols-[auto_1fr_auto_auto] gap-x-3 gap-y-1 text-xs items-center">
+                  <div className="text-[10px] font-semibold text-stone-400 uppercase" />
+                  <div className="text-[10px] font-semibold text-stone-400 uppercase">Class</div>
+                  <div className="text-[10px] font-semibold text-stone-400 uppercase text-right">Predicted</div>
+                  <div className="text-[10px] font-semibold text-stone-400 uppercase text-right">Observed</div>
+                  {CLASSES.map(({ label, frac, color1, color2 }) => {
+                    const predicted = Math.round(frac * total);
+                    const observed = f2Result.phenotypeCounts[label] ?? 0;
+                    return (
+                      <div key={label} className="contents">
+                        <div className="flex gap-0.5">
+                          <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color1 }} />
+                          <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color2 }} />
+                        </div>
+                        <div className="font-semibold text-stone-700">{label}</div>
+                        <div className="text-right tabular-nums font-bold text-violet-900">
+                          {predicted} <span className="text-stone-400 font-normal">({(frac * 16).toFixed(0)}/16)</span>
+                        </div>
+                        <div className="text-right tabular-nums font-bold text-emerald-800">
+                          {observed}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-stone-500 mt-3 leading-relaxed">
+                  Predicted counts use the 9:3:3:1 ratio from the derivation grid above, rescaled to
+                  this run's sample size of {total}. Observed counts are your actual F2. Small differences
+                  are expected sampling noise; big differences would tell you the 9:3:3:1 model is wrong.
+                </p>
+              </div>
+            );
+          })()}
         </>
       )}
 
@@ -1612,6 +1808,7 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
           parentB={f1Result!.offspring[1] ?? f1Child}
           genes={[FLOWER_COLOR, SEED_SHAPE]}
           sampleSize={16}
+          storageKey="exp5-dihybrid"
         />
       )}
 
@@ -1681,14 +1878,22 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
             </div>
           </div>
 
-          {/* Linkage tease question — all four options must read as plausible; no telegraphs. */}
-          <QuestionPanel
-            question="Mendel's 7 traits were all on different chromosomes — he got lucky. What do you think would happen if the color gene and the shape gene were right next to each other on the same chromosome?"
-            correct={linkCorrect}
-            feedback={linkCorrect !== null
-              ? "Find out for yourself in the Linkage module →"
-              : undefined}
-          >
+          {/* Linkage tease — F-011: reframed as a prediction / wonder
+              prompt with no correct/wrong styling. Previously options
+              rendered emerald (correct) or red (wrong) and the advance
+              gate was `linkAnswer !== null`, so any answer advanced and
+              the "grade" didn't matter — teaching students that content
+              they haven't learned yet is graded-but-optional. Now every
+              option receives the same neutral-violet "find out for
+              yourself" feedback; the CTA to open the Linkage module
+              remains but is neutral. Bundle C (a later round) will add
+              a 7:1:1:7 vs 1:1:1:1 data comparison beside this block. */}
+          <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-3">
+            <p className="text-sm font-semibold text-violet-900">
+              Wonder prompt: what do you think would happen if the color gene and the shape gene
+              were right next to each other on the same chromosome? Pick whichever option feels
+              most likely to you — you'll find out for sure in the Linkage module.
+            </p>
             <div className="flex gap-2 flex-wrap flex-col">
               {[
                 'The same 9:3:3:1 ratio would still appear.',
@@ -1700,27 +1905,31 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
                   key={opt}
                   onClick={() => {
                     setLinkAnswer(opt);
-                    setLinkCorrect(opt === 'The parental combinations would be over-represented, not 9:3:3:1.');
                   }}
                   className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold text-left transition-all ${
                     linkAnswer === opt
-                      ? linkCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
-                      : 'border-stone-200 bg-white hover:border-stone-300'
+                      ? 'border-violet-400 bg-white text-violet-900'
+                      : 'border-violet-200 bg-white text-stone-700 hover:border-violet-300'
                   }`}
                 >
                   {opt}
                 </button>
               ))}
             </div>
-            {linkCorrect !== null && (
-              <a
-                href="/breeding-game/linkage.html"
-                className="block mt-3 rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg"
-              >
-                Open the Linkage module →
-              </a>
+            {linkAnswer && (
+              <div className="rounded-lg bg-violet-100 p-3 text-sm text-violet-900">
+                Prediction recorded. This is a live open question — the Linkage module works through
+                it with real maize chromosome-9 data (Creighton &amp; McClintock 1931). You'll see whether
+                your intuition matches the biology.
+              </div>
             )}
-          </QuestionPanel>
+            <a
+              href="/breeding-game/linkage.html"
+              className="block mt-1 rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg"
+            >
+              Open the Linkage module →
+            </a>
+          </div>
         </>
       )}
 
@@ -1769,34 +1978,38 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
 // Backwards options for Exp 6 — given 9:3:4, what does it tell you about
 // gene interaction? Uses the maize aleurone labels the forward experiment
 // teaches: Purple (R_C_) / Red (rrC_) / Colorless (anything cc).
+// F-015: correct option used to be a ~22-word textbook definition while
+// distractors were 3-6 words. A student could pick by length alone.
+// Correct option is now ~6 words; distractors are padded to match so
+// none of the four options is visually distinctive.
 const EXP6_BACKWARD_OPTIONS = [
   {
     key: 'recessive_epistasis',
-    label: 'Two genes assort independently and there is recessive epistasis: one gene\u2019s recessive homozygote (cc) masks the other gene\u2019s effect entirely.',
+    label: 'Recessive epistasis — cc masks the R gene.',
     correct: true,
     feedback:
       'Correct. The 9:3:4 ratio is the signature of recessive epistasis. Without the C gene\u2019s product (when cc), the R gene can\u2019t produce its colored pigment — so all cc offspring (3+1 of the 16 = 4) are colorless regardless of R/r genotype. Purple = R_C_ (9), red = rrC_ (3), colorless = anything-cc (4).',
   },
   {
     key: 'linked',
-    label: 'The two genes are linked.',
+    label: 'Tight linkage between C and R — parental combinations dominate the brood.',
     correct: false,
     feedback:
       'Linkage would distort the ratio away from a clean 16-part split. The 9:3:4 still adds to 16, so it\u2019s still independent assortment — what changed is that two of the four phenotype classes (colorless from R_cc and rrcc) collapsed into one because of recessive epistasis.',
   },
   {
     key: 'incomplete',
-    label: 'There\u2019s incomplete dominance at one of the loci.',
+    label: 'Incomplete dominance at the R locus making heterozygotes colorless.',
     correct: false,
     feedback:
-      'Incomplete dominance affects a single gene\u2019s heterozygotes — it would create a third intermediate phenotype like pink. Epistasis is about one gene masking another gene\u2019s effect, which is what 9:3:4 tells you.',
+      'Incomplete dominance affects a single gene\u2019s heterozygotes — it would create a third intermediate phenotype (like pink) with a 1:2:1 ratio, not a 9:3:4. Epistasis is one gene masking another, which is what 9:3:4 tells you.',
   },
   {
-    key: 'noise',
-    label: 'The colorless class is a sampling artifact.',
+    key: 'triallele',
+    label: 'A single gene with three alleles producing three phenotype classes.',
     correct: false,
     feedback:
-      'Nope — the colorless class is exactly 4/16 = 25% of offspring, which is far too consistent to be sampling noise. It\u2019s a real biological signal.',
+      'A single gene with three alleles can produce three phenotype classes, but the expected ratios would depend on which alleles the parents carry and would not normally give a clean 9:3:4. The 9:3:4 is specifically two independent genes where one recessive homozygote (cc) masks the second gene\u2019s effect entirely.',
   },
 ] as const;
 
@@ -1938,40 +2151,42 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// Backwards options for Exp 7 — given a continuous bell-shaped F2 fruit
-// weight distribution, infer polygenic architecture. Exp 7 is themed on
-// tomato fruit weight (Yule 1902; the canonical textbook polygenic plant
-// trait), but the underlying engine is a generic additive model — each
-// gene contributes +0/+1/+2 favorable alleles that sum to the plant's
-// fruit weight. Re-theming is prose/labels only; the math is unchanged.
+// Backwards options for Exp 7 — TRANSFER question to a different trait
+// (F-016). Previously this asked a near-verbatim rephrase of the amber
+// "notice the bell curve" callout from 30 seconds earlier, using the
+// same tomato fruit-weight example — recognition, not transfer. Now the
+// question is about **maize kernel number**: the student has to apply
+// the polygenic / n-slider intuition they just built with tomatoes to a
+// different plant trait and reason about what genetic architecture is
+// consistent with a bell curve they haven't seen on screen.
 const EXP7_BACKWARD_OPTIONS = [
   {
-    key: 'single_triallele',
-    label: 'Fruit weight is controlled by a single gene with three alleles.',
+    key: 'one_gene',
+    label: 'One gene with two alleles — kernel number is Mendelian.',
     correct: false,
     feedback:
-      'A single gene with three alleles would give at most 6 distinct genotype classes, producing a step-shaped distribution with discrete peaks — not a smooth bell curve. The smooth, continuous F2 fruit weight distribution implies many genes contributing together.',
+      'A single gene with two alleles gives at most 3 distinct genotype classes (AA, Aa, aa), producing three sharp peaks, not a smooth bell. A smooth continuous distribution rules out one gene — you need many loci, each contributing a small amount, to build up the bell.',
   },
   {
-    key: 'polygenic',
-    label: 'Fruit weight is controlled by many genes, each contributing a small additive effect.',
+    key: 'three_genes',
+    label: 'Three genes with additive effects — each adds a small increment.',
+    correct: false,
+    feedback:
+      'Three genes gives 7 classes (2n+1 with n=3), which in your Exp 7 slider still looks step-shaped — you can see the discrete peaks. You need enough loci for the binomial-over-classes to smooth out into a bell. Three isn\u2019t enough; try the slider at n=8 or n=12 to see what polygenic really looks like.',
+  },
+  {
+    key: 'many_genes',
+    label: 'Many genes each contributing a small additive effect to kernel number.',
     correct: true,
     feedback:
-      'Correct. When fruit weight is the sum of contributions from many genes (polygenic), the central limit theorem produces a roughly normal (bell-shaped) distribution in the F2. Each gene contributes a small fraction, and most plants inherit a roughly average mix of \u201c+\u201d/\u201c\u2212\u201d alleles. Very few inherit all \u201c+\u201d (giant fruit) or all \u201c\u2212\u201d (tiny fruit). This is exactly what real tomato QTL studies have found for fruit weight.',
-  },
-  {
-    key: 'linked',
-    label: 'Fruit weight is controlled by linked genes on one chromosome.',
-    correct: false,
-    feedback:
-      'Linkage doesn\u2019t create the bell shape — it affects which combinations of alleles travel together, but the underlying distribution still depends on how many independent loci contribute. A dozen loci scattered across several chromosomes will give you the same bell curve.',
+      'Correct. When kernel number is the sum of contributions from many independent genes (each adding +0, +1, or +2 kernels per dose), the central limit theorem produces a roughly normal (bell-shaped) distribution in the F2 — exactly as you saw in Exp 7 when you dialed the slider up to n=8 or beyond. The pedagogy transfers: tomato fruit weight, maize kernel number, Arabidopsis rosette diameter, wheat yield — same polygenic architecture, same bell curve.',
   },
   {
     key: 'environmental',
-    label: 'Fruit weight is purely environmental, not genetic.',
+    label: 'Kernel number is determined entirely by environment, not genetics.',
     correct: false,
     feedback:
-      'If fruit weight were purely environmental you\u2019d see no relationship between parent and offspring values at all — but in F2 the mean matches the F1 mean, which is what you\u2019d expect for an additive polygenic trait. Environment contributes variance on top of genetics, but the bell shape itself comes from the polygenic architecture.',
+      'If kernel number were purely environmental you\u2019d expect no relationship between parent and offspring counts, and no systematic difference between a high-yielding line and a low-yielding line grown in the same field. Real maize lines have real genetic differences in kernel number — environment adds variance on top of genetics, but the bell shape itself comes from the polygenic architecture.',
   },
 ] as const;
 
@@ -2142,7 +2357,7 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
               on screen (F-038). onComplete fires from the backward state. */}
           {forwardEverCorrect && nGenes >= 5 && (
             <QuestionPanel
-              question="You observe a continuous, bell-shaped distribution of F2 tomato fruit weights (most fruits near the middle, few at the extremes — tiny or giant). What does this tell you about the genes controlling fruit weight?"
+              question="Transfer: you see a continuous, bell-shaped distribution of maize kernel number per ear (most ears in the middle with average counts, very few ears with unusually high or low counts). What's the simplest genetic architecture consistent with this?"
               correct={backCorrect}
               feedback={backOpt ? backOpt.feedback : undefined}
             >
