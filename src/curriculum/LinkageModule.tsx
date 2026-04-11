@@ -66,8 +66,8 @@ function ChromosomeDiagram({ genes, chrom1, chrom2, label }: {
               {/* Marks on chrom 2 */}
               <line x1={x} y1={barY2 - 2} x2={x} y2={barY2 + 10} stroke="#1e5a7a" strokeWidth={2} />
               <text x={x} y={barY2 + 22} textAnchor="middle" className="text-[9px] font-bold fill-cyan-900">{a2}</text>
-              {/* Gene name */}
-              <text x={x} y={barY1 + 28} textAnchor="middle" className="text-[7px] fill-stone-400">{g.name}</text>
+              {/* Gene name — placed in the gap between the two chromosome bars */}
+              <text x={x} y={35} textAnchor="middle" className="text-[7px] fill-stone-500">{g.name}</text>
             </g>
           );
         })}

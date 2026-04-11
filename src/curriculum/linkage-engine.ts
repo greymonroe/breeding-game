@@ -39,7 +39,7 @@ export interface LinkedCrossResult {
 
 export const KERNEL_COLOR: LinkedGeneDefinition = {
   id: 'color',
-  name: 'Aleurone color',
+  name: 'Aleurone',
   alleles: ['C', 'c'],
   phenotypeMap: {
     'CC': 'Purple', 'Cc': 'Purple',
@@ -50,7 +50,7 @@ export const KERNEL_COLOR: LinkedGeneDefinition = {
 
 export const KERNEL_SHAPE: LinkedGeneDefinition = {
   id: 'shape',
-  name: 'Kernel shape',
+  name: 'Shape',
   alleles: ['Sh', 'sh'],
   phenotypeMap: {
     'ShSh': 'Plump', 'Shsh': 'Plump',
@@ -61,7 +61,7 @@ export const KERNEL_SHAPE: LinkedGeneDefinition = {
 
 export const ENDOSPERM: LinkedGeneDefinition = {
   id: 'endo',
-  name: 'Endosperm starch',
+  name: 'Endosperm',
   alleles: ['Wx', 'wx'],
   phenotypeMap: {
     'WxWx': 'Starchy', 'Wxwx': 'Starchy',
