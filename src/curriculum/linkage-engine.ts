@@ -6,6 +6,8 @@
  * travel together during meiosis unless recombination occurs.
  */
 
+import { canonicalGenotypeKey } from './genetics-engine';
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 export interface LinkedGeneDefinition {
@@ -37,14 +39,15 @@ export interface LinkedCrossResult {
 // The classical plant linkage trio, from Creighton & McClintock (1931):
 // three genes linked on maize chromosome 9, order C — Sh — Wx.
 
+// phenotypeMap keys use canonicalGenotypeKey (uppercase-first). Each
+// heterozygote is written exactly once — `genoPhenotype` normalizes both
+// draw orders before lookup, matching the Mendelian engine's convention.
+
 export const KERNEL_COLOR: LinkedGeneDefinition = {
   id: 'color',
   name: 'Aleurone',
   alleles: ['C', 'c'],
-  phenotypeMap: {
-    'CC': 'Purple', 'Cc': 'Purple',
-    'cC': 'Purple', 'cc': 'Yellow',
-  },
+  phenotypeMap: { 'CC': 'Purple', 'Cc': 'Purple', 'cc': 'Yellow' },
   colorMap: { 'Purple': '#5a2a6b', 'Yellow': '#e8c24a' },
 };
 
@@ -52,10 +55,7 @@ export const KERNEL_SHAPE: LinkedGeneDefinition = {
   id: 'shape',
   name: 'Shape',
   alleles: ['Sh', 'sh'],
-  phenotypeMap: {
-    'ShSh': 'Plump', 'Shsh': 'Plump',
-    'shSh': 'Plump', 'shsh': 'Shrunken',
-  },
+  phenotypeMap: { 'ShSh': 'Plump', 'Shsh': 'Plump', 'shsh': 'Shrunken' },
   colorMap: { 'Plump': '#e4d08a', 'Shrunken': '#a8874a' },
 };
 
@@ -63,10 +63,7 @@ export const ENDOSPERM: LinkedGeneDefinition = {
   id: 'endo',
   name: 'Endosperm',
   alleles: ['Wx', 'wx'],
-  phenotypeMap: {
-    'WxWx': 'Starchy', 'Wxwx': 'Starchy',
-    'wxWx': 'Starchy', 'wxwx': 'Waxy',
-  },
+  phenotypeMap: { 'WxWx': 'Starchy', 'Wxwx': 'Starchy', 'wxwx': 'Waxy' },
   colorMap: { 'Starchy': '#f2e8c4', 'Waxy': '#d4a870' },
 };
 
@@ -84,10 +81,11 @@ export function makeLinkedOrganism(
   };
 }
 
-/** Get phenotype for one gene */
+/** Get phenotype for one gene. Uses canonicalGenotypeKey so both draw
+ *  orders (e.g. "Shsh" and "shSh") map to the same canonical key and
+ *  phenotypeMap authors only need to write each heterozygote once. */
 function genoPhenotype(gene: LinkedGeneDefinition, a1: string, a2: string): string {
-  const key = `${a1}${a2}`;
-  return gene.phenotypeMap[key] ?? gene.phenotypeMap[`${a2}${a1}`] ?? 'Unknown';
+  return gene.phenotypeMap[canonicalGenotypeKey(a1, a2)] ?? 'Unknown';
 }
 
 /** Get phenotype string for display */

@@ -646,9 +646,20 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [done, setDone] = useState(false);
 
   const parentRr = useMemo(() => makeOrganism({ color: ['R', 'r'] }, 'Rr'), []);
   const parentrr = useMemo(() => makeOrganism({ color: ['r', 'r'] }, 'rr'), []);
+
+  // Auto-advance once the test cross has produced data. useEffect with
+  // cleanup — never setTimeout from a callback body (same bug class as
+  // setTimeout-from-render: timer leaks if the user navigates away mid-cross).
+  useEffect(() => {
+    if (done) {
+      const t = setTimeout(onComplete, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [done, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -690,7 +701,7 @@ function Exp2_GenotypePrediction({ onComplete }: { onComplete: () => void }) {
           <p className="text-sm text-stone-600">Now verify your prediction experimentally:</p>
           <CrossWorkbench
             parentA={parentRr} parentB={parentrr} genes={[FLOWER_COLOR]}
-            onCross={(r) => { setCrossResult(r); setTimeout(onComplete, 2000); }}
+            onCross={(r) => { setCrossResult(r); setDone(true); }}
             crossResult={crossResult}
             sampleSize={100} label="Test Cross: Rr × rr" showGenotypes
           />
@@ -1047,13 +1058,6 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
 
   const f1Child = f1Result?.offspring[0];
 
-  // Look colors up deterministically by phenotype label using the same gene
-  // colorMap RatioBar uses — never by index/sort order.
-  const phenotypeFill = useCallback((colorLabel: string, shapeLabel: string) => ({
-    color: FLOWER_COLOR.colorMap[colorLabel] ?? '#999',
-    shape: SEED_SHAPE.colorMap[shapeLabel] ?? '#999',
-  }), []);
-
   // Auto-advance once the student answers the final linkage tease correctly.
   // Using useEffect (not setTimeout from render) keeps React and timers sane.
   useEffect(() => {
@@ -1107,60 +1111,40 @@ function Exp5_TwoGenes({ onComplete }: { onComplete: () => void }) {
                 <div className="text-center font-semibold text-violet-900">Wrinkled (1/4)</div>
 
                 <div className="flex items-center justify-end font-semibold text-violet-900 pr-2">Red (3/4)</div>
-                {(() => {
-                  const { color, shape } = phenotypeFill('Red', 'Round');
-                  return (
-                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
-                      <div className="flex gap-1">
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
-                      </div>
-                      <div className="text-[10px] font-semibold text-stone-700">Red, Round</div>
-                      <div className="text-[11px] font-bold text-violet-900">3/4 × 3/4 = 9/16</div>
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  const { color, shape } = phenotypeFill('Red', 'Wrinkled');
-                  return (
-                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
-                      <div className="flex gap-1">
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
-                      </div>
-                      <div className="text-[10px] font-semibold text-stone-700">Red, Wrinkled</div>
-                      <div className="text-[11px] font-bold text-violet-900">3/4 × 1/4 = 3/16</div>
-                    </div>
-                  );
-                })()}
+                <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                  <div className="flex gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: FLOWER_COLOR.colorMap['Red'] }} />
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: SEED_SHAPE.colorMap['Round'] }} />
+                  </div>
+                  <div className="text-[10px] font-semibold text-stone-700">Red, Round</div>
+                  <div className="text-[11px] font-bold text-violet-900">3/4 × 3/4 = 9/16</div>
+                </div>
+                <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                  <div className="flex gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: FLOWER_COLOR.colorMap['Red'] }} />
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: SEED_SHAPE.colorMap['Wrinkled'] }} />
+                  </div>
+                  <div className="text-[10px] font-semibold text-stone-700">Red, Wrinkled</div>
+                  <div className="text-[11px] font-bold text-violet-900">3/4 × 1/4 = 3/16</div>
+                </div>
 
                 <div className="flex items-center justify-end font-semibold text-violet-900 pr-2">White (1/4)</div>
-                {(() => {
-                  const { color, shape } = phenotypeFill('White', 'Round');
-                  return (
-                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
-                      <div className="flex gap-1">
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
-                      </div>
-                      <div className="text-[10px] font-semibold text-stone-700">White, Round</div>
-                      <div className="text-[11px] font-bold text-violet-900">1/4 × 3/4 = 3/16</div>
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  const { color, shape } = phenotypeFill('White', 'Wrinkled');
-                  return (
-                    <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
-                      <div className="flex gap-1">
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: color }} />
-                        <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: shape }} />
-                      </div>
-                      <div className="text-[10px] font-semibold text-stone-700">White, Wrinkled</div>
-                      <div className="text-[11px] font-bold text-violet-900">1/4 × 1/4 = 1/16</div>
-                    </div>
-                  );
-                })()}
+                <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                  <div className="flex gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: FLOWER_COLOR.colorMap['White'] }} />
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: SEED_SHAPE.colorMap['Round'] }} />
+                  </div>
+                  <div className="text-[10px] font-semibold text-stone-700">White, Round</div>
+                  <div className="text-[11px] font-bold text-violet-900">1/4 × 3/4 = 3/16</div>
+                </div>
+                <div className="rounded-lg border border-stone-200 p-2 flex flex-col items-center gap-1">
+                  <div className="flex gap-1">
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: FLOWER_COLOR.colorMap['White'] }} />
+                    <span className="inline-block w-3 h-3 rounded-sm border border-stone-200" style={{ backgroundColor: SEED_SHAPE.colorMap['Wrinkled'] }} />
+                  </div>
+                  <div className="text-[10px] font-semibold text-stone-700">White, Wrinkled</div>
+                  <div className="text-[11px] font-bold text-violet-900">1/4 × 1/4 = 1/16</div>
+                </div>
               </div>
             </div>
 
@@ -1309,6 +1293,15 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
+  // Auto-advance once the student picks the 9:3:4 epistatic ratio. useEffect
+  // with cleanup — never setTimeout from a click handler.
+  useEffect(() => {
+    if (correct === true) {
+      const t = setTimeout(onComplete, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [correct, onComplete]);
+
   // F1 dihybrid for maize aleurone color: Cc Rr × Cc Rr.
   // Use the gene objects' id fields directly so this stays consistent if the engine renames them.
   const f1 = useMemo(
@@ -1363,9 +1356,7 @@ function Exp6_Epistasis({ onComplete }: { onComplete: () => void }) {
             {['9:3:3:1', '9:3:4', '12:3:1', '15:1'].map(opt => (
               <button key={opt} onClick={() => {
                 setAnswer(opt);
-                const isCorrect = opt === '9:3:4';
-                setCorrect(isCorrect);
-                if (isCorrect) setTimeout(onComplete, 2000);
+                setCorrect(opt === '9:3:4');
               }}
                 className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
                   answer === opt
@@ -1387,6 +1378,15 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
   const [crossResult, setCrossResult] = useState<CrossResult | null>(null);
   const [classAnswer, setClassAnswer] = useState('');
   const [classCorrect, setClassCorrect] = useState<boolean | null>(null);
+
+  // Auto-advance once the student picks the 2n + 1 answer. useEffect with
+  // cleanup — never setTimeout from a click handler.
+  useEffect(() => {
+    if (classCorrect === true) {
+      const t = setTimeout(onComplete, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [classCorrect, onComplete]);
 
   const genes = useMemo(() =>
     Array.from({ length: nGenes }, (_, i) => makeAdditiveGene(`qtl${i}`, i)),
@@ -1497,9 +1497,7 @@ function Exp7_Quantitative({ onComplete }: { onComplete: () => void }) {
                 {['n', '2n', '2n + 1', 'infinitely many'].map(opt => (
                   <button key={opt} onClick={() => {
                     setClassAnswer(opt);
-                    const isCorrect = opt === '2n + 1';
-                    setClassCorrect(isCorrect);
-                    if (isCorrect) setTimeout(onComplete, 2000);
+                    setClassCorrect(opt === '2n + 1');
                   }}
                     className={`rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all ${
                       classAnswer === opt
