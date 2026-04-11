@@ -87,11 +87,19 @@ interface MonohybridCase {
 
 type MonoRatio = 'all-red' | '3:1' | '1:1' | 'all-white';
 
+// Note: Rr × Rr (the canonical 3:1 monohybrid cross) is duplicated so that
+// the most pedagogically valuable case surfaces ~3/9 of uniform draws rather
+// than ~1/6. The all-red cases are represented once each since they all
+// teach the same "dominant allele present → uniform F1" lesson. This fixes
+// F-031 from the April 2026 peer review.
 const MONOHYBRID_CASES: readonly MonohybridCase[] = [
   { parents: ['RR', 'RR'], ratioKey: 'all-red' },
   { parents: ['RR', 'Rr'], ratioKey: 'all-red' },
   { parents: ['RR', 'rr'], ratioKey: 'all-red' },
   { parents: ['Rr', 'Rr'], ratioKey: '3:1' },
+  { parents: ['Rr', 'Rr'], ratioKey: '3:1' },
+  { parents: ['Rr', 'Rr'], ratioKey: '3:1' },
+  { parents: ['Rr', 'rr'], ratioKey: '1:1' },
   { parents: ['Rr', 'rr'], ratioKey: '1:1' },
   { parents: ['rr', 'rr'], ratioKey: 'all-white' },
 ];
@@ -421,9 +429,12 @@ export function generateNoiseRecognition(rng: Rng = Math.random): PracticeProble
   // Triangular-ish noise: (rng+rng-1) centered at 0 with max |1|.
   const noise = (rng() + rng() - 1) * maxDrift;
   let red = Math.round(target.expectedRed + noise);
-  // Clamp: for 3:1, keep red in [68, 82] (stays clearly above 2:1 of 66.7
-  //        and clearly below "all red"); for 1:1 keep in [44, 56].
-  if (target.label === '3:1') red = Math.max(68, Math.min(82, red));
+  // Clamp: for 3:1, keep red in [70, 80] (roughly \u00b11 SE around 75 \u2014
+  //        stays clear of the 2:1 boundary at 66.7 and the all-red extreme);
+  //        for 1:1 keep in [44, 56]. Tightened from [68, 82] per F-018 peer
+  //        review, because 68/100 is only ~1.3 counts from 2:1 and ~1.8 SE
+  //        below 3:1 \u2014 genuinely ambiguous for a noise-recognition item.
+  if (target.label === '3:1') red = Math.max(70, Math.min(80, red));
   else red = Math.max(44, Math.min(56, red));
   const white = 100 - red;
 
@@ -463,32 +474,95 @@ interface IncompleteDomCase {
   explanation: string;
 }
 
-const INCOMPLETE_DOM_CASES: readonly IncompleteDomCase[] = [
+// Species parameters for incomplete-dominance prompts. All three are real
+// textbook incomplete-dominance plants: snapdragons (Antirrhinum), four
+// o'clocks (Mirabilis jalapa \u2014 Correns 1909), and carnations
+// (Dianthus). Parameterizing over species prevents students from memorizing
+// "snapdragon pink" as a pattern-match and forces them to apply the
+// 1:2:1 genotype-equals-phenotype logic across organisms. Per F-042.
+interface IncompleteDomSpecies {
+  plant: string;                   // e.g. 'snapdragons'
+  singular: string;                // e.g. 'snapdragon'
+  heteroPhenotype: string;         // e.g. 'pink'
+  homoDomPhenotype: string;        // e.g. 'red'
+  homoRecPhenotype: string;        // e.g. 'white'
+}
+
+const INCOMPLETE_DOM_SPECIES: readonly IncompleteDomSpecies[] = [
   {
-    prompt:
-      'In snapdragons, red (RR) \u00d7 white (rr) produces all pink F1 plants. If you self the F1 (pink \u00d7 pink), what phenotype ratio do you expect in the F2?',
-    correct: '1 red : 2 pink : 1 white',
-    distractors: [
-      '3 red : 1 white',
-      '1 red : 1 white',
-      'All pink',
-    ],
-    explanation:
-      'With incomplete dominance, the heterozygote (Rr) has its own distinct phenotype (pink). The genotype ratio 1 RR : 2 Rr : 1 rr from Rr \u00d7 Rr maps directly to the phenotype ratio 1 red : 2 pink : 1 white, because each genotype class now shows as a different color. There is no 3:1 collapse.',
+    plant: 'snapdragons',
+    singular: 'snapdragon',
+    heteroPhenotype: 'pink',
+    homoDomPhenotype: 'red',
+    homoRecPhenotype: 'white',
   },
   {
-    prompt:
-      'Red-flowered (RR) \u00d7 white-flowered (rr) snapdragons produce all pink F1. What genotype does the pink phenotype correspond to?',
-    correct: 'Rr (heterozygous)',
-    distractors: [
-      'RR (homozygous red)',
-      'rr (homozygous white)',
-      'A new mutation',
-    ],
-    explanation:
-      'Under incomplete dominance, the heterozygote expresses an intermediate phenotype because neither allele fully masks the other. Every F1 plant inherits one R from the RR parent and one r from the rr parent, so every F1 plant is Rr \u2014 and Rr shows pink in snapdragons, not red.',
+    plant: 'four o\u2019clocks',
+    singular: 'four o\u2019clock',
+    heteroPhenotype: 'pink',
+    homoDomPhenotype: 'red',
+    homoRecPhenotype: 'white',
+  },
+  {
+    plant: 'carnations',
+    singular: 'carnation',
+    heteroPhenotype: 'pink',
+    homoDomPhenotype: 'red',
+    homoRecPhenotype: 'white',
   },
 ];
+
+// Each species yields two prompt forms: (1) "what F2 ratio?" and
+// (2) "what genotype corresponds to the intermediate phenotype?". That gives
+// 3 species \u00d7 2 forms = 6 distinct prompts, satisfying F-042's
+// \u22656-prompt requirement. All prompts validate against the same
+// canonical incomplete-dominance rule (1:2:1 genotype = 1:2:1 phenotype).
+const INCOMPLETE_DOM_CASES: readonly IncompleteDomCase[] = INCOMPLETE_DOM_SPECIES.flatMap(
+  (sp): IncompleteDomCase[] => [
+    {
+      prompt:
+        `In ${sp.plant}, ${sp.homoDomPhenotype} (RR) \u00d7 ${sp.homoRecPhenotype} (rr) ` +
+        `produces all ${sp.heteroPhenotype} F1 plants. If you self the F1 ` +
+        `(${sp.heteroPhenotype} \u00d7 ${sp.heteroPhenotype}), what phenotype ratio do ` +
+        'you expect in the F2?',
+      correct:
+        `1 ${sp.homoDomPhenotype} : 2 ${sp.heteroPhenotype} : 1 ${sp.homoRecPhenotype}`,
+      distractors: [
+        `3 ${sp.homoDomPhenotype} : 1 ${sp.homoRecPhenotype}`,
+        `1 ${sp.homoDomPhenotype} : 1 ${sp.homoRecPhenotype}`,
+        `All ${sp.heteroPhenotype}`,
+      ],
+      explanation:
+        `With incomplete dominance, the heterozygote (Rr) has its own distinct ` +
+        `phenotype (${sp.heteroPhenotype}). The genotype ratio 1 RR : 2 Rr : 1 rr ` +
+        `from Rr \u00d7 Rr maps directly to the phenotype ratio ` +
+        `1 ${sp.homoDomPhenotype} : 2 ${sp.heteroPhenotype} : 1 ${sp.homoRecPhenotype}, ` +
+        'because each genotype class now shows as a different color. There is no 3:1 collapse.',
+    },
+    {
+      prompt:
+        `${capitalize(sp.homoDomPhenotype)}-flowered (RR) \u00d7 ${sp.homoRecPhenotype}-flowered ` +
+        `(rr) ${sp.plant} produce all ${sp.heteroPhenotype} F1. What genotype does ` +
+        `the ${sp.heteroPhenotype} phenotype correspond to?`,
+      correct: 'Rr (heterozygous)',
+      distractors: [
+        `RR (homozygous ${sp.homoDomPhenotype})`,
+        `rr (homozygous ${sp.homoRecPhenotype})`,
+        'A new mutation',
+      ],
+      explanation:
+        'Under incomplete dominance, the heterozygote expresses an intermediate ' +
+        'phenotype because neither allele fully masks the other. Every F1 plant ' +
+        'inherits one R from the RR parent and one r from the rr parent, so every ' +
+        `F1 plant is Rr \u2014 and Rr shows ${sp.heteroPhenotype} in ${sp.plant}, ` +
+        `not ${sp.homoDomPhenotype}.`,
+    },
+  ],
+);
+
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1);
+}
 
 export function generateIncompleteDominance(rng: Rng = Math.random): PracticeProblem {
   const chosen = pick(INCOMPLETE_DOM_CASES, rng);
@@ -521,18 +595,26 @@ export function generateIncompleteDominance(rng: Rng = Math.random): PracticePro
 }
 
 function whyWrongIncomplete(label: string): string {
-  if (label === '3 red : 1 white')
-    return 'That\u2019s the complete-dominance answer. With incomplete dominance the heterozygote is pink, not red, so the ratio is 1:2:1 not 3:1.';
-  if (label === '1 red : 1 white')
+  // Match by pattern so this works for any species parameterization.
+  // Distractor shapes:
+  //   "3 <dom> : 1 <rec>"            \u2192 complete-dominance trap
+  //   "1 <dom> : 1 <rec>"            \u2192 test-cross trap
+  //   "All <hetero>"                 \u2192 F1-is-final trap
+  //   "RR (homozygous <dom>)"        \u2192 genotype confusion
+  //   "rr (homozygous <rec>)"        \u2192 genotype confusion
+  //   "A new mutation"               \u2192 blending misconception
+  if (/^3\s+\w+\s*:\s*1\s+\w+$/.test(label))
+    return 'That\u2019s the complete-dominance answer. With incomplete dominance the heterozygote has its own intermediate phenotype, so the ratio is 1:2:1, not 3:1.';
+  if (/^1\s+\w+\s*:\s*1\s+\w+$/.test(label))
     return '1:1 is the test-cross ratio (Rr \u00d7 rr). The F1 \u00d7 F1 here is Rr \u00d7 Rr, and with incomplete dominance that gives three distinct phenotype classes, not two.';
-  if (label === 'All pink')
-    return 'The F1 are all pink because they\u2019re all Rr. But crossing two Rr parents produces 1 RR : 2 Rr : 1 rr \u2014 red and white reappear in the F2.';
-  if (label === 'RR (homozygous red)')
-    return 'RR would show the full red phenotype. The pink F1 plants got one R from the red parent and one r from the white parent, so they\u2019re Rr.';
-  if (label === 'rr (homozygous white)')
-    return 'rr would show the full white phenotype. The F1 have one R allele each (from the RR parent), so they\u2019re heterozygous, not homozygous recessive.';
+  if (/^All\s+\w+$/.test(label))
+    return 'The F1 are all heterozygous because they all inherit one R and one r. But crossing two Rr parents produces 1 RR : 2 Rr : 1 rr \u2014 both homozygous phenotypes reappear in the F2.';
+  if (/^RR\s*\(homozygous/.test(label))
+    return 'RR would show the full homozygous-dominant phenotype. The intermediate F1 plants got one R from the dominant parent and one r from the recessive parent, so they\u2019re Rr, not RR.';
+  if (/^rr\s*\(homozygous/.test(label))
+    return 'rr would show the full recessive phenotype. The F1 have one R allele each (from the RR parent), so they\u2019re heterozygous, not homozygous recessive.';
   if (label === 'A new mutation')
-    return 'No mutation is needed. Pink is simply the heterozygous phenotype under incomplete dominance \u2014 the two alleles blend in the visible phenotype without altering the genetic material.';
+    return 'No mutation is needed. The intermediate phenotype is simply what the heterozygote looks like under incomplete dominance \u2014 the two alleles blend in the visible phenotype without altering the genetic material.';
   return 'Not quite \u2014 reason through what genotype the F1 plants must carry.';
 }
 

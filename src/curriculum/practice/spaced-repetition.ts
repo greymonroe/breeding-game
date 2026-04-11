@@ -7,13 +7,18 @@
  * in `loadState` and `saveState`.
  *
  * Design notes:
- *  - "SM-2-lite" ease levels 0..3 map to intervals {0min, 4hr, 1d, 4d}.
+ *  - "SM-2-lite" ease levels 0..3 map to intervals {0min, 15min, 1d, 4d}.
  *    A correct answer promotes ease by 1; a wrong answer drops ease by 1
  *    (never below 0). This is simple enough to reason about by hand and
- *    still gives the student a reason to come back tomorrow.
+ *    still gives the student a reason to come back tomorrow. The 15-minute
+ *    ease-1 interval (was 4 hours pre-F-033) ensures a just-missed concept
+ *    resurfaces within the same practice session rather than vanishing.
  *  - Concept selection weights three factors additively:
  *      due weight: 1 if now >= nextDue (70% of the final weight)
- *      weak weight: extra for concepts with accuracy < 0.7
+ *      weak weight: extra for concepts with accuracy < 0.9 (any recent miss
+ *        should resurface \u2014 F-034 loosened this from < 0.7, which let
+ *        a 9/10 session at acc=0.9 silently skip the upweight and broke the
+ *        "you'll see more of those next time" promise on the scorecard)
  *      new weight: moderate for never-seen concepts
  *      floor: small positive for mastered-and-not-due concepts
  *  - Streak math uses LOCAL calendar days, not UTC, so crossing midnight
@@ -57,7 +62,7 @@ export const SCHEMA_VERSION = 1 as const;
  *  a session every couple of days keeps the full concept set in rotation. */
 export const EASE_INTERVALS_MS: Record<0 | 1 | 2 | 3, number> = {
   0: 0,                       // retry immediately (this session)
-  1: 4 * 60 * 60 * 1000,      // 4 hours
+  1: 15 * 60 * 1000,          // 15 minutes (within-session resurface, F-033)
   2: 24 * 60 * 60 * 1000,     // 1 day
   3: 4 * 24 * 60 * 60 * 1000, // 4 days
 };
@@ -246,7 +251,7 @@ interface ConceptWeight {
  *    - base floor 0.1 for every concept (never starve a mastered concept)
  *    - +1.0 if the concept is due or overdue (nextDue <= now)
  *    - +0.7 if the concept is new (attempts === 0)
- *    - +0.5 if accuracy < 0.7 (weak spot \u2014 extra practice)
+ *    - +0.5 if accuracy < 0.9 (weak spot \u2014 any recent miss; F-034)
  *    - +0.3 if accuracy < 0.5 (on top of the above \u2014 really weak)
  */
 export function selectNextConcept(
@@ -262,7 +267,13 @@ export function selectNextConcept(
       w += 0.7;
     } else {
       const acc = s.correct / s.attempts;
-      if (acc < 0.7) w += 0.5;
+      // Threshold 0.9 (was 0.7 pre-F-034): a 9/10 session is exactly the
+      // case where the student saw one miss and we promised on the
+      // scorecard they'd see more of that concept. 0.9 is strictly greater
+      // than any accuracy a student with \u22651 miss on their current
+      // attempts can achieve, so the upweight fires whenever they missed
+      // anything recently.
+      if (acc < 0.9) w += 0.5;
       if (acc < 0.5) w += 0.3;
     }
     return { concept: c, weight: w };
