@@ -76,6 +76,37 @@ function ChromosomeDiagram({ genes, chrom1, chrom2, label }: {
   );
 }
 
+// Map a phenotype label (e.g. "Purple, Plump" or "Yellow, Shrunken, Starchy")
+// to a deterministic fill color. We key off the color word first (C/c drives
+// the visually dominant anthocyanin pigment), then nudge shade using the
+// other phenotypes so reciprocal classes are distinguishable but still
+// recognizable as "purple-ish" or "yellow-ish". This replaces the old
+// sort-order palette which scrambled colors across runs.
+function phenotypeFill(label: string): string {
+  const l = label.toLowerCase();
+  const purple = l.includes('purple');
+  const yellow = l.includes('yellow');
+  const shrunken = l.includes('shrunken');
+  const waxy = l.includes('waxy');
+
+  // Base: Purple (anthocyanin) dark, Yellow (colorless aleurone) pale
+  // Shrunken darkens/desaturates; Waxy shifts warmer. Values chosen to stay
+  // on a purple-or-yellow family so the label always matches the swatch.
+  if (purple) {
+    if (shrunken && waxy) return '#3a1a4a';
+    if (shrunken) return '#4a1e5a';
+    if (waxy) return '#6e3a80';
+    return '#5a2a6b'; // canonical purple plump (starchy) — matches KERNEL_COLOR
+  }
+  if (yellow) {
+    if (shrunken && waxy) return '#a8823a';
+    if (shrunken) return '#c49a48';
+    if (waxy) return '#d4a860';
+    return '#e8c24a'; // canonical yellow plump (starchy) — matches KERNEL_COLOR
+  }
+  return '#888';
+}
+
 function LinkageRatioBar({ counts }: {
   counts: Record<string, number>;
 }) {
@@ -83,30 +114,31 @@ function LinkageRatioBar({ counts }: {
   if (total === 0) return null;
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 
-  // Build color from first gene's color map
-  const colorPalette = ['#7cb5d4', '#2d6080', '#e8a060', '#c45a3a', '#6ab070', '#9060b0', '#d4a040', '#888'];
-
   return (
     <div className="space-y-1">
       <div className="flex h-6 rounded-full overflow-hidden border border-stone-200">
-        {entries.map(([label, count], idx) => (
-          <div key={label} style={{
-            width: `${(count / total) * 100}%`,
-            backgroundColor: colorPalette[idx % colorPalette.length],
-          }} className="relative" title={`${label}: ${count}`}>
-            {(count / total) > 0.08 && (
-              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white drop-shadow-sm">
-                {count}
-              </span>
-            )}
-          </div>
-        ))}
+        {entries.map(([label, count]) => {
+          const fill = phenotypeFill(label);
+          const isPale = label.toLowerCase().includes('yellow');
+          return (
+            <div key={label} style={{
+              width: `${(count / total) * 100}%`,
+              backgroundColor: fill,
+            }} className="relative" title={`${label}: ${count}`}>
+              {(count / total) > 0.08 && (
+                <span className={`absolute inset-0 flex items-center justify-center text-[8px] font-bold drop-shadow-sm ${isPale ? 'text-stone-800' : 'text-white'}`}>
+                  {count}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
       <div className="flex gap-3 justify-center flex-wrap">
-        {entries.map(([label, count], idx) => (
+        {entries.map(([label, count]) => (
           <div key={label} className="flex items-center gap-1 text-[10px]">
             <span className="w-2.5 h-2.5 rounded-sm border border-stone-200"
-              style={{ backgroundColor: colorPalette[idx % colorPalette.length] }} />
+              style={{ backgroundColor: phenotypeFill(label) }} />
             <span className="text-stone-600 font-semibold">{label}: {count}</span>
             <span className="text-stone-400">({((count / total) * 100).toFixed(1)}%)</span>
           </div>
@@ -184,7 +216,7 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
         Cross a maize plant heterozygous for <strong>aleurone color</strong> (C/c) and <strong>kernel shape</strong> (Sh/sh) with a
-        homozygous recessive tester (cc, shsh). If the genes assort independently, you'd expect a <strong>1:1:1:1</strong> ratio of kernel phenotypes on the ear.
+        homozygous recessive tester (c/c, sh/sh). If the genes assort independently, you'd expect a <strong>1:1:1:1</strong> ratio of kernel phenotypes on the ear.
       </p>
 
       <LinkageCrossWorkbench
@@ -205,7 +237,7 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
         >
           <div className="flex gap-2 flex-wrap">
             {[
-              'The genes are on the same chromosome (linked)',
+              'The genes are on the same chromosome',
               'One gene is epistatic to the other',
               'The sample size is too small',
             ].map(opt => (
@@ -260,7 +292,7 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Both parents below are <strong>Cc Shsh</strong> — same genotype! But the alleles are arranged
+        Both parents below are <strong>C/c Sh/sh</strong> — same genotype! But the alleles are arranged
         differently on the chromosomes. Compare the two testcrosses.
       </p>
 
@@ -382,7 +414,15 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
               <button
                 onClick={() => {
                   const val = parseFloat(rfInput);
-                  const isCorrect = Math.abs(val - Math.round(actualRF)) <= 2;
+                  // Accept ±2 of EITHER the sampled RF from this run OR the
+                  // target 17 cM (true population RF; see recombFreqs=[0.17]
+                  // above). With n=500 and p=0.17, the sample drifts enough
+                  // that "17" — the textbook answer Exp 4 demands — can get
+                  // rejected if we only check against the sampled RF.
+                  const targetRF = 17;
+                  const isCorrect =
+                    Math.abs(val - Math.round(actualRF)) <= 2 ||
+                    Math.abs(val - targetRF) <= 2;
                   setRfCorrect(isCorrect);
                   if (isCorrect) setTimeout(onComplete, 1500);
                 }}
@@ -410,7 +450,8 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        You've calculated that aleurone color and kernel shape have a recombination frequency of about <strong>17%</strong>.
+        You've calculated that aleurone color and kernel shape have a recombination frequency of about <strong>17%</strong>
+        <span className="text-stone-400"> (simplified for this module; the actual C–sh1 map distance on maize chromosome 9 is ~29 cM)</span>.
         In genetics, <strong>1% RF = 1 centiMorgan (cM)</strong> of map distance.
       </p>
 
@@ -503,7 +544,8 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
           )}
           {step === 2 && (
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
-              <strong>You built your first genetic map!</strong> C and Sh are 17 cM apart on maize chromosome 9.
+              <strong>You built your first genetic map!</strong> In this module C and Sh are 17 cM apart on
+              maize chromosome 9 (simplified from the actual C–sh1 distance of ~29 cM).
               This technique — converting recombination frequencies to map distances — is the foundation of
               all genetic mapping.
             </div>
@@ -627,7 +669,7 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
           </div>
 
           <QuestionPanel
-            question="The two LEAST frequent classes are double crossovers. Compare them to the parental classes — which gene changed position?"
+            question="The two LEAST frequent classes are double crossovers. Compare each rare class to the parental class it MOST resembles (the nearest parental) — the single gene that differs is the middle gene. Which gene is it?"
             correct={correct}
             feedback={correct === true
               ? "Right! The double crossover class differs from the parental class at only the MIDDLE gene. The gene that flipped must be between the other two on the chromosome."
@@ -703,12 +745,35 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
-  // Given data: testcross offspring for two linked genes
-  // Expected under independent assortment: 1:1:1:1
-  const observed = [180, 170, 26, 24]; // parental:parental:recomb:recomb
-  const labels = ['Purple Plump', 'Yellow Shrunken', 'Purple Shrunken', 'Yellow Plump'];
+  // Run a fresh testcross with the same parameters as Exp 3 (C Sh / c sh
+  // heterozygote × tester, 17 cM linkage, n=400). We freeze the result once,
+  // via useState + empty-deps initializer, so the (O−E)²/E values the student
+  // types against don't shift on every re-render. Students applying chi-square
+  // to their own data — not hard-coded counts — is the pedagogical goal.
+  const [{ observed, labels }] = useState(() => {
+    const parent = makeLinkedOrganism(
+      { color: 'C', shape: 'Sh' },
+      { color: 'c', shape: 'sh' },
+      'het',
+    );
+    const tester = makeLinkedOrganism(
+      { color: 'c', shape: 'sh' },
+      { color: 'c', shape: 'sh' },
+      'tester',
+    );
+    const result = linkedCross(parent, tester, [KERNEL_COLOR, KERNEL_SHAPE], [0.17], 400, 1);
+    // Canonical order: two parentals first, then two recombinants, so the
+    // table reads naturally from "most common" to "least common".
+    const order = ['Purple, Plump', 'Yellow, Shrunken', 'Purple, Shrunken', 'Yellow, Plump'];
+    const obs = order.map(k => result.phenotypeCounts[k] ?? 0);
+    return { observed: obs, labels: order };
+  });
+
+  // Expected under H₀ (independent assortment) is 1:1:1:1 — each class is
+  // total/4. This is the null hypothesis; the chi-square test asks whether
+  // observed counts are consistent with it.
   const total = observed.reduce((a, b) => a + b, 0);
-  const expected = [total / 4, total / 4, total / 4, total / 4]; // 1:1:1:1
+  const expected = [total / 4, total / 4, total / 4, total / 4];
 
   const chiSqTerms = observed.map((o, i) => ((o - expected[i]) ** 2) / expected[i]);
   const totalChiSq = chiSqTerms.reduce((a, b) => a + b, 0);
@@ -716,10 +781,15 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        From a testcross of linked genes, you observe the following offspring counts.
-        If the genes were <strong>unlinked</strong>, you'd expect a <strong>1:1:1:1</strong> ratio.
-        Let's use the <strong>chi-square test</strong> to statistically evaluate whether these data fit that expectation.
+        From a testcross of <strong>C/c Sh/sh</strong> × tester (same cross as Experiment 3), you observe the
+        offspring counts below. Let's use the <strong>chi-square test</strong> to statistically evaluate
+        whether these data fit the ratio we'd expect if the genes were independent.
       </p>
+      <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-600 space-y-1">
+        <p><strong>H₀:</strong> genes assort independently (1:1:1:1 ratio)</p>
+        <p><strong>Hₐ:</strong> genes do not assort independently (they are linked)</p>
+        <p><strong>df</strong> = categories − 1 = 4 − 1 = 3</p>
+      </div>
 
       {/* Data table */}
       <div className="overflow-x-auto">
@@ -834,7 +904,9 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
 }
 
 function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
-  const threeGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [KERNEL_COLOR, ENDOSPERM, KERNEL_SHAPE];
+  // By Exp 7 the student has discovered the true order C — Sh — Wx, so we
+  // display and analyze in true order (unlike Exp 5, which presented a
+  // scrambled order as a puzzle).
   const trueOrderGenes: [LinkedGeneDefinition, LinkedGeneDefinition, LinkedGeneDefinition] = [KERNEL_COLOR, KERNEL_SHAPE, ENDOSPERM];
 
   const parent = useMemo(() => makeLinkedOrganism(
@@ -853,6 +925,9 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
   const [coincInput, setCoinInput] = useState('');
   const [intInput, setIntInput] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  // Remember the student's entered values at the moment they clicked Check,
+  // so the feedback panel can print them alongside the measured values.
+  const [submitted, setSubmitted] = useState<{ c: number; i: number } | null>(null);
 
   const recombFreqs = [0.08, 0.10]; // C–Sh, Sh–Wx
   const usedCoincidence = 0.5; // strong positive interference
@@ -863,10 +938,13 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
     setStep(1);
   }, [parent, tester]);
 
-  // Analyze results
+  // Analyze results in TRUE order (C — Sh — Wx). The simulation in
+  // handleCross generates offspring in true order, so the analysis must
+  // match — otherwise Region I / Region II get swapped relative to the
+  // "Region I (C — Sh) / Region II (Sh — Wx)" labels shown below.
   const analysis = useMemo(() => {
     if (!crossResult) return null;
-    return threePointAnalysis(crossResult.offspring, threeGenes);
+    return threePointAnalysis(crossResult.offspring, trueOrderGenes);
   }, [crossResult]);
 
   // Compute expected vs observed DCO
@@ -878,14 +956,15 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        In the three-point cross, we found double crossover offspring. But are there as many as we'd
-        <strong> expect</strong>? If crossovers were independent, the expected frequency of double crossovers
-        would be the product of the two single-crossover frequencies.
+        Now that we've discovered the order is <strong>C — Sh — Wx</strong>, we can quantify
+        <strong> interference</strong>. In the three-point cross, we found double crossover offspring —
+        but are there as many as we'd <strong>expect</strong>? If crossovers were independent, the
+        expected frequency of double crossovers would be the product of the two single-crossover frequencies.
       </p>
 
       <div className="flex items-center justify-center gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <ChromosomeDiagram genes={threeGenes} chrom1={parent.chromosome1} chrom2={parent.chromosome2} label="Trihybrid" />
+          <ChromosomeDiagram genes={trueOrderGenes} chrom1={parent.chromosome1} chrom2={parent.chromosome2} label="Trihybrid" />
           <span className="text-2xl font-bold text-stone-400">&times;</span>
           <span className="text-sm text-stone-500">tester (all recessive)</span>
         </div>
@@ -948,6 +1027,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
                 const iVal = parseFloat(intInput);
                 const cClose = Math.abs(cVal - actualCoincidence) < 0.15;
                 const iClose = Math.abs(iVal - actualInterference) < 0.15;
+                setSubmitted({ c: cVal, i: iVal });
                 setCorrect(cClose && iClose);
                 if (cClose && iClose) setStep(2);
               }}
@@ -955,19 +1035,21 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
             >
               Check
             </button>
-            {correct === false && (
-              <div className="text-sm text-red-600">
-                Coincidence = {observedDCO} / {expectedDCO.toFixed(1)} = {actualCoincidence.toFixed(2)}.
-                Interference = 1 - {actualCoincidence.toFixed(2)} = {actualInterference.toFixed(2)}.
+            {correct === false && submitted && (
+              <div className="text-sm text-red-600 space-y-1">
+                <p>You entered: c = {submitted.c.toFixed(2)}, I = {submitted.i.toFixed(2)}</p>
+                <p>Measured from your cross: c = {actualCoincidence.toFixed(2)}, I = {actualInterference.toFixed(2)}</p>
+                <p className="text-stone-600">Hint: Coincidence = {observedDCO} / {expectedDCO.toFixed(1)} = {actualCoincidence.toFixed(2)}; Interference = 1 − coincidence.</p>
               </div>
             )}
           </div>
 
-          {step >= 2 && (
+          {step >= 2 && submitted && (
             <div className="space-y-4">
               <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800 space-y-2">
                 <p><strong>Positive interference!</strong> There are FEWER double crossovers than expected ({observedDCO} observed vs {expectedDCO.toFixed(1)} expected).</p>
-                <p>Coincidence = {actualCoincidence.toFixed(2)}, Interference = {actualInterference.toFixed(2)}</p>
+                <p>You entered: c = {submitted.c.toFixed(2)}, I = {submitted.i.toFixed(2)}</p>
+                <p>Measured from your cross: c = {actualCoincidence.toFixed(2)}, I = {actualInterference.toFixed(2)} <span className="text-emerald-600">✓ within tolerance</span></p>
                 <p>This means one crossover <strong>inhibits</strong> a second crossover nearby. This is a real biological phenomenon — the physical mechanics of chromosome crossing over make nearby double events less likely.</p>
               </div>
               <button onClick={onComplete}
