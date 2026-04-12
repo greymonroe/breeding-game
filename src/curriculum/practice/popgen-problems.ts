@@ -247,9 +247,14 @@ function generateBackwardHWE(rng: Rng): PracticeProblem {
     : `No, reject HWE. p\u0302 = ${wrongP}, \u03C7\u00B2 = ${round(chiSq * 3, 2)} > 3.841`;
 
   // Distractor: correct p̂ but wrong conclusion (flip reject/not)
+  // Show a fabricated chi-square that is consistent with the flipped conclusion
+  // so the distractor is internally coherent (wrong answer, but not self-contradictory).
+  const flippedChi = reject
+    ? round(rng() * 3, 2)            // claim not significant → show χ² < 3.841
+    : round(4 + rng() * 20, 2);       // claim significant    → show χ² > 3.841
   const distractor2 = reject
-    ? `Yes, fail to reject HWE. p\u0302 = ${roundedP}, \u03C7\u00B2 = ${roundedChi} (not significant)`
-    : `No, reject HWE. p\u0302 = ${roundedP}, \u03C7\u00B2 = ${roundedChi} (significant)`;
+    ? `Yes, fail to reject HWE. p\u0302 = ${roundedP}, \u03C7\u00B2 = ${flippedChi} (not significant)`
+    : `No, reject HWE. p\u0302 = ${roundedP}, \u03C7\u00B2 = ${flippedChi} (significant)`;
 
   // Distractor: use genotype frequencies as allele frequencies
   const n = counts.MM + counts.Mm + counts.mm;

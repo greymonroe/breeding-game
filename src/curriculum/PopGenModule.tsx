@@ -79,7 +79,7 @@ const PLANT_EXAMPLES = {
 // ── Shared visualization components ─────────────────────────────────────
 
 /** Grid of colored circles representing a population (Mimulus colors) */
-function PopulationGrid({ genotypes, size = 16, colorScheme = 'mimulus' }: {
+function PopulationGrid({ genotypes, size = 20, colorScheme = 'mimulus' }: {
   genotypes: { AA: number; Aa: number; aa: number };
   size?: number;
   colorScheme?: 'mimulus' | 'violet';
@@ -108,7 +108,7 @@ function PopulationGrid({ genotypes, size = 16, colorScheme = 'mimulus' }: {
   const labels = colorScheme === 'mimulus' ? PLANT_EXAMPLES.mimulus.genotypeLabels : { AA: 'AA', Aa: 'Aa', aa: 'aa' };
 
   return (
-    <div className="flex flex-wrap gap-1.5 justify-center">
+    <div className="flex flex-wrap gap-1.5 justify-center mx-auto" style={{ maxWidth: `${10 * (size + 6) + 12}px` }}>
       {individuals.map((g, i) => (
         <div key={i} className="flex items-center justify-center rounded-full border"
           style={{
@@ -118,15 +118,15 @@ function PopulationGrid({ genotypes, size = 16, colorScheme = 'mimulus' }: {
           }}
           title={labels[g]} />
       ))}
-      <div className="w-full flex justify-center gap-4 mt-2 text-[10px] text-stone-500">
+      <div className="w-full flex justify-center gap-4 mt-2 text-[11px] text-stone-500">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: colorMap.AA }} /> {labels.AA}
+          <span className="inline-block w-3.5 h-3.5 rounded-full" style={{ backgroundColor: colorMap.AA }} /> {labels.AA}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: colorMap.Aa }} /> {labels.Aa}
+          <span className="inline-block w-3.5 h-3.5 rounded-full" style={{ backgroundColor: colorMap.Aa }} /> {labels.Aa}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full border" style={{ backgroundColor: colorMap.aa, borderColor: borderMap.aa }} /> {labels.aa}
+          <span className="inline-block w-3.5 h-3.5 rounded-full border" style={{ backgroundColor: colorMap.aa, borderColor: borderMap.aa }} /> {labels.aa}
         </span>
       </div>
     </div>
@@ -189,8 +189,11 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
           pure mathematicians in Britain and who <em>detests</em> applied mathematics on principle. Hardy is
           annoyed enough to write a one-page letter to <em>Science</em> essentially under protest, titled{' '}
           <em>"Mendelian Proportions in a Mixed Population,"</em> explaining the answer in algebra a first-year
-          probability student would understand. The letter appears in volume 28 of <em>Science</em>, July 10, 1908,
-          pages 49–50. In Stuttgart, the physician <strong>Wilhelm Weinberg</strong> derives the same result
+          probability student would understand.
+        </p>
+        <p>
+          The letter appears in volume 28 of <em>Science</em>, July 10, 1908,
+          pages 49-50. In Stuttgart, the physician <strong>Wilhelm Weinberg</strong> derives the same result
           independently earlier the same year. The result is now called the <strong>Hardy-Weinberg Theorem</strong>,
           and it is the single most important mathematical result in population genetics.
         </p>
@@ -292,6 +295,8 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
 
           {/* Backward problem */}
           {forwardEverCorrect && (
+            <>
+            <hr className="border-stone-200" />
             <QuestionPanel
               question="You observe a Mimulus population where 25% of plants have the mm (cream) phenotype. If the population is in HWE, what is p(M)?"
               correct={backCorrect}
@@ -301,6 +306,9 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
                 ? 'Remember: under HWE, the frequency of mm = q\u00B2. If 25% are mm, what is q? And then what is p = 1 \u2212 q?'
                 : undefined}
             >
+              <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                Working backward
+              </div>
               <div className="flex flex-col gap-2">
                 {[
                   { key: 'a', label: 'p(M) = 0.75 (confused phenotype frequency with allele frequency)' },
@@ -325,6 +333,7 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
                 ))}
               </div>
             </QuestionPanel>
+          </>
           )}
 
           {/* What's next tease */}
@@ -386,17 +395,6 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div className="space-y-6">
-      {/* 1.10 — Linkage handoff callout */}
-      <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
-        <strong className="text-stone-800">Coming from the Linkage module?</strong> Good — population genetics
-        is where the recombination frequency you just learned to measure shows up again. When two alleles
-        at linked loci travel together in a population for many generations, they build up a correlation
-        called <strong>linkage disequilibrium</strong> (LD). LD decays over time at a rate proportional
-        to 1 − <em>r</em>, where <em>r</em> is the recombination frequency between the loci — so
-        tightly-linked loci can stay in LD for thousands of generations, while loosely-linked loci
-        randomize within dozens.
-      </div>
-
       <p className="text-sm text-stone-600">
         Below is a natural population of <strong>~50 <em>Mimulus guttatus</em></strong> (yellow monkeyflower)
         plants sampled from a serpentine-soil site. Each plant is diploid at the anthocyanin pigmentation
@@ -406,7 +404,7 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
 
       <PopulationGrid genotypes={pop} colorScheme="mimulus" />
 
-      {/* Fix 10: Prediction step — visual estimation before counting */}
+      {/* Fix 10: Prediction step -- visual estimation before counting */}
       <QuestionPanel
         question="Looking at the grid of Mimulus plants, estimate p(M) before counting. Is it closer to 0.3, 0.5, or 0.7?"
         correct={visualCorrect}
@@ -489,6 +487,9 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
             ? 'Remember: the expected count of M alleles = 2N \u00D7 p. With N = 100 diploid plants, there are 200 alleles total.'
             : undefined}
         >
+          <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+            Working backward
+          </div>
           <div className="flex gap-3 items-end flex-wrap">
             <div>
               <label className="block text-xs text-stone-500 mb-1">Expected M allele count</label>
@@ -509,6 +510,19 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
           </div>
         </QuestionPanel>
       )}
+
+      {/* Linkage handoff callout — supplementary for students coming from the Linkage module */}
+      <details className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
+        <summary className="cursor-pointer font-semibold text-stone-800">Coming from the Linkage module?</summary>
+        <p className="mt-2">
+          Population genetics is where the recombination frequency you just learned to measure shows up again.
+          When two alleles at linked loci travel together in a population for many generations, they build up
+          a correlation called <strong>linkage disequilibrium</strong> (LD). LD decays over time at a rate
+          proportional to 1 {'\u2212'} <em>r</em>, where <em>r</em> is the recombination frequency between the
+          loci — so tightly-linked loci can stay in LD for thousands of generations, while loosely-linked loci
+          randomize within dozens.
+        </p>
+      </details>
     </div>
   );
 }
@@ -758,7 +772,7 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
                   );
                 })}
                 <tr className="bg-stone-50 font-bold">
-                  <td className="border border-stone-200 px-3 py-1.5" colSpan={3}>X{'\u00B2'} =</td>
+                  <td className="border border-stone-200 px-3 py-1.5 text-right" colSpan={3}>Total X{'\u00B2'} =</td>
                   <td className="border border-stone-200 px-3 py-1.5 text-right font-mono text-violet-800">{sampleData.hwe.chiSquare.toFixed(3)}</td>
                 </tr>
               </tbody>
@@ -963,6 +977,9 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
             ? 'First compute p\u0302: count M alleles = 2\u00D7MM + Mm, total alleles = 2\u00D7500. Then compute HWE expected counts and X\u00B2. Compare to 3.84.'
             : undefined}
         >
+          <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+            Working backward
+          </div>
           <div className="flex flex-col gap-2">
             {[
               { key: 'a', label: 'p\u0302 = 0.20, X\u00B2 \u2248 70, strongly reject HWE \u2014 deficit of heterozygotes suggests inbreeding' },
@@ -1065,8 +1082,12 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
         and even when the true frequency is p = 0.5, the sampled count isn't going to be exactly 20 M
         and 20 m — just like 40 coin flips aren't going to land exactly 20 heads and 20 tails. The sample
         count of M alleles follows a binomial distribution with mean 2Np and variance 2N {'\u00B7'} p(1 {'\u2212'} p).
-        Since allele frequency = count / (2N), dividing the count variance by (2N){'\u00B2'} gives the
-        frequency variance: p(1 {'\u2212'} p) / (2N).{' '}
+        Since allele frequency = count / (2N), dividing the count variance by (2N){'\u00B2'} gives:
+        <div className="my-2 py-2 px-3 bg-white rounded-lg text-center">
+          <span className="text-base font-bold text-violet-900 font-mono">
+            Var(p) = p(1 {'\u2212'} p) / (2N)
+          </span>
+        </div>
         <strong>Smaller N means bigger variance means faster drift.</strong> When N = 2000, the same
         formula gives a per-generation standard error of {'\u221A'}(0.25/4000) {'\u2248'} 0.0079 — the
         frequency barely moves. Drift is not magic; it is finite-sample binomial noise in the gamete pool.
@@ -1112,7 +1133,7 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
                 initialFreqA={initialFreq}
                 generations={gens}
                 nReplicates={nReps}
-                height={180}
+                height={250}
                 yLabel="Freq(M)"
                 onSimComplete={handleSmallSimComplete}
               />
@@ -1132,7 +1153,7 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
                 initialFreqA={initialFreq}
                 generations={gens}
                 nReplicates={nReps}
-                height={180}
+                height={250}
                 yLabel="Freq(M)"
                 onSimComplete={handleLargeSimComplete}
               />
@@ -1201,6 +1222,9 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
                     ? 'Remember: drift is random. At N=20 with p\u2080=0.5, fixation time is highly variable. Any individual trajectory is just one draw from a wide distribution.'
                     : undefined}
                 >
+                  <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                    Working backward
+                  </div>
                   <div className="flex flex-col gap-2">
                     {[
                       { key: 'a', label: 'The population that fixed M must have had selection favoring M' },
@@ -1425,6 +1449,9 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
                 ? 'Think about the selection recursion: at low p, \u0394p \u2248 s\u00B7p\u00B7q\u00B2. With s=0.1, p\u2080=0.01, the initial \u0394p is small but accelerates. Over 30 generations, does p reach the observed range?'
                 : undefined}
             >
+              <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                Working backward
+              </div>
               <div className="flex flex-col gap-2">
                 {[
                   { key: 'a', label: 'Yes \u2014 with s=0.1 and p\u2080=0.01, the recursion predicts p reaching ~0.10\u20130.20 by generation 30' },
@@ -1613,6 +1640,9 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
                 ? 'Think about the migration model: each generation, both populations move toward the average. With m = 0.03 and 30 generations, would they have fully converged yet?'
                 : undefined}
             >
+              <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                Working backward
+              </div>
               <div className="flex flex-col gap-2">
                 {[
                   { key: 'a', label: 'Yes \u2014 the symmetric model predicts exponential approach to 0.5, and at gen 30 they should be approximately 0.42/0.58' },
@@ -1830,6 +1860,9 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
                 ? 'Rearrange the formula: q\u0302 \u2248 \u221A(\u03BC/s), so \u03BC = s\u00B7q\u0302\u00B2. Plug in s = 0.5 and q\u0302 = 0.02.'
                 : undefined}
             >
+              <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                Working backward
+              </div>
               <div className="flex gap-3 items-end flex-wrap">
                 <div>
                   <label className="block text-xs text-stone-500 mb-1">{'\u03BC'} (mutation rate)</label>
@@ -2025,6 +2058,9 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
                 ? 'Use the sampling variance formula: Var(p\u0302) = p(1\u2212p)/(2N). The observed deviation is |0.85 \u2212 0.5| = 0.35. What N makes (0.35)\u00B2 \u2248 0.25/(2N)?'
                 : undefined}
             >
+              <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                Working backward
+              </div>
               <div className="flex flex-col gap-2">
                 {[
                   { key: 'a', label: 'N \u2248 2 (a founding pair) \u2014 the deviation of 0.35 is ~1 SD when N is very small' },
