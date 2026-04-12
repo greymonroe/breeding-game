@@ -13,10 +13,10 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import {
-  simulate, simulateReplicates, hardyWeinberg, testHWE,
+  simulate, hardyWeinberg, testHWE, sampleZygotes,
 } from './popgen-engine';
 import {
-  ModuleShell, QuestionPanel, HistogramChart,
+  ModuleShell, QuestionPanel, HistogramChart, AlleleTrajectoryVisualizer,
   type ModuleDefinition,
 } from './components';
 
@@ -65,84 +65,6 @@ const PLANT_EXAMPLES = {
 } as const;
 
 // ── Shared visualization components ─────────────────────────────────────
-
-/** SVG line chart showing allele frequency trajectories */
-function FrequencyChart({ trajectories, generations, height = 200, colors, labels, yLabel = 'Freq(M)' }: {
-  trajectories: number[][];
-  generations: number;
-  height?: number;
-  colors?: string[];
-  labels?: string[];
-  yLabel?: string;
-}) {
-  const width = 500;
-  const pad = { top: 20, right: 20, bottom: 30, left: 40 };
-  const plotW = width - pad.left - pad.right;
-  const plotH = height - pad.top - pad.bottom;
-
-  const defaultColors = ['#7c3aed', '#a78bfa', '#c4b5fd', '#ddd6fe'];
-
-  return (
-    <div className="w-full">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet">
-        {/* Axes */}
-        <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + plotH}
-          stroke="#a8a29e" strokeWidth="1" />
-        <line x1={pad.left} y1={pad.top + plotH} x2={pad.left + plotW} y2={pad.top + plotH}
-          stroke="#a8a29e" strokeWidth="1" />
-
-        {/* Y-axis labels */}
-        {[0, 0.25, 0.5, 0.75, 1].map(v => (
-          <g key={v}>
-            <text x={pad.left - 5} y={pad.top + plotH - v * plotH + 3}
-              textAnchor="end" fontSize="8" fill="#78716c">{v.toFixed(2)}</text>
-            <line x1={pad.left} y1={pad.top + plotH - v * plotH}
-              x2={pad.left + plotW} y2={pad.top + plotH - v * plotH}
-              stroke="#e7e5e4" strokeWidth="0.5" />
-          </g>
-        ))}
-
-        {/* X-axis label */}
-        <text x={pad.left + plotW / 2} y={height - 4} textAnchor="middle"
-          fontSize="9" fill="#78716c">Generation</text>
-
-        {/* Y-axis label */}
-        <text x={12} y={pad.top + plotH / 2} textAnchor="middle"
-          fontSize="9" fill="#78716c" transform={`rotate(-90, 12, ${pad.top + plotH / 2})`}>
-          {yLabel}
-        </text>
-
-        {/* Trajectories */}
-        {trajectories.map((traj, ti) => {
-          const maxGen = traj.length - 1;
-          if (maxGen === 0) return null;
-          const pts = traj.map((f, i) => {
-            const x = pad.left + (i / Math.max(generations, maxGen)) * plotW;
-            const y = pad.top + plotH - f * plotH;
-            return `${x},${y}`;
-          }).join(' ');
-          const color = colors?.[ti] ?? defaultColors[ti % defaultColors.length];
-          return (
-            <polyline key={ti} points={pts} fill="none" stroke={color}
-              strokeWidth={trajectories.length > 5 ? 1 : 1.5}
-              opacity={trajectories.length > 5 ? 0.4 : 0.8} />
-          );
-        })}
-
-        {/* Legend */}
-        {labels && labels.map((lbl, i) => (
-          <g key={i}>
-            <line x1={pad.left + plotW - 100} y1={pad.top + 10 + i * 14}
-              x2={pad.left + plotW - 85} y2={pad.top + 10 + i * 14}
-              stroke={colors?.[i] ?? defaultColors[i % defaultColors.length]} strokeWidth="2" />
-            <text x={pad.left + plotW - 80} y={pad.top + 13 + i * 14}
-              fontSize="8" fill="#57534e">{lbl}</text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
 
 /** Grid of colored circles representing a population (Mimulus colors) */
 function PopulationGrid({ genotypes, size = 16, colorScheme = 'mimulus' }: {
@@ -293,10 +215,20 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
   const [predAa, setPredAa] = useState('');
   const [predaa, setPredaa] = useState('');
   const [predCorrect, setPredCorrect] = useState<boolean | null>(null);
-  const [simResult, setSimResult] = useState<{ AA: number; Aa: number; aa: number } | null>(null);
-  const [hweTest, setHweTest] = useState<ReturnType<typeof testHWE> | null>(null);
 
-  // 1.4 — Noise literacy panel state
+  // Step 2: stochastic sample
+  const [sampleData, setSampleData] = useState<{ obs: { AA: number; Aa: number; aa: number }; pHat: number; hwe: ReturnType<typeof testHWE> } | null>(null);
+
+  // Step 3: chi-square quiz
+  const [chiAnswer, setChiAnswer] = useState('');
+  const [chiCorrect, setChiCorrect] = useState<boolean | null>(null);
+
+  // Step 4: selection follow-up
+  const [selData, setSelData] = useState<{ obs: { AA: number; Aa: number; aa: number }; hwe: ReturnType<typeof testHWE> } | null>(null);
+  const [selAnswer, setSelAnswer] = useState('');
+  const [selCorrect, setSelCorrect] = useState<boolean | null>(null);
+
+  // Noise literacy panel state (kept from Phase 1)
   const [showNoise, setShowNoise] = useState(false);
   const [noiseSmall, setNoiseSmall] = useState<{ p: number; se: number } | null>(null);
   const [noiseLarge, setNoiseLarge] = useState<{ p: number; se: number } | null>(null);
@@ -312,22 +244,89 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
     if (ok) setStep(1);
   };
 
-  const handleSimulate = () => {
-    const result = simulate({ popSize: 1000, initialFreqA: p, generations: 1 });
-    const geno = result.genotypeHistory[1];
-    setSimResult(geno);
-    setHweTest(testHWE(geno));
+  const handleSample = () => {
+    const obs = sampleZygotes(1000, p);
+    const total = obs.AA + obs.Aa + obs.aa;
+    const pHat = (2 * obs.AA + obs.Aa) / (2 * total);
+    const hwe = testHWE(obs);
+    setSampleData({ obs, pHat, hwe });
     setStep(2);
-    setTimeout(onComplete, 2000);
   };
+
+  const getChiCorrectAnswer = () => {
+    if (!sampleData) return '';
+    return sampleData.hwe.chiSquare < 3.84 ? 'yes' : 'no';
+  };
+
+  const handleChiAnswer = (ans: string) => {
+    setChiAnswer(ans);
+    const correctAns = getChiCorrectAnswer();
+    const isCorrect = ans === correctAns;
+    setChiCorrect(isCorrect);
+    if (isCorrect) setStep(3);
+  };
+
+  const chiWrongFeedback = () => {
+    if (!sampleData) return '';
+    const correctAns = getChiCorrectAnswer();
+    if (chiAnswer === 'no' && correctAns === 'yes') {
+      return `The observed X\u00B2 = ${sampleData.hwe.chiSquare.toFixed(3)} is below 3.84 \u2014 small deviations from exact HWE are just sampling noise at N=1000.`;
+    }
+    if (chiAnswer === 'perfect') {
+      return 'The sample never matches expected perfectly \u2014 there is always sampling noise. HWE is a statistical null hypothesis, not an exact prediction.';
+    }
+    if (chiAnswer === 'cannot_tell') {
+      return 'We have plenty of data \u2014 N=1000 gives a chi-square test with good power.';
+    }
+    if (chiAnswer === 'yes' && correctAns === 'no') {
+      return `The observed X\u00B2 = ${sampleData.hwe.chiSquare.toFixed(3)} exceeds the critical value of 3.84, so we reject the null hypothesis of HWE at \u03B1 = 0.05.`;
+    }
+    return 'Look at the computed X\u00B2 value and compare it to the critical value of 3.84.';
+  };
+
+  const handleRunSelection = () => {
+    // Apply one generation of selection: wAA=1, wAa=1, waa=0.5
+    const wAA = 1, wAa = 1, waa = 0.5;
+    const q = 1 - p;
+    const wBar = p * p * wAA + 2 * p * q * wAa + q * q * waa;
+    const pAfterSel = (p * p * wAA + p * q * wAa) / wBar;
+    const obs = sampleZygotes(1000, pAfterSel);
+    const hwe = testHWE(obs);
+    setSelData({ obs, hwe });
+    setStep(4);
+  };
+
+  const handleSelAnswer = (ans: string) => {
+    setSelAnswer(ans);
+    // After selection, chi-square should be large (testing against HWE expected from post-selection p-hat,
+    // but the genotype frequencies from the post-selection gamete pool ARE in HWE because sampleZygotes
+    // draws from random mating). The real test: genotype counts vs HWE expectations from the ORIGINAL p.
+    // Actually, testHWE computes expected from the observed p-hat, so it will still likely pass HWE.
+    // The pedagogically correct approach: test the post-selection sample against the ORIGINAL p=0.6 expectations.
+    // We need to do a manual chi-square against original HWE expectations.
+    const isCorrect = ans === 'no';
+    setSelCorrect(isCorrect);
+    if (isCorrect) setTimeout(onComplete, 1500);
+  };
+
+  // Manual chi-square of selection sample against original HWE (p=0.6)
+  const selChiSquare = useMemo(() => {
+    if (!selData) return null;
+    const N = selData.obs.AA + selData.obs.Aa + selData.obs.aa;
+    const expAA = hw.AA * N;
+    const expAa = hw.Aa * N;
+    const expaa = hw.aa * N;
+    const chi = ((selData.obs.AA - expAA) ** 2) / expAA
+              + ((selData.obs.Aa - expAa) ** 2) / expAa
+              + ((selData.obs.aa - expaa) ** 2) / expaa;
+    return chi;
+  }, [selData, hw]);
 
   const runNoiseLiteracy = () => {
     const pNoise = 0.6;
-    // N=50 sample
     const small = simulate({ popSize: 50, initialFreqA: pNoise, generations: 1 });
     const smallP = small.freqHistory[1];
     const smallSE = Math.sqrt(pNoise * (1 - pNoise) / (2 * 50));
-    // N=5000 sample
     const large = simulate({ popSize: 5000, initialFreqA: pNoise, generations: 1 });
     const largeP = large.freqHistory[1];
     const largeSE = Math.sqrt(pNoise * (1 - pNoise) / (2 * 5000));
@@ -361,6 +360,7 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
         <div className="mt-1 italic">When any of these break, the population departs from HWE.</div>
       </div>
 
+      {/* Step 1: Predict genotype frequencies */}
       <QuestionPanel
         question={`With p = ${p}, predict the Mimulus genotype frequencies (to 2 decimal places):`}
         correct={predCorrect}
@@ -396,104 +396,238 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
         </div>
       </QuestionPanel>
 
+      {/* Step 2: Stochastic sample */}
       {step >= 1 && (
         <div className="space-y-3">
           <p className="text-sm text-stone-600">
-            Now simulate random mating in a large <em>Mimulus</em> population (N=1000) for one generation to verify:
+            Now sample 1000 diploid <em>Mimulus</em> zygotes from a random-mating population at p(M) = {p}.
+            This is a <strong>real stochastic sample</strong> — the counts will not be exactly p{'\u00B2'}{'\u00B7'}N.
           </p>
-          <button onClick={handleSimulate}
+          <button onClick={handleSample}
             className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg">
-            Simulate Random Mating
+            Sample 1000 Zygotes
           </button>
         </div>
       )}
 
-      {step >= 2 && simResult && hweTest && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3 text-center text-sm">
-            {(['AA', 'Aa', 'aa'] as const).map(g => {
-              const total = simResult.AA + simResult.Aa + simResult.aa;
-              const obs = simResult[g] / total;
-              const exp = g === 'AA' ? hw.AA : g === 'Aa' ? hw.Aa : hw.aa;
-              const label = g === 'AA' ? 'MM' : g === 'Aa' ? 'Mm' : 'mm';
-              return (
-                <div key={g} className="rounded-lg bg-stone-50 border p-3">
-                  <div className="font-bold text-stone-700">{label}</div>
-                  <div className="text-xs text-stone-500 mt-1">
-                    Predicted: <span className="font-mono">{exp.toFixed(3)}</span>
-                  </div>
-                  <div className="text-xs text-violet-600 font-semibold">
-                    Observed: <span className="font-mono">{obs.toFixed(3)}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
-            <strong>Chi-square test:</strong> X{'\u00B2'} = {hweTest.chiSquare.toFixed(3)}, p-value = {hweTest.pValue.toFixed(3)}.
-            {hweTest.inEquilibrium
-              ? ' The population IS in Hardy-Weinberg equilibrium — observed matches expected.'
-              : ' Slight deviation detected, but with large N this is expected stochastic variation.'}
-            <br /><strong>Key insight:</strong> Random mating alone produces HW equilibrium in just ONE generation.
+      {step >= 2 && sampleData && (
+        <div className="space-y-4">
+          {/* Observed vs Expected table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-stone-100">
+                  <th className="border border-stone-200 px-3 py-2 text-left">Genotype</th>
+                  <th className="border border-stone-200 px-3 py-2 text-right">Observed</th>
+                  <th className="border border-stone-200 px-3 py-2 text-right">Expected (HWE)</th>
+                  <th className="border border-stone-200 px-3 py-2 text-right">(O{'\u2212'}E){'\u00B2'}/E</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(['AA', 'Aa', 'aa'] as const).map(g => {
+                  const label = g === 'AA' ? 'MM' : g === 'Aa' ? 'Mm' : 'mm';
+                  const obs = sampleData.obs[g];
+                  const exp = sampleData.hwe.expected[g];
+                  const component = exp > 0 ? ((obs - exp) ** 2) / exp : 0;
+                  return (
+                    <tr key={g}>
+                      <td className="border border-stone-200 px-3 py-1.5 font-bold text-stone-700">{label}</td>
+                      <td className="border border-stone-200 px-3 py-1.5 text-right font-mono text-violet-700">{obs}</td>
+                      <td className="border border-stone-200 px-3 py-1.5 text-right font-mono text-stone-600">{exp.toFixed(1)}</td>
+                      <td className="border border-stone-200 px-3 py-1.5 text-right font-mono text-stone-600">{component.toFixed(3)}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-stone-50 font-bold">
+                  <td className="border border-stone-200 px-3 py-1.5" colSpan={3}>X{'\u00B2'} =</td>
+                  <td className="border border-stone-200 px-3 py-1.5 text-right font-mono text-violet-800">{sampleData.hwe.chiSquare.toFixed(3)}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
-          {/* 1.4 — Noise literacy panel */}
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-stone-700">How precise is your estimate?</p>
-            <p className="text-xs text-stone-600">
-              When you sample allele frequencies from a real population, your estimate carries sampling noise.
-              The standard error of p-hat scales as {'\u221A'}(p(1{'\u2212'}p) / (2N)).
-              Compare a small vs. large <em>Mimulus</em> sample, both drawn from p = 0.6:
-            </p>
-            <button onClick={runNoiseLiteracy}
-              className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg">
-              Sample N=50 vs N=5000
+          <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
+            <strong>Observed p-hat:</strong> {sampleData.pHat.toFixed(4)} (true p = {p})
+            <br />
+            <strong>Chi-square formula:</strong> X{'\u00B2'} = {'\u03A3'} (O{'\u2212'}E){'\u00B2'}/E, df = 1 (3 classes {'\u2212'} 1 parameter {'\u2212'} 1)
+            <br />
+            <strong>Critical value:</strong> X{'\u00B2'}<sub>0.05,1</sub> = 3.84. If X{'\u00B2'} {'<'} 3.84, fail to reject HWE.
+            <br />
+            <strong>p-value:</strong> {sampleData.hwe.pValue.toFixed(4)}
+          </div>
+
+          {/* Step 3: Chi-square puzzle */}
+          <QuestionPanel
+            question={`Based on this chi-square test (X\u00B2 = ${sampleData.hwe.chiSquare.toFixed(3)}, critical value = 3.84), is this Mimulus population in Hardy-Weinberg equilibrium?`}
+            correct={chiCorrect}
+            feedback={chiCorrect === true
+              ? sampleData.hwe.chiSquare < 3.84
+                ? `Correct! X\u00B2 = ${sampleData.hwe.chiSquare.toFixed(3)} < 3.84. We fail to reject HWE. The observed deviations from p\u00B2, 2pq, q\u00B2 are within the range expected from sampling noise alone. Random mating produces HWE in just one generation.`
+                : `Correct! X\u00B2 = ${sampleData.hwe.chiSquare.toFixed(3)} \u2265 3.84, so we reject HWE at \u03B1 = 0.05. This can happen about 5% of the time even when the null is true \u2014 a Type I error. Try re-sampling to see how often this occurs.`
+              : chiCorrect === false
+              ? chiWrongFeedback()
+              : undefined}
+          >
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { key: 'yes', label: 'Yes \u2014 fail to reject HWE' },
+                { key: 'no', label: 'No \u2014 reject HWE' },
+                { key: 'perfect', label: 'It matches perfectly' },
+                { key: 'cannot_tell', label: 'Cannot tell from these data' },
+              ].map(opt => (
+                <button key={opt.key} onClick={() => handleChiAnswer(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                    chiAnswer === opt.key
+                      ? chiCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </QuestionPanel>
+        </div>
+      )}
+
+      {/* Step 4: Selection follow-up */}
+      {step >= 3 && (
+        <div className="space-y-4">
+          <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
+            <strong>What if we break an assumption?</strong> Let's apply one generation of <strong>selection
+            against mm</strong> (w<sub>MM</sub> = 1, w<sub>Mm</sub> = 1, w<sub>mm</sub> = 0.5), then
+            sample 1000 zygotes and test them against the <em>original</em> HWE expectations (p = {p}).
+          </div>
+          {!selData && (
+            <button onClick={handleRunSelection}
+              className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg">
+              Apply Selection + Sample
             </button>
+          )}
+          {selData && selChiSquare !== null && (
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-stone-100">
+                      <th className="border border-stone-200 px-3 py-2 text-left">Genotype</th>
+                      <th className="border border-stone-200 px-3 py-2 text-right">Observed (after selection)</th>
+                      <th className="border border-stone-200 px-3 py-2 text-right">Expected (original HWE, p={p})</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(['AA', 'Aa', 'aa'] as const).map(g => {
+                      const label = g === 'AA' ? 'MM' : g === 'Aa' ? 'Mm' : 'mm';
+                      const N = selData.obs.AA + selData.obs.Aa + selData.obs.aa;
+                      const exp = (g === 'AA' ? hw.AA : g === 'Aa' ? hw.Aa : hw.aa) * N;
+                      return (
+                        <tr key={g}>
+                          <td className="border border-stone-200 px-3 py-1.5 font-bold text-stone-700">{label}</td>
+                          <td className="border border-stone-200 px-3 py-1.5 text-right font-mono text-violet-700">{selData.obs[g]}</td>
+                          <td className="border border-stone-200 px-3 py-1.5 text-right font-mono text-stone-600">{exp.toFixed(1)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-            {showNoise && noiseSmall && noiseLarge && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-lg bg-stone-50 border p-3 text-center">
-                  <div className="text-sm font-bold text-stone-700">N = 50 plants</div>
-                  <div className="text-xs text-stone-500 mt-1">
-                    Observed p-hat = <span className="font-mono text-violet-700">{noiseSmall.p.toFixed(3)}</span>
-                  </div>
-                  <div className="text-xs text-stone-500">
-                    SE = {noiseSmall.se.toFixed(4)} &rarr; {'\u00B1'}2 SE band: [{Math.max(0, 0.6 - 2 * noiseSmall.se).toFixed(3)}, {Math.min(1, 0.6 + 2 * noiseSmall.se).toFixed(3)}]
-                  </div>
+              <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
+                <strong>X{'\u00B2'} (vs original HWE):</strong> <span className="font-mono text-violet-800">{selChiSquare.toFixed(2)}</span>
+                {selChiSquare >= 3.84
+                  ? <span className="text-red-700 font-bold"> {'\u226B'} 3.84 \u2014 massively significant!</span>
+                  : <span className="text-emerald-700"> {'<'} 3.84</span>}
+              </div>
+
+              <QuestionPanel
+                question={`After one generation of selection against mm (X\u00B2 = ${selChiSquare.toFixed(2)} vs original HWE), is this population still in Hardy-Weinberg equilibrium relative to p = ${p}?`}
+                correct={selCorrect}
+                feedback={selCorrect === true
+                  ? `Correct! Selection changed the allele frequency away from p = ${p}, so the genotype frequencies no longer match the original HWE expectations. HWE breaks when any of the five assumptions break. You just broke the "no selection" assumption.`
+                  : selCorrect === false
+                  ? `Look at X\u00B2 = ${selChiSquare.toFixed(2)}. That is far above 3.84. Selection against mm shifted allele frequencies away from p = ${p} \u2014 the population has departed from HWE.`
+                  : undefined}
+              >
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { key: 'yes', label: 'Yes \u2014 still in HWE' },
+                    { key: 'no', label: 'No \u2014 not in HWE' },
+                    { key: 'closer', label: 'Even closer to HWE than before' },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => handleSelAnswer(opt.key)}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                        selAnswer === opt.key
+                          ? selCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      }`}>
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="rounded-lg bg-stone-50 border p-3 text-center">
-                  <div className="text-sm font-bold text-stone-700">N = 5000 plants</div>
-                  <div className="text-xs text-stone-500 mt-1">
-                    Observed p-hat = <span className="font-mono text-violet-700">{noiseLarge.p.toFixed(3)}</span>
-                  </div>
-                  <div className="text-xs text-stone-500">
-                    SE = {noiseLarge.se.toFixed(4)} &rarr; {'\u00B1'}2 SE band: [{Math.max(0, 0.6 - 2 * noiseLarge.se).toFixed(3)}, {Math.min(1, 0.6 + 2 * noiseLarge.se).toFixed(3)}]
-                  </div>
+              </QuestionPanel>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Noise literacy panel (kept from Phase 1) */}
+      {step >= 3 && (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-stone-700">How precise is your estimate?</p>
+          <p className="text-xs text-stone-600">
+            When you sample allele frequencies from a real population, your estimate carries sampling noise.
+            The standard error of p-hat scales as {'\u221A'}(p(1{'\u2212'}p) / (2N)).
+            Compare a small vs. large <em>Mimulus</em> sample, both drawn from p = 0.6:
+          </p>
+          <button onClick={runNoiseLiteracy}
+            className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg">
+            Sample N=50 vs N=5000
+          </button>
+
+          {showNoise && noiseSmall && noiseLarge && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-lg bg-stone-50 border p-3 text-center">
+                <div className="text-sm font-bold text-stone-700">N = 50 plants</div>
+                <div className="text-xs text-stone-500 mt-1">
+                  Observed p-hat = <span className="font-mono text-violet-700">{noiseSmall.p.toFixed(3)}</span>
                 </div>
-                <div className="md:col-span-2 text-xs text-stone-600 italic">
-                  The {'\u00B1'}2 SE band is ~10{'\u00D7'} wider for N=50 than N=5000. Sample size matters for precision.
-                  When you read a published allele frequency, always ask: how large was the sample?
+                <div className="text-xs text-stone-500">
+                  SE = {noiseSmall.se.toFixed(4)} &rarr; {'\u00B1'}2 SE band: [{Math.max(0, 0.6 - 2 * noiseSmall.se).toFixed(3)}, {Math.min(1, 0.6 + 2 * noiseSmall.se).toFixed(3)}]
                 </div>
               </div>
-            )}
-          </div>
+              <div className="rounded-lg bg-stone-50 border p-3 text-center">
+                <div className="text-sm font-bold text-stone-700">N = 5000 plants</div>
+                <div className="text-xs text-stone-500 mt-1">
+                  Observed p-hat = <span className="font-mono text-violet-700">{noiseLarge.p.toFixed(3)}</span>
+                </div>
+                <div className="text-xs text-stone-500">
+                  SE = {noiseLarge.se.toFixed(4)} &rarr; {'\u00B1'}2 SE band: [{Math.max(0, 0.6 - 2 * noiseLarge.se).toFixed(3)}, {Math.min(1, 0.6 + 2 * noiseLarge.se).toFixed(3)}]
+                </div>
+              </div>
+              <div className="md:col-span-2 text-xs text-stone-600 italic">
+                The {'\u00B1'}2 SE band is ~10{'\u00D7'} wider for N=50 than N=5000. Sample size matters for precision.
+                When you read a published allele frequency, always ask: how large was the sample?
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
-          {/* 1.9 — Hardy-Weinberg historical callout */}
-          <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
-            <strong className="text-stone-800">The Hardy-Weinberg Theorem (Hardy 1908; Weinberg 1908).</strong>{' '}
-            In a large, randomly mating population with no selection, no migration, and no mutation, allele
-            frequencies stay constant from generation to generation and genotype frequencies reach the values
-            p{'\u00B2'}, 2pq, q{'\u00B2'} after a single generation of random mating. The result was derived
-            independently in 1908 by <strong>G. H. Hardy</strong>, a Cambridge mathematician pressed into
-            service by Reginald Punnett over a cricket dinner to refute a bad population-level argument, and{' '}
-            <strong>Wilhelm Weinberg</strong>, a Stuttgart physician working on twin studies. Hardy published
-            his result as a one-page letter to <em>Science</em>; it is one of the founding documents of
-            20th-century population genetics.
-            <br /><br />
-            <strong>This theorem has five assumptions</strong> (large population, random mating, no selection,
-            no mutation, no migration). When any one breaks, the population departs from HWE — and each of
-            the next five experiments breaks exactly one of them.
-          </div>
+      {/* Hardy-Weinberg historical callout (kept from Phase 1) */}
+      {step >= 3 && (
+        <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
+          <strong className="text-stone-800">The Hardy-Weinberg Theorem (Hardy 1908; Weinberg 1908).</strong>{' '}
+          In a large, randomly mating population with no selection, no migration, and no mutation, allele
+          frequencies stay constant from generation to generation and genotype frequencies reach the values
+          p{'\u00B2'}, 2pq, q{'\u00B2'} after a single generation of random mating. The result was derived
+          independently in 1908 by <strong>G. H. Hardy</strong>, a Cambridge mathematician pressed into
+          service by Reginald Punnett over a cricket dinner to refute a bad population-level argument, and{' '}
+          <strong>Wilhelm Weinberg</strong>, a Stuttgart physician working on twin studies. Hardy published
+          his result as a one-page letter to <em>Science</em>; it is one of the founding documents of
+          20th-century population genetics.
+          <br /><br />
+          <strong>This theorem has five assumptions</strong> (large population, random mating, no selection,
+          no mutation, no migration). When any one breaks, the population departs from HWE — and each of
+          the next five experiments breaks exactly one of them.
         </div>
       )}
     </div>
@@ -504,8 +638,9 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
 
 function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
   const [hasRun, setHasRun] = useState(false);
-  const [smallResults, setSmallResults] = useState<number[][] | null>(null);
-  const [largeResults, setLargeResults] = useState<number[][] | null>(null);
+  const [smallFixedCount, setSmallFixedCount] = useState(0);
+  const [smallFixedACount, setSmallFixedACount] = useState(0);
+  const [largeFinalRange, setLargeFinalRange] = useState<{ min: number; max: number } | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
@@ -514,31 +649,34 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
   const [fixMPredCorrect, setFixMPredCorrect] = useState<boolean | null>(null);
   const [predictionLocked, setPredictionLocked] = useState(false);
 
+  // Simulation key to force re-render of AlleleTrajectoryVisualizer
+  const [simKey, setSimKey] = useState(0);
+
   const nReps = 10;
   const gens = 50;
   const initialFreq = 0.5;
 
-  const runSim = useCallback(() => {
-    const small = simulateReplicates({ popSize: 20, initialFreqA: initialFreq, generations: gens }, nReps);
-    const large = simulateReplicates({ popSize: 500, initialFreqA: initialFreq, generations: gens }, nReps);
-    setSmallResults(small.map(r => r.freqHistory));
-    setLargeResults(large.map(r => r.freqHistory));
-    setHasRun(true);
-  }, []);
-
-  const smallFinal = smallResults?.map(h => h[h.length - 1]) ?? [];
-  const largeFinal = largeResults?.map(h => h[h.length - 1]) ?? [];
-  const smallFixed = smallFinal.filter(f => f === 0 || f === 1).length;
-  const smallFixedM = smallFinal.filter(f => f === 1).length;
-
   const checkFixMPred = () => {
     const guess = parseInt(fixMPred, 10);
     if (Number.isNaN(guess)) { setFixMPredCorrect(false); return; }
-    // Neutral fixation probability = p0 = 0.5, so expected count ~= 5/10.
-    // Accept +/-2 (i.e. 3..7) since stochastic.
     const ok = guess >= 3 && guess <= 7;
     setFixMPredCorrect(ok);
     if (ok) setPredictionLocked(true);
+  };
+
+  const handleSmallSimComplete = useCallback((results: { freqHistories: number[][]; fixedCount: number; fixedACount: number }) => {
+    setSmallFixedCount(results.fixedCount);
+    setSmallFixedACount(results.fixedACount);
+    setHasRun(true);
+  }, []);
+
+  const handleLargeSimComplete = useCallback((results: { freqHistories: number[][] }) => {
+    const finals = results.freqHistories.map(h => h[h.length - 1]);
+    setLargeFinalRange({ min: Math.min(...finals), max: Math.max(...finals) });
+  }, []);
+
+  const runSim = () => {
+    setSimKey(k => k + 1);
   };
 
   return (
@@ -592,70 +730,96 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
         {hasRun ? 'Run Again' : 'Run 10 Replicates Each'}
       </button>
 
-      {hasRun && smallResults && largeResults && (
+      {predictionLocked && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-stone-700 text-center">Tiny roadside patch (N=20)</h3>
-              <FrequencyChart trajectories={smallResults} generations={gens} height={180} yLabel="Freq(M)" />
-              <div className="text-xs text-center text-stone-500">
-                Fixed (either allele): {smallFixed}/{nReps} &middot;
-                {' '}<span className="text-violet-700 font-semibold">Fixed M: {smallFixedM}/{nReps}</span>
-                {' '}(predicted {fixMPred || '\u2014'})
-              </div>
+              <AlleleTrajectoryVisualizer
+                key={`small-${simKey}`}
+                popSize={20}
+                initialFreqA={initialFreq}
+                generations={gens}
+                nReplicates={nReps}
+                height={180}
+                yLabel="Freq(M)"
+                onSimComplete={handleSmallSimComplete}
+              />
+              {hasRun && (
+                <div className="text-xs text-center text-stone-500">
+                  Fixed (either allele): {smallFixedCount}/{nReps} &middot;
+                  {' '}<span className="text-violet-700 font-semibold">Fixed M: {smallFixedACount}/{nReps}</span>
+                  {' '}(predicted {fixMPred || '\u2014'})
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-stone-700 text-center">Larger hillside (N=500)</h3>
-              <FrequencyChart trajectories={largeResults} generations={gens} height={180} yLabel="Freq(M)" />
-              <div className="text-xs text-center text-stone-500">
-                Range: {Math.min(...largeFinal).toFixed(2)} — {Math.max(...largeFinal).toFixed(2)}
+              <AlleleTrajectoryVisualizer
+                key={`large-${simKey}`}
+                popSize={500}
+                initialFreqA={initialFreq}
+                generations={gens}
+                nReplicates={nReps}
+                height={180}
+                yLabel="Freq(M)"
+                onSimComplete={handleLargeSimComplete}
+              />
+              {largeFinalRange && (
+                <div className="text-xs text-center text-stone-500">
+                  Range: {largeFinalRange.min.toFixed(2)} — {largeFinalRange.max.toFixed(2)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {hasRun && (
+            <>
+              <QuestionPanel
+                question="What effect does population size have on allele frequency change over time?"
+                correct={correct}
+                feedback={correct === true
+                  ? `Exactly! This is genetic drift — random fluctuations in allele frequency due to finite population size. Smaller populations experience MORE drift. With N=20, alleles frequently reach fixation (0 or 1) purely by chance. With N=500, frequencies stay near 0.5.`
+                  : correct === false
+                  ? 'Look at the trajectories — which population shows more random variation?'
+                  : undefined}
+              >
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    'Smaller populations fluctuate more randomly',
+                    'Larger populations fluctuate more randomly',
+                    'Population size has no effect',
+                  ].map(opt => (
+                    <button key={opt} onClick={() => {
+                      setAnswer(opt);
+                      const isCorrect = opt.includes('Smaller');
+                      setCorrect(isCorrect);
+                      if (isCorrect) setTimeout(onComplete, 1500);
+                    }}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                        answer === opt
+                          ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      }`}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </QuestionPanel>
+
+              {/* 1.9 — Wright's drift model callout */}
+              <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
+                <strong className="text-stone-800">Wright's drift model (Wright 1931).</strong>{' '}
+                In a population of finite size N, allele frequencies fluctuate at random from generation to
+                generation because the next generation's gamete pool is a finite sample from the current one.{' '}
+                <strong>Sewall Wright</strong> at the University of Chicago worked this out in his 1931 paper{' '}
+                <em>Evolution in Mendelian Populations</em> (<em>Genetics</em>, 16: 97-159), one of the three
+                foundational papers of theoretical population genetics (along with Fisher 1930 and Haldane 1932).
+                Wright showed that the variance of p per generation is p(1 {'\u2212'} p) / (2N) — the smaller
+                the population, the faster drift operates.
               </div>
-            </div>
-          </div>
-
-          <QuestionPanel
-            question="What effect does population size have on allele frequency change over time?"
-            correct={correct}
-            feedback={correct === true
-              ? `Exactly! This is genetic drift — random fluctuations in allele frequency due to finite population size. Smaller populations experience MORE drift. With N=20, alleles frequently reach fixation (0 or 1) purely by chance. With N=500, frequencies stay near 0.5.`
-              : correct === false
-              ? 'Look at the trajectories — which population shows more random variation?'
-              : undefined}
-          >
-            <div className="flex gap-2 flex-wrap">
-              {[
-                'Smaller populations fluctuate more randomly',
-                'Larger populations fluctuate more randomly',
-                'Population size has no effect',
-              ].map(opt => (
-                <button key={opt} onClick={() => {
-                  setAnswer(opt);
-                  const isCorrect = opt.includes('Smaller');
-                  setCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
-                }}
-                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
-                    answer === opt
-                      ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
-                      : 'border-stone-200 bg-white hover:border-stone-300'
-                  }`}>
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </QuestionPanel>
-
-          {/* 1.9 — Wright's drift model callout */}
-          <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
-            <strong className="text-stone-800">Wright's drift model (Wright 1931).</strong>{' '}
-            In a population of finite size N, allele frequencies fluctuate at random from generation to
-            generation because the next generation's gamete pool is a finite sample from the current one.{' '}
-            <strong>Sewall Wright</strong> at the University of Chicago worked this out in his 1931 paper{' '}
-            <em>Evolution in Mendelian Populations</em> (<em>Genetics</em>, 16: 97-159), one of the three
-            foundational papers of theoretical population genetics (along with Fisher 1930 and Haldane 1932).
-            Wright showed that the variance of p per generation is p(1 {'\u2212'} p) / (2N) — the smaller
-            the population, the faster drift operates.
-          </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -767,12 +931,15 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
 
       {results && (
         <>
-          <FrequencyChart
-            trajectories={results}
+          <AlleleTrajectoryVisualizer
+            popSize={500}
+            initialFreqA={0.2}
             generations={gens}
-            colors={['#ddd6fe', '#a78bfa', '#7c3aed']}
-            labels={['s = 0.05 (weak)', 's = 0.10 (medium)', `s = ${selCoeff.toFixed(2)} (your choice)`]}
+            nReplicates={1}
             yLabel="Freq(R)"
+            trajectories={results}
+            trajectoryColors={['#ddd6fe', '#a78bfa', '#7c3aed']}
+            trajectoryLabels={['s = 0.05 (weak)', 's = 0.10 (medium)', `s = ${selCoeff.toFixed(2)} (your choice)`]}
           />
 
           <QuestionPanel
@@ -826,7 +993,8 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
 
 function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
   const [migRate, setMigRate] = useState(0.05);
-  const [results, setResults] = useState<number[][] | null>(null);
+  const [hasRun, setHasRun] = useState(false);
+  const [simKey, setSimKey] = useState(0);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
 
@@ -837,25 +1005,10 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
 
   const gens = 80;
 
-  const runSim = useCallback(() => {
-    // Two-island migration model (Mimulus serpentine/non-serpentine)
-    const m = migRate;
-    const p1Init = 0.1;
-    const p2Init = 0.9;
-    let p1 = p1Init;
-    let p2 = p2Init;
-    const history1: number[] = [p1];
-    const history2: number[] = [p2];
-    for (let t = 0; t < gens; t++) {
-      const newP1 = (1 - m) * p1 + m * p2;
-      const newP2 = (1 - m) * p2 + m * p1;
-      p1 = newP1;
-      p2 = newP2;
-      history1.push(p1);
-      history2.push(p2);
-    }
-    setResults([history1, history2]);
-  }, [migRate]);
+  const runSim = () => {
+    setSimKey(k => k + 1);
+    setHasRun(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -915,14 +1068,16 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
         </button>
       </div>
 
-      {results && (
+      {hasRun && (
         <>
-          <FrequencyChart
-            trajectories={results}
+          <AlleleTrajectoryVisualizer
+            key={`mig-${simKey}`}
+            popSize={500}
+            initialFreqA={0.5}
             generations={gens}
-            colors={['#7c3aed', '#f59e0b']}
-            labels={['Serpentine site (starts p=0.1)', 'Non-serpentine meadow (starts p=0.9)']}
+            nReplicates={1}
             yLabel="Freq(M)"
+            twoIsland={{ p1Init: 0.1, p2Init: 0.9, migRate: migRate, generations: gens }}
           />
 
           <QuestionPanel
@@ -997,7 +1152,7 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
       mutationRate: mu,
     });
     // We track freq of Chl (dominant), but we want freq of 'chl' = 1-p
-    setResult(sim.freqHistory.map(p => 1 - p));
+    setResult(sim.freqHistory.map(pVal => 1 - pVal));
   }, [mu, s]);
 
   return (
@@ -1071,11 +1226,14 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
 
       {result && (
         <>
-          <FrequencyChart
-            trajectories={[result]}
+          <AlleleTrajectoryVisualizer
+            popSize={5000}
+            initialFreqA={1.0}
             generations={gens}
-            colors={['#7c3aed']}
-            yLabel="Freq(chl) — deleterious"
+            nReplicates={1}
+            yLabel="Freq(chl)"
+            trajectories={[result]}
+            trajectoryColors={['#7c3aed']}
           />
 
           {/* Formula revealed AFTER sim (per 1.7) */}
