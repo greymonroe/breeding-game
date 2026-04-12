@@ -253,13 +253,12 @@ export function AlleleTrajectoryVisualizer({
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  // Run once on mount if no controls (auto-run mode)
+  // Auto-run when no controls — re-run when simulation-relevant props change
   useEffect(() => {
     if (!showControls && !externalTrajectories) {
       runSimulation();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showControls, externalTrajectories, runSimulation]);
 
   // ── Build polyline points ────────────────────────────────────────────────
 

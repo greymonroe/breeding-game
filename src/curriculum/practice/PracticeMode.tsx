@@ -236,6 +236,7 @@ export function PracticeMode({
         allConcepts={allConcepts}
         conceptLabels={conceptLabels}
         theme={theme}
+        themeColor={themeColor}
       />
     );
   }
@@ -250,6 +251,7 @@ export function PracticeMode({
         progress={{ index: sessionResults.length + 1, total: SESSION_LENGTH }}
         conceptLabels={conceptLabels}
         theme={theme}
+        themeColor={themeColor}
       />
     );
   }
@@ -263,6 +265,7 @@ export function PracticeMode({
         onBack={backToLanding}
         conceptLabels={conceptLabels}
         theme={theme}
+        themeColor={themeColor}
       />
     );
   }
@@ -277,12 +280,14 @@ function LandingCard({
   allConcepts,
   conceptLabels,
   theme,
+  themeColor = 'emerald',
 }: {
   state: PracticeState;
   onStart: () => void;
   allConcepts: readonly string[];
   conceptLabels: Record<string, string>;
   theme: ReturnType<typeof themeClasses>;
+  themeColor?: ThemeColor;
 }) {
   const streak = getStreakDisplay(state);
 
@@ -299,7 +304,7 @@ function LandingCard({
               immediate feedback, spaced-repetition scheduling.
             </p>
           </div>
-          <StreakPill streak={streak} />
+          <StreakPill streak={streak} themeColor={themeColor} />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
@@ -374,8 +379,10 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 
 function StreakPill({
   streak,
+  themeColor = 'emerald',
 }: {
   streak: { current: number; best: number; isToday: boolean };
+  themeColor?: ThemeColor;
 }) {
   const msg =
     streak.current === 0
@@ -383,8 +390,11 @@ function StreakPill({
       : streak.isToday
       ? `${streak.current} day streak \u2014 keep it up`
       : `${streak.current} day streak \u2014 practice today to extend it`;
+  const colorClasses = themeColor === 'violet'
+    ? 'border-violet-200 bg-violet-50 text-violet-800'
+    : 'border-emerald-200 bg-emerald-50 text-emerald-800';
   return (
-    <div className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800 flex items-center gap-1.5">
+    <div className={`rounded-full border ${colorClasses} px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5`}>
       <span aria-hidden>{'\uD83D\uDD25'}</span>
       <span>{msg}</span>
     </div>
@@ -402,6 +412,7 @@ function SessionCard({
   progress,
   conceptLabels,
   theme,
+  themeColor = 'emerald',
 }: {
   state: PracticeState;
   problem: PracticeProblem;
@@ -411,6 +422,7 @@ function SessionCard({
   progress: { index: number; total: number };
   conceptLabels: Record<string, string>;
   theme: ReturnType<typeof themeClasses>;
+  themeColor?: ThemeColor;
 }) {
   const answered = selectedIdx !== null;
   const selectedOption =
@@ -429,7 +441,7 @@ function SessionCard({
             {conceptLabels[problem.concept] ?? problem.concept}
           </span>
         </div>
-        <StreakPill streak={streak} />
+        <StreakPill streak={streak} themeColor={themeColor} />
       </div>
 
       <ProgressBar current={progress.index} total={progress.total} theme={theme} />
@@ -625,6 +637,7 @@ function Scorecard({
   onBack,
   conceptLabels,
   theme,
+  themeColor = 'emerald',
 }: {
   state: PracticeState;
   results: SessionResult[];
@@ -633,6 +646,7 @@ function Scorecard({
   onBack: () => void;
   conceptLabels: Record<string, string>;
   theme: ReturnType<typeof themeClasses>;
+  themeColor?: ThemeColor;
 }) {
   const correctCount = results.filter(r => r.correct).length;
   const perfect = correctCount === results.length && results.length > 0;
@@ -682,7 +696,7 @@ function Scorecard({
               : 'Review your answers below and keep practicing.'}
           </p>
         </div>
-        <StreakPill streak={streak} />
+        <StreakPill streak={streak} themeColor={themeColor} />
       </div>
 
       <div className={`rounded-xl border ${theme.scoreBorder} ${theme.scoreBg} p-5 text-center relative`}>

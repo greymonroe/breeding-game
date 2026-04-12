@@ -100,6 +100,7 @@ function round(x: number, n: number): number {
 //
 // Discovery beat: the student must apply the HW equation, not just recall it.
 
+// Exclude p=0.5 — the "swap p and q" distractor is identical to the correct answer at p=0.5
 const HWE_P_VALUES = [0.2, 0.3, 0.4, 0.6, 0.7, 0.8] as const;
 
 function generateForwardHWE(rng: Rng): PracticeProblem {

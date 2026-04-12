@@ -12,7 +12,7 @@
  *  7. Founder Effect — sampling shifts allele frequencies (Hawaiian Bidens)
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   simulate, hardyWeinberg, testHWE, sampleZygotes,
 } from './popgen-engine';
@@ -53,15 +53,25 @@ const PLANT_EXAMPLES = {
     species: 'Amaranthus palmeri',
     common: 'Palmer amaranth',
     alleles: { dominant: 'R', recessive: 's' },
+    genotypeLabels: { AA: 'RR', Aa: 'Rs', aa: 'ss' },
+    colors: { AA: '#15803d', Aa: '#4ade80', aa: '#fde68a' },
+    borders: { AA: '#166534', Aa: '#22c55e', aa: '#fbbf24' },
   },
   arabidopsis: {
     species: 'Arabidopsis thaliana',
     common: 'thale cress',
     alleles: { dominant: 'Chl', recessive: 'chl' },
+    genotypeLabels: { AA: 'Chl/Chl', Aa: 'Chl/chl', aa: 'chl/chl' },
+    colors: { AA: '#15803d', Aa: '#86efac', aa: '#fefce8' },
+    borders: { AA: '#166534', Aa: '#4ade80', aa: '#fef08a' },
   },
   bidens: {
     species: 'Bidens',
     common: 'Hawaiian tarweeds / beggar-ticks',
+    alleles: { dominant: 'A', recessive: 'a' },
+    genotypeLabels: { AA: 'AA', Aa: 'Aa', aa: 'aa' },
+    colors: { AA: '#7c3aed', Aa: '#c4b5fd', aa: '#f5f3ff' },
+    borders: { AA: '#6d28d9', Aa: '#a78bfa', aa: '#ddd6fe' },
   },
 } as const;
 
@@ -73,16 +83,19 @@ function PopulationGrid({ genotypes, size = 16, colorScheme = 'mimulus' }: {
   size?: number;
   colorScheme?: 'mimulus' | 'violet';
 }) {
-  const individuals: ('AA' | 'Aa' | 'aa')[] = [];
-  for (let i = 0; i < genotypes.AA; i++) individuals.push('AA');
-  for (let i = 0; i < genotypes.Aa; i++) individuals.push('Aa');
-  for (let i = 0; i < genotypes.aa; i++) individuals.push('aa');
+  const individuals = useMemo(() => {
+    const arr: ('AA' | 'Aa' | 'aa')[] = [];
+    for (let i = 0; i < genotypes.AA; i++) arr.push('AA');
+    for (let i = 0; i < genotypes.Aa; i++) arr.push('Aa');
+    for (let i = 0; i < genotypes.aa; i++) arr.push('aa');
 
-  // Shuffle for visual randomness
-  for (let i = individuals.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [individuals[i], individuals[j]] = [individuals[j], individuals[i]];
-  }
+    // Shuffle for visual randomness (stable across re-renders)
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [genotypes.AA, genotypes.Aa, genotypes.aa]);
 
   const mimulusColors = PLANT_EXAMPLES.mimulus.colors;
   const mimulusBorders = PLANT_EXAMPLES.mimulus.borders;
@@ -130,6 +143,13 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backAnswer, setBackAnswer] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   const handlePrediction = (ans: string) => {
     setPrediction(ans);
@@ -151,7 +171,7 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
     <div className="space-y-6">
       {/* Historical framing */}
       <div className="rounded-lg bg-stone-50 border border-stone-200 p-4 text-sm text-stone-700 space-y-3">
-        <p style={{ fontFamily: "'Patrick Hand', cursive" }} className="text-lg font-bold text-stone-800">
+        <p className="font-hand text-lg font-bold text-stone-800">
           The dinner-table proof that settled a decade of confusion
         </p>
         <p>
@@ -221,7 +241,7 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
 
           {/* Hardy's algebra */}
           <div className="rounded-lg bg-violet-50 border border-violet-200 p-4 text-sm text-violet-900 space-y-3">
-            <p style={{ fontFamily: "'Patrick Hand', cursive" }} className="text-lg font-bold text-violet-800">
+            <p className="font-hand text-lg font-bold text-violet-800">
               Hardy's one-page algebra
             </p>
             <p>
@@ -245,7 +265,7 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
             question="Why does Hardy's one-page letter matter beyond settling a dinner dispute?"
             correct={exitCorrect}
             feedback={exitCorrect === true
-              ? 'You just learned the single most important move in population genetics: Hardy-Weinberg is the null. Every experiment in this module breaks one of Hardy\'s five assumptions, and we\'ll use HWE as the baseline against which we detect each force — drift (Exp 4), selection (Exp 5), migration (Exp 6), mutation-selection balance (Exp 7), founder effect (Exp 8).'
+              ? 'You just learned the single most important move in population genetics: Hardy-Weinberg is the null. Every experiment in this module breaks one of Hardy\'s five assumptions, and we\'ll use HWE as the baseline against which we detect each force — drift (Genetic Drift), selection (Natural Selection), migration (Migration), mutation-selection balance (Mutation-Selection), founder effect (Founder Effect).'
               : exitCorrect === false
               ? 'Think again: Hardy showed that under ideal conditions, allele frequencies don\'t change. What does that give us when we study real populations?'
               : undefined}
@@ -272,32 +292,33 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
           {/* Backward problem */}
           {forwardEverCorrect && (
             <QuestionPanel
-              question="If you observe a Mimulus population where p(M) drifted from 0.5 to 0.62 over 10 generations at N=200, is this consistent with HWE + drift alone, or does it require invoking selection?"
+              question="You observe a Mimulus population where 25% of plants have the mm (cream) phenotype. If the population is in HWE, what is p(M)?"
               correct={backCorrect}
               feedback={backCorrect === true
-                ? 'Correct. At N=200, per-generation variance is p(1\u2212p)/(2N) = 0.25/400 = 0.000625. Over 10 independent generations, cumulative variance \u2248 10 \u00D7 0.000625 = 0.00625, so SD \u2248 0.079. A shift of 0.12 is ~1.5 SD \u2014 easily within drift range. No need to invoke selection.'
+                ? 'Correct! If 25% are mm, then q\u00B2 = 0.25, so q = \u221A0.25 = 0.5, and p = 1 \u2212 q = 0.5. The key insight: you must take the square root of the recessive phenotype frequency to get the recessive allele frequency, not use the phenotype frequency directly.'
                 : backCorrect === false
-                ? 'Think about the expected standard deviation of drift over 10 generations. Per-generation variance = p(1\u2212p)/(2N). Over t generations, cumulative variance \u2248 t \u00D7 p(1\u2212p)/(2N). Compute the SD and compare to the observed shift of 0.12.'
+                ? 'Remember: under HWE, the frequency of mm = q\u00B2. If 25% are mm, what is q? And then what is p = 1 \u2212 q?'
                 : undefined}
             >
               <div className="flex flex-col gap-2">
                 {[
-                  { key: 'a', label: 'Drift alone at N=200 could easily produce this \u2014 the expected SD over 10 gens is substantial' },
-                  { key: 'b', label: 'This requires selection \u2014 drift cannot move frequencies this much' },
-                  { key: 'c', label: 'HWE means frequencies never change, so something is wrong' },
-                  { key: 'd', label: 'Cannot tell without knowing the selection coefficient' },
+                  { key: 'a', label: 'p(M) = 0.75 (confused phenotype frequency with allele frequency)' },
+                  { key: 'b', label: 'p(M) = 0.50 (q = \u221A0.25 = 0.5, so p = 0.5)' },
+                  { key: 'c', label: 'p(M) = 0.25 (using mm frequency directly as allele frequency)' },
+                  { key: 'd', label: 'Cannot determine p(M) from phenotype data alone' },
                 ].map(opt => (
                   <button key={opt.key} onClick={() => {
                     setBackAnswer(opt.key);
-                    const isCorrect = opt.key === 'a';
+                    const isCorrect = opt.key === 'b';
                     setBackCorrect(isCorrect);
-                    if (isCorrect) setTimeout(onComplete, 1500);
+                    if (isCorrect) setBackCompleted(true);
                   }}
+                    disabled={backCompleted}
                     className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
                       backAnswer === opt.key
                         ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                         : 'border-stone-200 bg-white hover:border-stone-300'
-                    }`}>
+                    } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
                     ({opt.key}) {opt.label}
                   </button>
                 ))}
@@ -336,12 +357,21 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
   const trueP = countM / totalAlleles;
   const trueQ = countm / totalAlleles;
 
+  const [visualEstimate, setVisualEstimate] = useState('');
+  const [visualCorrect, setVisualCorrect] = useState<boolean | null>(null);
   const [pInput, setPInput] = useState('');
   const [qInput, setQInput] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backInput, setBackInput] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted1, setBackCompleted1] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted1) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted1, onComplete]);
 
   const handleCheck = () => {
     const pVal = parseFloat(pInput);
@@ -374,6 +404,43 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
       </p>
 
       <PopulationGrid genotypes={pop} colorScheme="mimulus" />
+
+      {/* Fix 10: Prediction step — visual estimation before counting */}
+      <QuestionPanel
+        question="Looking at the grid of Mimulus plants, estimate p(M) before counting. Is it closer to 0.3, 0.5, or 0.7?"
+        correct={visualCorrect}
+        feedback={visualCorrect === true
+          ? `Good eye! The actual p(M) = ${trueP.toFixed(3)}. Now count precisely to verify.`
+          : visualCorrect === false
+          ? `Not quite \u2014 the actual p(M) = ${trueP.toFixed(3)}. Visual estimation is a useful first check, but always count to be sure.`
+          : undefined}
+      >
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: '0.3', label: 'Closer to 0.3' },
+            { key: '0.5', label: 'Closer to 0.5' },
+            { key: '0.7', label: 'Closer to 0.7' },
+          ].map(opt => {
+            const optVal = parseFloat(opt.key);
+            const diffs = [Math.abs(trueP - 0.3), Math.abs(trueP - 0.5), Math.abs(trueP - 0.7)];
+            const closestIdx = diffs.indexOf(Math.min(...diffs));
+            const closestVal = [0.3, 0.5, 0.7][closestIdx];
+            return (
+              <button key={opt.key} onClick={() => {
+                setVisualEstimate(opt.key);
+                setVisualCorrect(optVal === closestVal);
+              }}
+                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                  visualEstimate === opt.key
+                    ? visualCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                    : 'border-stone-200 bg-white hover:border-stone-300'
+                }`}>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </QuestionPanel>
 
       <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
         <strong>Your task:</strong> Count the genotypes directly from the grid above.
@@ -432,9 +499,10 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
               const val = parseInt(backInput, 10);
               const isCorrect = !Number.isNaN(val) && Math.abs(val - 24) <= 3;
               setBackCorrect(isCorrect);
-              if (isCorrect) setTimeout(onComplete, 1500);
+              if (isCorrect) setBackCompleted1(true);
             }}
-              className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg">
+              disabled={backCompleted1}
+              className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg disabled:opacity-50">
               Check
             </button>
           </div>
@@ -470,6 +538,13 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backAnswer, setBackAnswer] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted2, setBackCompleted2] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted2) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted2, onComplete]);
 
   // Noise literacy panel state (kept from Phase 1)
   const [showNoise, setShowNoise] = useState(false);
@@ -782,12 +857,12 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
               </div>
 
               <QuestionPanel
-                question={`After one generation of selection against mm (X\u00B2 = ${selChiSquare.toFixed(2)} vs original HWE), is this population still in Hardy-Weinberg equilibrium relative to p = ${p}?`}
+                question={`After one generation of selection against mm (X\u00B2 = ${selChiSquare.toFixed(2)} vs original HWE at p = ${p}), is this population still in Hardy-Weinberg equilibrium relative to the original p = ${p}?`}
                 correct={selCorrect}
                 feedback={selCorrect === true
-                  ? `Correct! Selection changed the allele frequency away from p = ${p}, so the genotype frequencies no longer match the original HWE expectations. HWE breaks when any of the five assumptions break. You just broke the "no selection" assumption.`
+                  ? `Correct! The chi-square is large not because random mating broke, but because the allele frequency shifted. Selection changed p from ${p} to ~${((p * p * 1 + p * (1 - p) * 1) / (p * p * 1 + 2 * p * (1 - p) * 1 + (1 - p) * (1 - p) * 0.5)).toFixed(3)} in just one generation. The post-selection genotypes ARE in HWE at their new p \u2014 random mating still works fine. But HWE assumes allele frequencies don't change, and selection violates that assumption.`
                   : selCorrect === false
-                  ? `Look at X\u00B2 = ${selChiSquare.toFixed(2)}. That is far above 3.84. Selection against mm shifted allele frequencies away from p = ${p} \u2014 the population has departed from HWE.`
+                  ? `Look at X\u00B2 = ${selChiSquare.toFixed(2)}. That is far above 3.84. Selection against mm shifted the allele frequency away from p = ${p}, so the genotypes no longer match the original HWE expectations.`
                   : undefined}
               >
                 <div className="flex gap-2 flex-wrap">
@@ -896,13 +971,14 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
                 setBackAnswer(opt.key);
                 const isCorrect = opt.key === 'a';
                 setBackCorrect(isCorrect);
-                if (isCorrect) setTimeout(onComplete, 1500);
+                if (isCorrect) setBackCompleted2(true);
               }}
+                disabled={backCompleted2}
                 className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
                   backAnswer === opt.key
                     ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                     : 'border-stone-200 bg-white hover:border-stone-300'
-                }`}>
+                } ${backCompleted2 ? 'opacity-70 cursor-default' : ''}`}>
                 ({opt.key}) {opt.label}
               </button>
             ))}
@@ -932,6 +1008,13 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backAnswer, setBackAnswer] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted3, setBackCompleted3] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted3) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted3, onComplete]);
 
   // Simulation key to force re-render of AlleleTrajectoryVisualizer
   const [simKey, setSimKey] = useState(0);
@@ -1125,13 +1208,14 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
                         setBackAnswer(opt.key);
                         const isCorrect = opt.key === 'b';
                         setBackCorrect(isCorrect);
-                        if (isCorrect) setTimeout(onComplete, 1500);
+                        if (isCorrect) setBackCompleted3(true);
                       }}
+                        disabled={backCompleted3}
                         className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
                           backAnswer === opt.key
                             ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                             : 'border-stone-200 bg-white hover:border-stone-300'
-                        }`}>
+                        } ${backCompleted3 ? 'opacity-70 cursor-default' : ''}`}>
                         ({opt.key}) {opt.label}
                       </button>
                     ))}
@@ -1163,6 +1247,13 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backAnswer, setBackAnswer] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted4, setBackCompleted4] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted4) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted4, onComplete]);
 
   const gens = 100;
 
@@ -1208,6 +1299,15 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
         reduced fitness. Starting with p(R) = 0.2, watch how selection increases the resistant allele.
       </p>
 
+      {/* Fix 5: Motivate the Δp formula before asking students to use it */}
+      <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
+        <strong>Where does the formula come from?</strong> Selection against a recessive homozygote (ss)
+        acts only on the fraction q{'\u00B2'} of the population. The per-generation change in p depends on
+        how many susceptible homozygotes there are (q{'\u00B2'}), how many R alleles exist in the population (p),
+        and how strong selection is (s). The exact formula is {'\u0394'}p = s{'\u00B7'}p{'\u00B7'}q{'\u00B2'} / (1 {'\u2212'} s{'\u00B7'}q{'\u00B2'}),
+        where the denominator accounts for the reduced total population fitness.
+      </div>
+
       {/* 1.5 — Prediction before selection */}
       <QuestionPanel
         question={`Before simulating, calculate \u0394p for the first generation. Given p(R) = ${predP}, q(s) = ${predQ}, selection coefficient s = ${predS} against ss homozygotes. Use the formula: \u0394p = s\u00B7p\u00B7q\u00B2 / (1 \u2212 s\u00B7q\u00B2)`}
@@ -1246,6 +1346,7 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
         </label>
         <input type="range" min="0.01" max="0.5" step="0.01" value={selCoeff}
           onChange={e => setSelCoeff(parseFloat(e.target.value))}
+          aria-label="Selection coefficient s"
           className="w-40 accent-violet-500" />
         <span className="text-sm font-mono text-violet-700">{selCoeff.toFixed(2)}</span>
         <button onClick={runSim}
@@ -1331,13 +1432,14 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
                     setBackAnswer(opt.key);
                     const isCorrect = opt.key === 'a';
                     setBackCorrect(isCorrect);
-                    if (isCorrect) setTimeout(onComplete, 1500);
+                    if (isCorrect) setBackCompleted4(true);
                   }}
+                    disabled={backCompleted4}
                     className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
                       backAnswer === opt.key
                         ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                         : 'border-stone-200 bg-white hover:border-stone-300'
-                    }`}>
+                    } ${backCompleted4 ? 'opacity-70 cursor-default' : ''}`}>
                     ({opt.key}) {opt.label}
                   </button>
                 ))}
@@ -1368,6 +1470,13 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backAnswer, setBackAnswer] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted5, setBackCompleted5] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted5) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted5, onComplete]);
 
   const gens = 80;
 
@@ -1426,6 +1535,7 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
         <label className="text-sm font-semibold text-stone-600">Migration rate:</label>
         <input type="range" min="0.01" max="0.2" step="0.01" value={migRate}
           onChange={e => setMigRate(parseFloat(e.target.value))}
+          aria-label="Migration rate m"
           className="w-40 accent-violet-500" />
         <span className="text-sm font-mono text-violet-700">{migRate.toFixed(2)}</span>
         <button onClick={runSim}
@@ -1494,9 +1604,9 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
               question="Two Mimulus populations start at p\u2081=0.0 and p\u2082=1.0. After 30 generations of symmetric migration at m=0.03, you observe p\u2081=0.42 and p\u2082=0.58. Is this consistent with migration alone?"
               correct={backCorrect}
               feedback={backCorrect === true
-                ? 'Correct. The symmetric two-island model predicts p\u2081(t) = 0.5 \u2212 0.5\u00B7(1\u22122m)\u1D57. With m=0.03: (0.94)\u00B3\u2070 \u2248 0.154, so p\u2081(30) \u2248 0.5 \u2212 0.077 = 0.42. The observed values match the closed-form prediction for migration alone.'
+                ? 'Yes, this is consistent. With m = 0.03, both populations are still converging toward 0.5 at generation 30. The convergence is exponential \u2014 fast at first, then slower as they approach the midpoint. The observed values of 0.42 and 0.58 are symmetric around 0.5 and match what the two-island model predicts.'
                 : backCorrect === false
-                ? 'Use the formula p\u2081(t) = 0.5 \u2212 0.5\u00B7(1\u22122m)\u1D57. Plug in m=0.03, t=30. Does the predicted p\u2081(30) match 0.42?'
+                ? 'Think about the migration model: each generation, both populations move toward the average. With m = 0.03 and 30 generations, would they have fully converged yet?'
                 : undefined}
             >
               <div className="flex flex-col gap-2">
@@ -1510,13 +1620,14 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
                     setBackAnswer(opt.key);
                     const isCorrect = opt.key === 'a';
                     setBackCorrect(isCorrect);
-                    if (isCorrect) setTimeout(onComplete, 1500);
+                    if (isCorrect) setBackCompleted5(true);
                   }}
+                    disabled={backCompleted5}
                     className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
                       backAnswer === opt.key
                         ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                         : 'border-stone-200 bg-white hover:border-stone-300'
-                    }`}>
+                    } ${backCompleted5 ? 'opacity-70 cursor-default' : ''}`}>
                     ({opt.key}) {opt.label}
                   </button>
                 ))}
@@ -1547,6 +1658,13 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backInput, setBackInput] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted6, setBackCompleted6] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted6) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted6, onComplete]);
 
   const gens = 500;
   const expectedEq = Math.sqrt(mu / s);
@@ -1585,15 +1703,15 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
       >
         <div className="flex gap-2 flex-wrap">
           {[
-            { key: 'a', label: 'q\u0302 = 0 (selection eliminates it completely)' },
-            { key: 'b', label: 'q\u0302 = 1 (mutation dominates)' },
-            { key: 'c', label: 'q\u0302 \u2248 0.5 (intermediate balance)' },
-            { key: 'd', label: 'q\u0302 \u2248 0.014 (very low but nonzero)' },
+            { key: 'a', label: 'The mutant allele will be completely eliminated (q\u0302 = 0)' },
+            { key: 'b', label: 'The mutant allele will reach high frequency (q\u0302 > 0.1)' },
+            { key: 'c', label: 'The mutant allele will settle at a very low but nonzero frequency' },
+            { key: 'd', label: 'The mutant allele frequency will fluctuate randomly with no equilibrium' },
           ].map(opt => (
             <button key={opt.key} onClick={() => {
               if (!predLocked) {
                 setPredAnswer(opt.key);
-                const isCorrect = opt.key === 'd';
+                const isCorrect = opt.key === 'c';
                 setPredCorrect(isCorrect);
                 if (isCorrect) setPredLocked(true);
               }
@@ -1615,6 +1733,7 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
           <label className="block text-xs text-stone-500 mb-1">Mutation rate ({'\u03BC'})</label>
           <input type="range" min="0.0001" max="0.01" step="0.0001" value={mu}
             onChange={e => setMu(parseFloat(e.target.value))}
+            aria-label="Mutation rate mu"
             className="w-32 accent-violet-500" />
           <span className="ml-2 text-xs font-mono text-violet-700">{mu.toFixed(4)}</span>
         </div>
@@ -1622,6 +1741,7 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
           <label className="block text-xs text-stone-500 mb-1">Selection coefficient (s)</label>
           <input type="range" min="0.01" max="0.5" step="0.01" value={s}
             onChange={e => setS(parseFloat(e.target.value))}
+            aria-label="Selection coefficient s"
             className="w-32 accent-violet-500" />
           <span className="ml-2 text-xs font-mono text-violet-700">{s.toFixed(2)}</span>
         </div>
@@ -1717,9 +1837,10 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
                   const val = parseFloat(backInput);
                   const isCorrect = !Number.isNaN(val) && Math.abs(val - 0.0002) <= 0.0001;
                   setBackCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
+                  if (isCorrect) setBackCompleted6(true);
                 }}
-                  className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg">
+                  disabled={backCompleted6}
+                  className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg disabled:opacity-50">
                   Check
                 </button>
               </div>
@@ -1743,6 +1864,13 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
   const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
   const [backAnswer, setBackAnswer] = useState('');
   const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted7, setBackCompleted7] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted7) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted7, onComplete]);
 
   const sourceP = 0.5;
   const nTrials = 20;
@@ -1850,7 +1978,7 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
           </div>
 
           <QuestionPanel
-            question="Try different founder sizes above. If you halve the founder population size, how does the spread of founder allele frequencies change? (Hint: standard deviation scales as 1/\u221AN.)"
+            question="Try different founder sizes above. If you halve the founder population size, how does the spread of founder allele frequencies change?"
             correct={correct}
             feedback={correct === true
               ? 'Correct. Since \u03C3 \u221D 1/\u221A(2N), halving N multiplies the spread by \u221A2 \u2248 1.41 — so the spread increases substantially (roughly doubles in a qualitative sense). Smaller founding groups deviate from the source more dramatically; this is why founder effects are strongest for the smallest colonizing groups.'
@@ -1904,13 +2032,14 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
                     setBackAnswer(opt.key);
                     const isCorrect = opt.key === 'a';
                     setBackCorrect(isCorrect);
-                    if (isCorrect) setTimeout(onComplete, 1500);
+                    if (isCorrect) setBackCompleted7(true);
                   }}
+                    disabled={backCompleted7}
                     className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
                       backAnswer === opt.key
                         ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
                         : 'border-stone-200 bg-white hover:border-stone-300'
-                    }`}>
+                    } ${backCompleted7 ? 'opacity-70 cursor-default' : ''}`}>
                     ({opt.key}) {opt.label}
                   </button>
                 ))}
