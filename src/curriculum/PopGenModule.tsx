@@ -20,6 +20,7 @@ import {
   ModuleShell, QuestionPanel, HistogramChart, AlleleTrajectoryVisualizer,
   type ModuleDefinition,
 } from './components';
+import { PlantIcon } from '../shared/icons/PlantIcon';
 
 // ── Plant example mapping ──────────────────────────────────────────────
 /**
@@ -108,25 +109,31 @@ function PopulationGrid({ genotypes, size = 20, colorScheme = 'mimulus' }: {
   const labels = colorScheme === 'mimulus' ? PLANT_EXAMPLES.mimulus.genotypeLabels : { AA: 'AA', Aa: 'Aa', aa: 'aa' };
 
   return (
-    <div className="flex flex-wrap gap-1.5 justify-center mx-auto" style={{ maxWidth: `${10 * (size + 6) + 12}px` }}>
+    <div className="flex flex-wrap gap-1 justify-center mx-auto" style={{ maxWidth: `${10 * (size + 4) + 12}px` }}>
       {individuals.map((g, i) => (
-        <div key={i} className="flex items-center justify-center rounded-full border"
-          style={{
-            width: size, height: size,
-            backgroundColor: colorMap[g],
-            borderColor: borderMap[g],
-          }}
-          title={labels[g]} />
+        <div key={i} title={labels[g]}>
+          <PlantIcon
+            color={colorMap[g]}
+            strokeColor={borderMap[g]}
+            pixelSize={size}
+            size="sm"
+            height={35}
+            showSoil={false}
+          />
+        </div>
       ))}
       <div className="w-full flex justify-center gap-4 mt-2 text-[11px] text-stone-500">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3.5 h-3.5 rounded-full" style={{ backgroundColor: colorMap.AA }} /> {labels.AA}
+          <PlantIcon color={colorMap.AA} strokeColor={borderMap.AA} pixelSize={14} size="sm" height={35} showSoil={false} />
+          {labels.AA}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3.5 h-3.5 rounded-full" style={{ backgroundColor: colorMap.Aa }} /> {labels.Aa}
+          <PlantIcon color={colorMap.Aa} strokeColor={borderMap.Aa} pixelSize={14} size="sm" height={35} showSoil={false} />
+          {labels.Aa}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3.5 h-3.5 rounded-full border" style={{ backgroundColor: colorMap.aa, borderColor: borderMap.aa }} /> {labels.aa}
+          <PlantIcon color={colorMap.aa} strokeColor={borderMap.aa} pixelSize={14} size="sm" height={35} showSoil={false} />
+          {labels.aa}
         </span>
       </div>
     </div>

@@ -20,3 +20,5 @@ export { AlleleTrajectoryVisualizer } from './AlleleTrajectoryVisualizer';
 export type { AlleleTrajectoryVisualizerProps } from './AlleleTrajectoryVisualizer';
 export { CrossoverVisualizer } from './CrossoverVisualizer';
 export type { CrossoverVisualizerProps } from './CrossoverVisualizer';
+export { OffspringGrid } from './OffspringGrid';
+export type { OffspringGridProps } from './OffspringGrid';

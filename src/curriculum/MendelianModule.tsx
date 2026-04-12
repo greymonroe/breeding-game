@@ -24,6 +24,7 @@ import {
 } from './genetics-engine';
 import {
   ModuleShell, QuestionPanel, CrossWorkbench, HistogramChart, GameteVisualizer, RatioBar,
+  OffspringGrid, phenotypeFill,
   type ModuleDefinition,
 } from './components';
 
@@ -341,6 +342,20 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
         />
       )}
 
+      {/* Offspring garden — F1 plants rendered as tiny flowers so the
+          all-red result is visually obvious before the RatioBar abstraction. */}
+      {f1Result && (
+        <OffspringGrid
+          offspring={Object.entries(f1Result.phenotypeCounts).map(([phenotype, count]) => ({
+            phenotype,
+            color: phenotypeFill(phenotype, [FLOWER_COLOR]),
+            count,
+          }))}
+          maxDisplay={12}
+          size={26}
+        />
+      )}
+
       {/* Observation after F1 appears. Leaves the resolution open — we have
           to run the F2 to find out whether white was destroyed or hidden. */}
       {step >= 2 && f1Result && (
@@ -374,6 +389,20 @@ function Exp0_ParticulateVsBlending({ onComplete }: { onComplete: () => void }) 
           crossResult={f2Result}
           sampleSize={40}
           label="F2 Cross: F1 × F1"
+        />
+      )}
+
+      {/* Offspring garden — F2 plants as tiny flowers. The 3:1 ratio is
+          visible as actual red and white plants before the RatioBar. */}
+      {f2Result && (
+        <OffspringGrid
+          offspring={Object.entries(f2Result.phenotypeCounts).map(([phenotype, count]) => ({
+            phenotype,
+            color: phenotypeFill(phenotype, [FLOWER_COLOR]),
+            count,
+          }))}
+          maxDisplay={40}
+          size={26}
         />
       )}
 
@@ -601,6 +630,19 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
         sampleSize={20} label="P Cross: Red × White"
       />
 
+      {/* Offspring garden — F1 all-red plants as tiny flowers */}
+      {f1Result && (
+        <OffspringGrid
+          offspring={Object.entries(f1Result.phenotypeCounts).map(([phenotype, count]) => ({
+            phenotype,
+            color: phenotypeFill(phenotype, [FLOWER_COLOR]),
+            count,
+          }))}
+          maxDisplay={20}
+          size={26}
+        />
+      )}
+
       {/* Step 2: Observe F1 */}
       {step >= 1 && (
         <QuestionPanel
@@ -679,6 +721,19 @@ function Exp1_OneGene({ onComplete }: { onComplete: () => void }) {
             sampleSize={100} label="F2 Cross: F1 × F1"
           />
         </>
+      )}
+
+      {/* Offspring garden — F2 plants showing the 3:1 as actual flowers */}
+      {f2Result && (
+        <OffspringGrid
+          offspring={Object.entries(f2Result.phenotypeCounts).map(([phenotype, count]) => ({
+            phenotype,
+            color: phenotypeFill(phenotype, [FLOWER_COLOR]),
+            count,
+          }))}
+          maxDisplay={40}
+          size={26}
+        />
       )}
 
       {/* Step 4: Observe F2 ratio */}
@@ -1223,6 +1278,21 @@ function Exp3_IncompleteDominance({ onComplete }: { onComplete: () => void }) {
             sampleSize={100} label="F2: Pink × Pink" showGenotypes
           />
         </>
+      )}
+
+      {/* Offspring garden — three flower colors in a field. The 1:2:1
+          is especially vivid here because every genotype has its own
+          visible color — red, pink, white as actual tiny plants. */}
+      {f2Result && (
+        <OffspringGrid
+          offspring={Object.entries(f2Result.phenotypeCounts).map(([phenotype, count]) => ({
+            phenotype,
+            color: phenotypeFill(phenotype, [FLOWER_COLOR_INCOMPLETE]),
+            count,
+          }))}
+          maxDisplay={40}
+          size={26}
+        />
       )}
 
       {step >= 3 && f2Result && (
