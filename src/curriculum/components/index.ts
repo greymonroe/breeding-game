@@ -16,3 +16,5 @@ export {
   FALLBACK_FILL,
 } from './colors';
 export type { PhenotypeColors } from './colors';
+export { AlleleTrajectoryVisualizer } from './AlleleTrajectoryVisualizer';
+export type { AlleleTrajectoryVisualizerProps } from './AlleleTrajectoryVisualizer';
