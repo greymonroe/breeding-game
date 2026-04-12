@@ -10,6 +10,7 @@
  * crossing over corresponds to physical chromosome exchange.
  *
  * Experiment flow:
+ *  0. Creighton & McClintock — 1931 proof that crossovers are physical
  *  1. Linked Genes — testcross shows non-1:1:1:1 ratio
  *  2. Coupling vs Repulsion — same genes, different chromosome arrangement
  *  3. Recombination Frequency — count recombinants, calculate RF%
@@ -191,6 +192,170 @@ function LinkageCrossWorkbench({ parentA, parentB, genes, recombFreqs, onCross, 
 }
 
 // ── Experiments ──────────────────────────────────────────────────────────
+
+function Exp0_CreightonMcClintock({ onComplete }: { onComplete: () => void }) {
+  const [prediction, setPrediction] = useState<string | null>(null);
+  const [predictionLocked, setPredictionLocked] = useState(false);
+  const [exitAnswer, setExitAnswer] = useState<string | null>(null);
+  const [exitCorrect, setExitCorrect] = useState<boolean | null>(null);
+
+  const handlePrediction = (key: string) => {
+    if (predictionLocked) return;
+    setPrediction(key);
+    setPredictionLocked(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Historical framing */}
+      <div className="rounded-xl bg-stone-50 border border-stone-200 p-5 space-y-3">
+        <h3 className="font-['Patrick_Hand'] text-lg text-stone-700 tracking-wide">CORNELL, 1931</h3>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          It's 1931. At Cornell, Barbara McClintock and Harriet Creighton are working on maize genetics.
+          Everyone in the field — going back to Morgan and Sturtevant in the 1910s — has been using
+          "crossing-over" as an abstract term for whatever produces recombinant offspring. Nobody has{' '}
+          <em>seen</em> a crossover. Nobody has proven that crossing-over corresponds to a physical exchange
+          of chromosome segments.
+        </p>
+        <p className="text-sm text-stone-600 leading-relaxed">
+          Creighton and McClintock have an idea: take a maize plant with two{' '}
+          <em>cytologically visible</em> markers on one chromosome — a knob at one end visible under the
+          microscope, and a translocated piece at the other end also visible — and make the same chromosome
+          carry two <em>genetic</em> markers scorable in kernels. If crossing-over is a physical exchange, then
+          every recombinant kernel should also show a physically recombinant chromosome under the scope.
+        </p>
+      </div>
+
+      {/* Prediction panel */}
+      <QuestionPanel
+        question="If crossing-over is a physical chromosome exchange, what do you predict Creighton and McClintock observed?"
+        correct={predictionLocked ? (prediction === 'physical_swap' ? true : false) : null}
+        feedback={prediction === 'physical_swap'
+          ? "Good prediction. Let's see if the data agree."
+          : predictionLocked
+          ? "Interesting prediction. Let's see what actually happened."
+          : undefined}
+      >
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: 'physical_swap', label: 'Recombinant kernels carry recombinant chromosomes (physical swap matches genetic recombination)' },
+            { key: 'same_chroms', label: 'Recombinant kernels carry the same chromosomes as parental kernels' },
+            { key: 'broken', label: 'Recombinant kernels carry broken chromosomes' },
+            { key: 'extra', label: 'Recombinant kernels carry extra chromosomes' },
+          ].map(opt => (
+            <button key={opt.key} onClick={() => handlePrediction(opt.key)}
+              disabled={predictionLocked}
+              className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                predictionLocked && prediction === opt.key
+                  ? prediction === 'physical_swap'
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-400 bg-amber-50 text-amber-800'
+                  : predictionLocked
+                  ? 'border-stone-100 bg-stone-100 text-stone-400 cursor-not-allowed'
+                  : 'border-stone-200 bg-white hover:border-stone-300 text-stone-700'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </QuestionPanel>
+
+      {/* Observation table — shown after prediction is locked */}
+      {predictionLocked && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-bold text-stone-700">What Creighton &amp; McClintock observed:</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr>
+                  <th className="border border-stone-300 bg-stone-100 px-3 py-2 text-left text-stone-600"></th>
+                  <th className="border border-stone-300 bg-stone-100 px-3 py-2 text-center text-stone-600 font-semibold">Parental chromosomes</th>
+                  <th className="border border-stone-300 bg-stone-100 px-3 py-2 text-center text-stone-600 font-semibold">Recombinant chromosomes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-stone-300 bg-stone-50 px-3 py-2 font-semibold text-stone-700">Parental kernels</td>
+                  <td className="border border-stone-300 px-3 py-2 text-center text-emerald-700 font-bold">Common (observed)</td>
+                  <td className="border border-stone-300 px-3 py-2 text-center text-stone-400">Not observed</td>
+                </tr>
+                <tr>
+                  <td className="border border-stone-300 bg-stone-50 px-3 py-2 font-semibold text-stone-700">Recombinant kernels</td>
+                  <td className="border border-stone-300 px-3 py-2 text-center text-stone-400">Not observed</td>
+                  <td className="border border-stone-300 px-3 py-2 text-center text-emerald-700 font-bold">Observed (every time!)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-stone-500 italic">
+            Every recombinant kernel had a physically recombinant chromosome. Every parental kernel had a physically parental chromosome.
+          </p>
+        </div>
+      )}
+
+      {/* Reveal callout */}
+      {predictionLocked && (
+        <div className="rounded-xl bg-violet-50 border border-violet-200 p-5 space-y-2">
+          <p className="text-sm text-violet-800 leading-relaxed">
+            <strong>Genetic recombination corresponds to physical chromosome exchange.</strong> This was the
+            first proof that crossing-over is a real cytological event, not a metaphor. Published in{' '}
+            <em>PNAS</em>, August 1931 — the single most important paper in the history of the chromosome
+            theory of inheritance.
+          </p>
+        </div>
+      )}
+
+      {/* Exit question — gates onComplete */}
+      {predictionLocked && (
+        <QuestionPanel
+          question="Why does Creighton and McClintock's result matter for everything else in this module?"
+          correct={exitCorrect}
+          feedback={exitCorrect === true
+            ? "Exactly. Because crossovers are physical exchanges, recombination frequency tells you something about physical distance. Genetic maps are maps of real chromosomes."
+            : exitCorrect === false
+            ? "Think about what it means to measure recombination frequency — if crossovers weren't physical, what would those measurements correspond to?"
+            : undefined}
+        >
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { key: 'rf_physical', label: 'It proves that RF measurements correspond to physical distances on chromosomes — so genetic maps are physical maps' },
+              { key: 'all_linked', label: 'It proves that all genes are linked' },
+              { key: 'mutation', label: 'It proves that mutation rates are constant' },
+              { key: 's_phase', label: 'It proves that chromosomes replicate during S phase' },
+            ].map(opt => (
+              <button key={opt.key} onClick={() => {
+                if (exitCorrect === true) return;
+                setExitAnswer(opt.key);
+                const isCorrect = opt.key === 'rf_physical';
+                setExitCorrect(isCorrect);
+                if (isCorrect) onComplete();
+              }}
+                disabled={exitCorrect === true}
+                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                  exitAnswer === opt.key
+                    ? exitCorrect ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-red-300 bg-red-50 text-red-800'
+                    : exitCorrect === true
+                    ? 'border-stone-100 bg-stone-100 text-stone-400 cursor-not-allowed'
+                    : 'border-stone-200 bg-white hover:border-stone-300 text-stone-700'
+                }`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </QuestionPanel>
+      )}
+
+      {/* Tease for the rest of the module */}
+      {exitCorrect === true && (
+        <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-4">
+          <p className="text-sm text-cyan-800 font-semibold">
+            Now that you believe crossovers are physical, the rest of this module is about how to measure them — and what those measurements tell you about genome architecture.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
   // Coupling: CSh/csh × csh/csh (testcross)
@@ -1315,6 +1480,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
 
 const EXPERIMENTS = [
   // Titles are plain; ModuleShell prefixes the index at render time (F-044).
+  { id: 'creighton_mcclintock', title: 'Creighton & McClintock', subtitle: 'Proving crossovers are physical', Component: Exp0_CreightonMcClintock },
   { id: 'linked_genes', title: 'Linked Genes', subtitle: 'When genes don\'t assort independently', Component: Exp1_LinkedGenes },
   { id: 'coupling_repulsion', title: 'Coupling vs Repulsion', subtitle: 'Cis and trans arrangements', Component: Exp2_CouplingRepulsion },
   { id: 'recomb_freq', title: 'Recombination Frequency', subtitle: 'Counting recombinants', Component: Exp3_RecombFrequency },

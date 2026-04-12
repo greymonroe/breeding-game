@@ -13,7 +13,7 @@ const MODULES = [
     description: 'Explore linked genes, recombination frequency, and build genetic maps.',
     difficulty: 'Intermediate',
     color: 'cyan',
-    experiments: 7,
+    experiments: 8,
     href: '/breeding-game/linkage.html',
     icon: 'chromosome' as const,
   },
