@@ -1,7 +1,8 @@
 /**
  * Population Genetics Curriculum Module
  *
- * Seven experiments exploring evolutionary forces:
+ * Eight experiments exploring evolutionary forces:
+ *  0. Hardy 1908 — why dominant alleles don't take over (historical framing)
  *  1. Allele Frequencies — count alleles, compute p and q (Mimulus guttatus)
  *  2. Hardy-Weinberg Equilibrium — predict genotype frequencies (Mimulus)
  *  3. Genetic Drift — small vs large populations (Mimulus serpentine sites)
@@ -24,19 +25,19 @@ import {
 /**
  * PLANT_EXAMPLES — experiment-to-organism mapping for the PopGen module.
  *
- * Exp 1–3, 5: Mimulus guttatus (yellow monkeyflower) — anthocyanin pigmentation
+ * Exp 0–4, 6: Mimulus guttatus (yellow monkeyflower) — anthocyanin pigmentation
  *   Alleles: M (anthocyanin, dominant) / m (null recessive)
  *   MM = deep magenta, Mm = pink-magenta, mm = cream/pale
  *
- * Exp 4: Amaranthus palmeri (Palmer amaranth) — glyphosate resistance
+ * Exp 5: Amaranthus palmeri (Palmer amaranth) — glyphosate resistance
  *   Alleles: R (resistant, dominant) / s (susceptible recessive)
  *   RR/Rs = resistant, ss = susceptible (reduced fitness under herbicide)
  *
- * Exp 6: Arabidopsis thaliana — chlorophyll biosynthesis
+ * Exp 7: Arabidopsis thaliana — chlorophyll biosynthesis
  *   Alleles: Chl (normal, dominant) / chl (null recessive)
  *   chl/chl = albino seedling, nearly lethal
  *
- * Exp 7: Hawaiian Bidens (tarweeds/beggar-ticks) — founder effect
+ * Exp 8: Hawaiian Bidens (tarweeds/beggar-ticks) — founder effect
  *   Uses abstract allele freq sampling (no specific locus), framed as Bidens colonization
  */
 const PLANT_EXAMPLES = {
@@ -114,6 +115,170 @@ function PopulationGrid({ genotypes, size = 16, colorScheme = 'mimulus' }: {
           <span className="inline-block w-3 h-3 rounded-full border" style={{ backgroundColor: colorMap.aa, borderColor: borderMap.aa }} /> {labels.aa}
         </span>
       </div>
+    </div>
+  );
+}
+
+// ── Experiment 0: Hardy 1908 + Weinberg 1908 ────────────────────────────
+
+function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
+  const [step, setStep] = useState(0);
+  const [prediction, setPrediction] = useState('');
+  const [predCorrect, setPredCorrect] = useState<boolean | null>(null);
+  const [exitAnswer, setExitAnswer] = useState('');
+  const [exitCorrect, setExitCorrect] = useState<boolean | null>(null);
+
+  const handlePrediction = (ans: string) => {
+    setPrediction(ans);
+    const isCorrect = ans === 'stays';
+    setPredCorrect(isCorrect);
+    if (isCorrect) {
+      setStep(1);
+    }
+  };
+
+  const handleExit = (ans: string) => {
+    setExitAnswer(ans);
+    const isCorrect = ans === 'null_hypothesis';
+    setExitCorrect(isCorrect);
+    if (isCorrect) setTimeout(onComplete, 1500);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Historical framing */}
+      <div className="rounded-lg bg-stone-50 border border-stone-200 p-4 text-sm text-stone-700 space-y-3">
+        <p style={{ fontFamily: "'Patrick Hand', cursive" }} className="text-lg font-bold text-stone-800">
+          The dinner-table proof that settled a decade of confusion
+        </p>
+        <p>
+          It's 1908. Gregor Mendel's 1865 pea paper has been rediscovered for eight years, the word "gene"
+          has just been coined by Wilhelm Johannsen, and biologists are wrestling with a seemingly obvious
+          question: <strong>if dominant alleles really are dominant, shouldn't they eventually take over the
+          population?</strong> After all, in every cross where a dominant allele is present, it wins the
+          phenotype. Surely, over many generations, dominance should swamp recession and every population
+          should reach 100% dominant phenotype.
+        </p>
+        <p>
+          Over a cricket dinner at Cambridge, the Mendelian geneticist <strong>Reginald Punnett</strong> mentions
+          this puzzle to his cricketing companion <strong>G. H. Hardy</strong>, who is one of the most celebrated
+          pure mathematicians in Britain and who <em>detests</em> applied mathematics on principle. Hardy is
+          annoyed enough to write a one-page letter to <em>Science</em> essentially under protest, titled{' '}
+          <em>"Mendelian Proportions in a Mixed Population,"</em> explaining the answer in algebra a first-year
+          probability student would understand. The letter appears in volume 28 of <em>Science</em>, July 10, 1908,
+          pages 49–50. In Stuttgart, the physician <strong>Wilhelm Weinberg</strong> derives the same result
+          independently earlier the same year. The result is now called the <strong>Hardy-Weinberg Theorem</strong>,
+          and it is the single most important mathematical result in population genetics.
+        </p>
+      </div>
+
+      {/* Prediction panel */}
+      <QuestionPanel
+        question="Punnett's intuition says dominant alleles should take over. You start with a Mimulus population at p(M) = 0.5 (equal frequencies of anthocyanin-producing M and non-producing m alleles), where M is dominant over m. After many generations of random mating (with no drift, no selection, no migration, no mutation), what do you predict?"
+        correct={predCorrect}
+        feedback={predCorrect === true
+          ? 'Correct — you predicted what Hardy proved: the frequency stays put. Let\'s see it in simulation.'
+          : predCorrect === false
+          ? 'Not quite. Think carefully: dominance describes phenotype expression, not allele transmission. Each Mm heterozygote still passes on m to half its offspring.'
+          : undefined}
+      >
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: 'rises', label: 'p(M) rises toward 1.0 (dominance wins eventually)' },
+            { key: 'stays', label: 'p(M) stays at 0.5 indefinitely' },
+            { key: 'falls', label: 'p(M) falls toward 0.0 (recessives eventually win)' },
+            { key: 'unknown', label: 'Cannot predict without more information' },
+          ].map(opt => (
+            <button key={opt.key} onClick={() => handlePrediction(opt.key)}
+              className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                prediction === opt.key
+                  ? predCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                  : 'border-stone-200 bg-white hover:border-stone-300'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </QuestionPanel>
+
+      {/* Observation: trajectory visualizer */}
+      {step >= 1 && (
+        <>
+          <AlleleTrajectoryVisualizer
+            popSize={10000}
+            initialFreqA={0.5}
+            generations={20}
+            nReplicates={1}
+            yLabel="p(M)"
+            presetLabel="Mimulus random mating, N = 10,000"
+          />
+          <p className="text-sm text-stone-500 italic text-center">
+            The frequency stays flat — exactly what Hardy and Weinberg predicted.
+          </p>
+
+          {/* Hardy's algebra */}
+          <div className="rounded-lg bg-violet-50 border border-violet-200 p-4 text-sm text-violet-900 space-y-3">
+            <p style={{ fontFamily: "'Patrick Hand', cursive" }} className="text-lg font-bold text-violet-800">
+              Hardy's one-page algebra
+            </p>
+            <p>
+              If the allele frequency is <em>p</em>, then under random mating the gamete pool has frequency{' '}
+              <em>p</em> for M and <em>q</em> = 1 − <em>p</em> for m. Random union of gametes produces
+              zygotes at frequencies <em>p</em><sup>2</sup> : 2<em>pq</em> : <em>q</em><sup>2</sup> — the
+              binomial expansion. The total frequency of M in the next generation is:
+            </p>
+            <div className="bg-white rounded-lg p-3 font-mono text-xs text-center">
+              p' = (2·p² + 2pq) / (2·(p² + 2pq + q²)) = p² + pq = p(p + q) = p·1 = p
+            </div>
+            <p>
+              <strong>The frequency doesn't change.</strong> Dominance describes phenotype expression, not
+              allele transmission — and Mendelian inheritance at a single locus is frequency-conservative
+              by construction.
+            </p>
+          </div>
+
+          {/* Exit question */}
+          <QuestionPanel
+            question="Why does Hardy's one-page letter matter beyond settling a dinner dispute?"
+            correct={exitCorrect}
+            feedback={exitCorrect === true
+              ? 'You just learned the single most important move in population genetics: Hardy-Weinberg is the null. Every experiment in this module breaks one of Hardy\'s five assumptions, and we\'ll use HWE as the baseline against which we detect each force — drift (Exp 4), selection (Exp 5), migration (Exp 6), mutation-selection balance (Exp 7), founder effect (Exp 8).'
+              : exitCorrect === false
+              ? 'Think again: Hardy showed that under ideal conditions, allele frequencies don\'t change. What does that give us when we study real populations?'
+              : undefined}
+          >
+            <div className="flex flex-col gap-2">
+              {[
+                { key: 'no_evolution', label: 'It proves that evolution cannot happen under Mendelian inheritance' },
+                { key: 'null_hypothesis', label: 'It provides a null hypothesis: a population that is not evolving should have frequencies stable at p\u00B2 : 2pq : q\u00B2. Any deviation is evidence that one of the five forces is operating.' },
+                { key: 'dominant_increase', label: 'It proves that dominant alleles become more common over time' },
+                { key: 'mendel_wrong', label: 'It shows that Mendelian inheritance is wrong' },
+              ].map(opt => (
+                <button key={opt.key} onClick={() => handleExit(opt.key)}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                    exitAnswer === opt.key
+                      ? exitCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </QuestionPanel>
+
+          {/* What's next tease */}
+          {exitCorrect && (
+            <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
+              <strong className="text-stone-800">What's next after PopGen?</strong> The next level up from here
+              is <strong>quantitative genetics</strong> — when many loci each contribute a small effect, the
+              population-level variance in trait value itself evolves, and the math is the{' '}
+              <strong>breeder's equation</strong> R = h²S (Lush 1937). Adjacent:{' '}
+              <strong>association mapping / GWAS</strong>, which sits on top of the linkage disequilibrium from
+              the Linkage module plus the population structure from this module.
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -1448,6 +1613,7 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
 
 const EXPERIMENTS = [
   // Titles are plain; ModuleShell prefixes the index at render time (F-044).
+  { id: 'hardy_weinberg_1908', title: 'Hardy 1908', subtitle: 'Why dominant alleles don\'t take over', Component: Exp0_HardyWeinberg1908 },
   { id: 'allele_freq', title: 'Allele Frequencies', subtitle: 'Count alleles and compute p and q in Mimulus', Component: Exp1_AlleleFrequencies },
   { id: 'hwe', title: 'Hardy-Weinberg', subtitle: 'Predict genotype frequencies from p and q', Component: Exp2_HardyWeinberg },
   { id: 'drift', title: 'Genetic Drift', subtitle: 'Small vs large Mimulus populations', Component: Exp3_GeneticDrift },
