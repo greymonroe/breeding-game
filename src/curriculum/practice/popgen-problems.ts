@@ -432,7 +432,7 @@ function generateSelectionDeltaP(rng: Rng): PracticeProblem {
     {
       label: `\u0394p = ${deltaP}`,
       isCorrect: true,
-      feedback: `Correct! \u0394p = spq\u00B2/(1\u2212sq\u00B2) = (${s})(${p})(${q})\u00B2 / (1 \u2212 (${s})(${q})\u00B2) = ${deltaP}. Selection against the susceptible ss homozygote increases the frequency of R by this amount each generation.`,
+      feedback: `Correct! \u0394p = spq\u00B2/(1\u2212sq\u00B2) = (${s})(${p})(${q})\u00B2 / (1 \u2212 (${s})(${q})\u00B2) = ${deltaP}. Selection against the susceptible rr homozygote increases the frequency of R by this amount each generation.`,
     },
     {
       label: `\u0394p = ${wrong1}`,
@@ -447,7 +447,7 @@ function generateSelectionDeltaP(rng: Rng): PracticeProblem {
     {
       label: `\u0394p = ${wrong3}`,
       isCorrect: false,
-      feedback: `Not quite. You used sp in the numerator instead of spq\u00B2. The change in p depends on both allele frequencies: \u0394p = spq\u00B2/(1\u2212sq\u00B2). The q\u00B2 term represents the frequency of the selected-against genotype (ss).`,
+      feedback: `Not quite. You used sp in the numerator instead of spq\u00B2. The change in p depends on both allele frequencies: \u0394p = spq\u00B2/(1\u2212sq\u00B2). The q\u00B2 term represents the frequency of the selected-against genotype (rr).`,
     },
   ], rng);
 
@@ -456,7 +456,7 @@ function generateSelectionDeltaP(rng: Rng): PracticeProblem {
     type: 'selection-delta-p',
     concept: 'selection-recurrence',
     difficulty: 2,
-    prompt: `In an Amaranthus palmeri population, the frequency of the glyphosate-resistance allele R is p = ${p} (so q(s) = ${q}). Glyphosate application imposes selection coefficient s = ${s} against susceptible homozygotes (ss, fitness = ${round(1 - s, 2)}). What is \u0394p for one generation?`,
+    prompt: `In an Amaranthus palmeri population, the frequency of the glyphosate-resistance allele R is p = ${p} (so q(r) = ${q}). Glyphosate application imposes selection coefficient s = ${s} against susceptible homozygotes (rr, fitness = ${round(1 - s, 2)}). What is \u0394p for one generation?`,
     hint: 'For selection against a recessive homozygote: \u0394p = spq\u00B2 / (1 \u2212 sq\u00B2).',
     options,
     explanation: `\u0394p = spq\u00B2/(1\u2212sq\u00B2) = (${s})(${p})(${q})\u00B2 / (1 \u2212 (${s})(${q})\u00B2) = (${s})(${p})(${round(qSq, 4)}) / (1 \u2212 (${s})(${round(qSq, 4)})) = ${round(s * p * qSq, 5)} / ${round(1 - s * qSq, 5)} = ${deltaP}. The R allele increases in frequency because ss homozygotes have lower fitness.`,

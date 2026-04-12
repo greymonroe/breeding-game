@@ -25,19 +25,20 @@ import {
 /**
  * PLANT_EXAMPLES — experiment-to-organism mapping for the PopGen module.
  *
- * Exp 0–4, 6: Mimulus guttatus (yellow monkeyflower) — anthocyanin pigmentation
+ * Exp 0 (Hardy 1908), Exp 1 (Allele Freq), Exp 2 (HWE), Exp 3 (Drift), Exp 5 (Migration):
+ *   Mimulus guttatus (yellow monkeyflower) — anthocyanin pigmentation
  *   Alleles: M (anthocyanin, dominant) / m (null recessive)
  *   MM = deep magenta, Mm = pink-magenta, mm = cream/pale
  *
- * Exp 5: Amaranthus palmeri (Palmer amaranth) — glyphosate resistance
- *   Alleles: R (resistant, dominant) / s (susceptible recessive)
- *   RR/Rs = resistant, ss = susceptible (reduced fitness under herbicide)
+ * Exp 4 (Selection): Amaranthus palmeri (Palmer amaranth) — glyphosate resistance
+ *   Alleles: R (resistant, dominant) / r (susceptible recessive)
+ *   RR/Rr = resistant, rr = susceptible (reduced fitness under herbicide)
  *
- * Exp 7: Arabidopsis thaliana — chlorophyll biosynthesis
+ * Exp 6 (Mutation-Selection): Arabidopsis thaliana — chlorophyll biosynthesis
  *   Alleles: Chl (normal, dominant) / chl (null recessive)
  *   chl/chl = albino seedling, nearly lethal
  *
- * Exp 8: Hawaiian Bidens (tarweeds/beggar-ticks) — founder effect
+ * Exp 7 (Founder Effect): Hawaiian Bidens (beggar-ticks, Asteraceae: Coreopsideae)
  *   Uses abstract allele freq sampling (no specific locus), framed as Bidens colonization
  */
 const PLANT_EXAMPLES = {
@@ -52,8 +53,8 @@ const PLANT_EXAMPLES = {
   amaranthus: {
     species: 'Amaranthus palmeri',
     common: 'Palmer amaranth',
-    alleles: { dominant: 'R', recessive: 's' },
-    genotypeLabels: { AA: 'RR', Aa: 'Rs', aa: 'ss' },
+    alleles: { dominant: 'R', recessive: 'r' },
+    genotypeLabels: { AA: 'RR', Aa: 'Rr', aa: 'rr' },
     colors: { AA: '#15803d', Aa: '#4ade80', aa: '#fde68a' },
     borders: { AA: '#166534', Aa: '#22c55e', aa: '#fbbf24' },
   },
@@ -67,7 +68,7 @@ const PLANT_EXAMPLES = {
   },
   bidens: {
     species: 'Bidens',
-    common: 'Hawaiian tarweeds / beggar-ticks',
+    common: 'Hawaiian beggar-ticks',
     alleles: { dominant: 'A', recessive: 'a' },
     genotypeLabels: { AA: 'AA', Aa: 'Aa', aa: 'aa' },
     colors: { AA: '#7c3aed', Aa: '#c4b5fd', aa: '#f5f3ff' },
@@ -944,8 +945,10 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
           20th-century population genetics.
           <br /><br />
           <strong>This theorem has five assumptions</strong> (large population, random mating, no selection,
-          no mutation, no migration). When any one breaks, the population departs from HWE — and each of
-          the next five experiments breaks exactly one of them.
+          no mutation, no migration). When any one breaks, the population departs from HWE — and the next
+          five experiments each violate at least one: drift (small population), selection,
+          migration, mutation + selection together, and the founder effect (an extreme
+          case of drift at the moment of colonization).
         </div>
       )}
 
@@ -1061,8 +1064,9 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
         40 alleles at each locus. The next generation is formed by drawing 40 gametes from these parents,
         and even when the true frequency is p = 0.5, the sampled count isn't going to be exactly 20 M
         and 20 m — just like 40 coin flips aren't going to land exactly 20 heads and 20 tails. The sample
-        count of M alleles follows a binomial distribution with mean 2Np and variance 2N {'\u00B7'} p(1 {'\u2212'} p),
-        so the allele frequency in the next generation has variance p(1 {'\u2212'} p) / (2N).{' '}
+        count of M alleles follows a binomial distribution with mean 2Np and variance 2N {'\u00B7'} p(1 {'\u2212'} p).
+        Since allele frequency = count / (2N), dividing the count variance by (2N){'\u00B2'} gives the
+        frequency variance: p(1 {'\u2212'} p) / (2N).{' '}
         <strong>Smaller N means bigger variance means faster drift.</strong> When N = 2000, the same
         formula gives a per-generation standard error of {'\u221A'}(0.25/4000) {'\u2248'} 0.0079 — the
         frequency barely moves. Drift is not magic; it is finite-sample binomial noise in the gamete pool.
@@ -1313,7 +1317,7 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
         question={`Before simulating, calculate \u0394p for the first generation. Given p(R) = ${predP}, q(s) = ${predQ}, selection coefficient s = ${predS} against ss homozygotes. Use the formula: \u0394p = s\u00B7p\u00B7q\u00B2 / (1 \u2212 s\u00B7q\u00B2)`}
         correct={predCorrect}
         feedback={predCorrect === true
-          ? `Correct! \u0394p = (${predS} \u00D7 ${predP} \u00D7 ${predQ}\u00B2) / (1 \u2212 ${predS} \u00D7 ${predQ}\u00B2) = ${closedFormDeltaP.toFixed(4)}. Notice how small \u0394p is — selection against a rare recessive is SLOW because most s alleles hide in Rs heterozygotes where they are shielded from selection. This is why herbicide resistance can persist at low frequency for years before becoming a visible problem.`
+          ? `Correct! \u0394p = (${predS} \u00D7 ${predP} \u00D7 ${predQ}\u00B2) / (1 \u2212 ${predS} \u00D7 ${predQ}\u00B2) = ${closedFormDeltaP.toFixed(4)}. Notice how small \u0394p is — selection against a rare recessive is SLOW because most r alleles hide in Rr heterozygotes where they are shielded from selection. This is why herbicide resistance can persist at low frequency for years before becoming a visible problem.`
           : predCorrect === false
           ? `Hint: plug in s=${predS}, p=${predP}, q=${predQ}. Numerator = s\u00B7p\u00B7q\u00B2 = ${predS} \u00D7 ${predP} \u00D7 ${(predQ * predQ).toFixed(2)}. Denominator = 1 \u2212 s\u00B7q\u00B2 = 1 \u2212 ${(predS * predQ * predQ).toFixed(3)}.`
           : undefined}
@@ -1413,7 +1417,7 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
           {/* Backward problem */}
           {forwardEverCorrect && (
             <QuestionPanel
-              question="You observe the Amaranthus resistance allele R rising from p = 0.01 to p = 0.15 over 30 generations. If R is dominant and selection is against susceptible homozygotes (ss), is this consistent with s \u2248 0.1?"
+              question="You observe the Amaranthus resistance allele R rising from p = 0.01 to p = 0.15 over 30 generations. If R is dominant and selection is against susceptible homozygotes (rr), is this consistent with s \u2248 0.1?"
               correct={backCorrect}
               feedback={backCorrect === true
                 ? 'Correct. With s=0.1 and p\u2080=0.01, \u0394p \u2248 s\u00B7p\u00B7q\u00B2 \u2248 0.1\u00D70.01\u00D71 = 0.001 per gen initially, accelerating as p rises (because more ss homozygotes are exposed to selection). Over 30 generations, the recursion predicts p reaching roughly 0.10\u20130.20 \u2014 consistent with the observed 0.15.'
@@ -1811,8 +1815,8 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
             mutation pressure forces new copies into every generation at rate {'\u03BC'}, and selection removes
             them at rate s {'\u00B7'} q{'\u00B2'}, and the balance between these two opposing forces is an
             equilibrium. <em>Arabidopsis</em> chlorophyll mutants at q {'\u2248'} 0.014 in our simulation
-            above would correspond to approximately 1 in 5000 alleles being mutant — exactly the order of
-            magnitude seen in real sequencing surveys.
+            above means approximately 1.4% of alleles in the population carry the mutant — about 1 in 71 alleles,
+            or in a population of N = 5000 plants, roughly 140 of the 10,000 alleles would be <em>chl</em>.
           </div>
 
           {/* Backward problem */}
@@ -1906,9 +1910,9 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
       {/* 1.8 — Hawaiian Bidens historical framing */}
       <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
         <strong className="text-stone-800">The Hawaiian <em>Bidens</em> radiation.</strong>{' '}
-        The ~19 species of Hawaiian <em>Bidens</em> (tarweeds / beggar-ticks, in Asteraceae) all descend
+        The ~19 species of Hawaiian <em>Bidens</em> (beggar-ticks, in Asteraceae) all descend
         from one or two mainland ancestors that arrived on the islands by long-distance seed dispersal
-        approximately 5 million years ago. The founding population was very small — likely fewer than
+        approximately 1.3–3 million years ago. The founding population was very small — likely fewer than
         10 plants — and every subsequent species in the Hawaiian radiation carries the genetic imprint
         of that bottleneck: reduced genetic diversity compared to mainland <em>Bidens</em>, fixed
         differences at many loci that are polymorphic on the mainland, and unusual allele-frequency
@@ -1981,21 +1985,21 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
             question="Try different founder sizes above. If you halve the founder population size, how does the spread of founder allele frequencies change?"
             correct={correct}
             feedback={correct === true
-              ? 'Correct. Since \u03C3 \u221D 1/\u221A(2N), halving N multiplies the spread by \u221A2 \u2248 1.41 — so the spread increases substantially (roughly doubles in a qualitative sense). Smaller founding groups deviate from the source more dramatically; this is why founder effects are strongest for the smallest colonizing groups.'
+              ? 'Correct. Since \u03C3 \u221D 1/\u221A(2N), halving N multiplies the spread by \u221A2 \u2248 1.41 — so the spread increases by about 41%. Smaller founding groups deviate from the source more dramatically; this is why founder effects are strongest for the smallest colonizing groups.'
               : correct === false
               ? 'Compare N=20 vs N=5 in the simulator above. Does the histogram get wider or narrower when N shrinks?'
               : undefined}
           >
             <div className="flex gap-2 flex-wrap">
               {[
-                'Spread roughly doubles (increases)',
+                'Spread increases substantially (~40% wider)',
                 'Spread stays the same',
                 'Spread is cut in half',
                 'No predictable change',
               ].map(opt => (
                 <button key={opt} onClick={() => {
                   setAnswer(opt);
-                  const isCorrect = opt.startsWith('Spread roughly doubles');
+                  const isCorrect = opt.startsWith('Spread increases substantially');
                   setCorrect(isCorrect);
                   if (isCorrect) setForwardEverCorrect(true);
                 }}
