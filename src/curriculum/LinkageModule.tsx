@@ -174,7 +174,7 @@ function LinkageCrossWorkbench({ parentA, parentB, genes, recombFreqs, onCross, 
           <ChromosomeDiagram genes={genes} chrom1={parentB.chromosome1} chrom2={parentB.chromosome2} label="Parent 2" />
         </div>
         <button onClick={doCross}
-          className="rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
+          className="rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-800 transition-all">
           Cross!
         </button>
       </div>
@@ -205,6 +205,7 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
     'tester',
   ), []);
 
+  const [prediction, setPrediction] = useState<string | null>(null);
   const [crossResult, setCrossResult] = useState<LinkedCrossResult | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
@@ -215,48 +216,132 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-600">
-        Cross a maize plant heterozygous for <strong>aleurone color</strong> (C/c) and <strong>kernel shape</strong> (Sh/sh) with a
-        homozygous recessive tester (c/c, sh/sh). If the genes assort independently, you'd expect a <strong>1:1:1:1</strong> ratio of kernel phenotypes on the ear.
+        You are about to cross a maize plant heterozygous for <strong>aleurone color</strong> (C/c) and <strong>kernel shape</strong> (Sh/sh) with a
+        homozygous recessive tester (c/c, sh/sh).
       </p>
 
-      <LinkageCrossWorkbench
-        parentA={parentCSh} parentB={tester} genes={genes} recombFreqs={recombFreqs}
-        onCross={setCrossResult} crossResult={crossResult}
-        sampleSize={200} label="Testcross: C Sh / c sh × c sh / c sh"
-      />
+      {/* 1.1 — Prediction step before Cross */}
+      <div className="rounded-xl border-2 border-stone-200 bg-stone-50 p-4 space-y-3">
+        <p className="text-sm font-semibold text-stone-700">
+          Before you cross: if these two genes are on <em>different</em> chromosomes, what phenotype ratio do you expect in the testcross offspring?
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { label: '1:1:1:1 (independent assortment)', key: '1:1:1:1' },
+            { label: '9:3:3:1', key: '9:3:3:1' },
+            { label: 'All one class', key: 'all' },
+            { label: "Can't say yet", key: 'unsure' },
+          ].map(opt => (
+            <button key={opt.key} onClick={() => { if (!prediction) setPrediction(opt.key); }}
+              disabled={prediction !== null}
+              className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                prediction === opt.key
+                  ? 'border-violet-400 bg-violet-50 text-violet-800'
+                  : prediction !== null
+                  ? 'border-stone-100 bg-stone-100 text-stone-400 cursor-not-allowed'
+                  : 'border-stone-200 bg-white hover:border-stone-300'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {prediction && (
+          <p className="text-xs text-stone-500 italic">
+            Prediction locked. Now perform the cross to see what actually happens.
+          </p>
+        )}
+      </div>
+
+      {prediction && (
+        <LinkageCrossWorkbench
+          parentA={parentCSh} parentB={tester} genes={genes} recombFreqs={recombFreqs}
+          onCross={setCrossResult} crossResult={crossResult}
+          sampleSize={200} label="Testcross: C Sh / c sh  x  c sh / c sh"
+        />
+      )}
 
       {crossResult && (
-        <QuestionPanel
-          question="The kernels on the ear DON'T follow a 1:1:1:1 ratio. Two classes are much more common than the other two. Why?"
-          correct={correct}
-          feedback={correct === true
-            ? "Correct! These two genes are on the SAME chromosome (maize chromosome 9). They tend to be inherited together — this is called genetic linkage. The rare classes are recombinants, produced when crossing over separates the linked alleles."
-            : correct === false
-            ? "Look at which kernel classes are most frequent. The parental combinations (Purple Plump and Yellow Shrunken) are far more common than the recombinant combinations..."
-            : undefined}
-        >
-          <div className="flex gap-2 flex-wrap">
-            {[
-              'The genes are on the same chromosome',
-              'One gene is epistatic to the other',
-              'The sample size is too small',
-            ].map(opt => (
-              <button key={opt} onClick={() => {
-                setAnswer(opt);
-                const isCorrect = opt.includes('same chromosome');
-                setCorrect(isCorrect);
-                if (isCorrect) setTimeout(onComplete, 1500);
-              }}
-                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
-                  answer === opt
-                    ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
-                    : 'border-stone-200 bg-white hover:border-stone-300'
-                }`}>
-                {opt}
+        <>
+          {prediction === '1:1:1:1' && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+              You predicted 1:1:1:1 — a good prediction if the genes are on different chromosomes.
+              But look at the numbers. The four classes are <strong>not</strong> equal.
+            </div>
+          )}
+          {prediction && prediction !== '1:1:1:1' && (
+            <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-sm text-stone-600">
+              Look at the offspring counts. Are the four classes equal? What pattern do you see?
+            </div>
+          )}
+
+          <QuestionPanel
+            question="The kernels on the ear DON'T follow a 1:1:1:1 ratio. Two classes are much more common than the other two. Why?"
+            correct={correct}
+            feedback={correct === true
+              ? "Correct! These two genes are on the SAME chromosome (maize chromosome 9). They tend to be inherited together — this is called genetic linkage. The rare classes are recombinants, produced when crossing over separates the linked alleles."
+              : correct === false
+              ? "Look at which kernel classes are most frequent. The parental combinations (Purple Plump and Yellow Shrunken) are far more common than the recombinant combinations..."
+              : undefined}
+          >
+            <div className="flex gap-2 flex-wrap">
+              {[
+                'The genes are on the same chromosome',
+                'One gene is epistatic to the other',
+                'The sample size is too small',
+              ].map(opt => (
+                <button key={opt} onClick={() => {
+                  setAnswer(opt);
+                  const isCorrect = opt.includes('same chromosome');
+                  setCorrect(isCorrect);
+                }}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
+                    answer === opt
+                      ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  }`}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </QuestionPanel>
+
+          {/* 1.3 — Molecular crossover callout */}
+          {correct === true && (
+            <div className="space-y-4">
+              <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-2">
+                <p className="text-sm font-semibold text-violet-900">How does crossing over work?</p>
+                <p className="text-sm text-violet-800">
+                  During <strong>prophase I</strong> of meiosis, homologous chromosomes pair up (<strong>synapsis</strong>) and
+                  form physical connections called <strong>chiasmata</strong>. At each chiasma, two of the four chromatids
+                  break and rejoin with each other — swapping segments of DNA.
+                </p>
+                <p className="text-sm text-violet-800">
+                  The result: two chromatids remain <strong>parental</strong> (unchanged), and two become
+                  <strong> recombinant</strong> (carrying new allele combinations). This is why we see mostly parental
+                  phenotypes, with a smaller fraction of recombinants — each crossover event produces exactly
+                  two parental and two recombinant chromatids out of the four in the tetrad.
+                </p>
+              </div>
+
+              {/* 1.6 — Named insight callout */}
+              <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4 space-y-2">
+                <p className="text-sm font-bold text-amber-900">When Mendel's Second Law breaks</p>
+                <p className="text-sm text-amber-800">
+                  Mendel's Law of Independent Assortment says alleles of different genes segregate
+                  independently during gamete formation — producing a 1:1:1:1 testcross ratio. But that law
+                  assumes the genes are on <strong>different chromosomes</strong>. When two genes sit on the
+                  <strong> same</strong> chromosome, they are <strong>linked</strong>: they travel together unless a
+                  crossover separates them. The closer the genes, the rarer the recombinants.
+                </p>
+              </div>
+
+              <button onClick={() => setTimeout(onComplete, 300)}
+                className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
+                Continue to next experiment
               </button>
-            ))}
-          </div>
-        </QuestionPanel>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -367,8 +452,19 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
   const [crossResult, setCrossResult] = useState<LinkedCrossResult | null>(null);
   const [rfInput, setRfInput] = useState('');
   const [rfCorrect, setRfCorrect] = useState<boolean | null>(null);
+  // 1.5 — Noise literacy: replicate RF dots
+  const [replicateRFs, setReplicateRFs] = useState<number[]>([]);
 
   const actualRF = crossResult ? (crossResult.recombinationFrequency * 100) : 0;
+
+  const runReplicates = useCallback(() => {
+    const rfs: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const rep = linkedCross(parent, tester, genes, recombFreqs, 500, 1);
+      rfs.push(rep.recombinationFrequency * 100);
+    }
+    setReplicateRFs(rfs);
+  }, [parent, tester, genes, recombFreqs]);
 
   return (
     <div className="space-y-6">
@@ -377,10 +473,28 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
         (new allele combinations not seen in either parent chromosome) and calculate the <strong>recombination frequency</strong>.
       </p>
 
+      {/* 1.2 — Derive RF from gamete multiplication rule */}
+      <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-2">
+        <p className="text-sm font-semibold text-violet-900">From crossover rate to expected ratio</p>
+        <p className="text-sm text-violet-800">
+          If C and Sh were on <strong>different chromosomes</strong> (unlinked), each gamete class would have
+          probability 1/2 x 1/2 = <strong>1/4</strong>, giving a <strong>1:1:1:1</strong> testcross ratio.
+        </p>
+        <p className="text-sm text-violet-800">
+          But if they are <strong>linked with 17% recombination</strong>, crossovers happen 17% of the time.
+          That means 83% of gametes are parental, 17% are recombinant. Each parental class gets
+          ~0.83/2 = <strong>0.415</strong> and each recombinant class gets ~0.17/2 = <strong>0.085</strong>.
+        </p>
+        <p className="text-sm text-violet-800">
+          In 100 offspring, expect roughly <strong>41.5 : 8.5 : 8.5 : 41.5</strong> (parental : recomb : recomb : parental)
+          — about a <strong>5:1:1:5</strong> ratio, very different from the 1:1:1:1 of independent assortment.
+        </p>
+      </div>
+
       <LinkageCrossWorkbench
         parentA={parent} parentB={tester} genes={genes} recombFreqs={recombFreqs}
         onCross={setCrossResult} crossResult={crossResult}
-        sampleSize={500} label="Testcross: C Sh / c sh × c sh / c sh"
+        sampleSize={500} label="Testcross: C Sh / c sh  x  c sh / c sh"
       />
 
       {crossResult && (
@@ -394,12 +508,12 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
           </div>
 
           <QuestionPanel
-            question={`RF% = (recombinants / total) × 100. Calculate the recombination frequency (round to nearest whole number):`}
+            question={`RF% = (recombinants / total) x 100. Calculate the recombination frequency (round to nearest whole number):`}
             correct={rfCorrect}
             feedback={rfCorrect === true
-              ? `Correct! The recombination frequency in your sample is ~${actualRF.toFixed(1)}%, consistent with the canonical C–Sh distance of 17 cM. This tells us these genes are about 17 map units (centiMorgans) apart on the chromosome.`
+              ? `Correct! The recombination frequency in your sample is ~${actualRF.toFixed(1)}%, consistent with the canonical C-Sh distance of 17 cM. This tells us these genes are about 17 map units (centiMorgans) apart on the chromosome.`
               : rfCorrect === false
-              ? `Not quite. RF% = (${crossResult.recombinantCount} / ${crossResult.total}) × 100 = ${actualRF.toFixed(1)}%. Round to the nearest whole number.`
+              ? `Not quite. RF% = (${crossResult.recombinantCount} / ${crossResult.total}) x 100 = ${actualRF.toFixed(1)}%. Round to the nearest whole number.`
               : undefined}
           >
             <div className="flex items-center gap-2">
@@ -414,17 +528,16 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
               <button
                 onClick={() => {
                   const val = parseFloat(rfInput);
-                  // Accept ±2 of EITHER the sampled RF from this run OR the
+                  // Accept +/-2 of EITHER the sampled RF from this run OR the
                   // target 17 cM (true population RF; see recombFreqs=[0.17]
                   // above). With n=500 and p=0.17, the sample drifts enough
-                  // that "17" — the textbook answer Exp 4 demands — can get
+                  // that "17" -- the textbook answer Exp 4 demands -- can get
                   // rejected if we only check against the sampled RF.
                   const targetRF = 17;
                   const isCorrect =
                     Math.abs(val - Math.round(actualRF)) <= 2 ||
                     Math.abs(val - targetRF) <= 2;
                   setRfCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
                 }}
                 className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
               >
@@ -432,6 +545,60 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
               </button>
             </div>
           </QuestionPanel>
+
+          {/* 1.5 — Noise literacy: replicate strip chart */}
+          {rfCorrect === true && (
+            <div className="space-y-3">
+              <p className="text-sm text-stone-600">
+                Your RF was {actualRF.toFixed(1)}% from one sample. But a different ear of corn might give a slightly
+                different number. How much does RF bounce around due to sampling?
+              </p>
+              <button onClick={runReplicates}
+                className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
+                Run this testcross 10 more times
+              </button>
+              {replicateRFs.length > 0 && (
+                <div className="space-y-2">
+                  {/* Strip chart */}
+                  <div className="relative h-12 rounded-lg bg-stone-100 border border-stone-200 overflow-hidden">
+                    {/* Shaded 17% +/- 2SE band: SE = sqrt(0.17*0.83/500) ~ 0.0168, 2SE ~ 3.4% */}
+                    <div className="absolute top-0 bottom-0"
+                      style={{
+                        left: `${((13.6 - 5) / 30) * 100}%`,
+                        width: `${((20.4 - 13.6) / 30) * 100}%`,
+                        backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                      }} />
+                    {/* 17% reference line */}
+                    <div className="absolute top-0 bottom-0 w-px bg-violet-500"
+                      style={{ left: `${((17 - 5) / 30) * 100}%` }} />
+                    {/* Dots */}
+                    {replicateRFs.map((rf, i) => (
+                      <div key={i} className="absolute w-2.5 h-2.5 rounded-full bg-cyan-600 border border-white"
+                        style={{
+                          left: `${((rf - 5) / 30) * 100}%`,
+                          top: `${20 + (i % 3) * 12}%`,
+                          transform: 'translateX(-50%)',
+                        }}
+                        title={`${rf.toFixed(1)}%`} />
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-[9px] text-stone-400 px-1">
+                    <span>5%</span>
+                    <span>17% (true RF)</span>
+                    <span>35%</span>
+                  </div>
+                  <p className="text-xs text-stone-500 italic">
+                    Each dot is one testcross with n=500. The shaded band shows 17% +/- 2 standard errors (~13.6-20.4%).
+                    Sampling variation means any single experiment won't give exactly 17% — but the dots cluster around the true value.
+                  </p>
+                  <button onClick={() => setTimeout(onComplete, 300)}
+                    className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
+                    Continue to next experiment
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -455,9 +622,22 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
         In genetics, <strong>1% RF = 1 centiMorgan (cM)</strong> of map distance.
       </p>
 
-      <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-sm text-cyan-800">
-        <strong>RF% = map distance in cM</strong>. This is Alfred Sturtevant's insight from 1913 —
-        recombination frequency between genes reflects their physical distance on the chromosome.
+      {/* 1.4 — Sturtevant's insight + 50% ceiling */}
+      <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-2">
+        <p className="text-sm font-semibold text-violet-900">Sturtevant's insight (1913)</p>
+        <p className="text-sm text-violet-800">
+          <strong>Alfred Sturtevant</strong>, a 19-year-old undergraduate in Thomas Hunt Morgan's lab, realized
+          that <strong>recombination frequency between two genes reflects their physical distance on the
+          chromosome</strong>. He defined 1% RF = 1 <strong>centiMorgan</strong> (cM) and used this to construct the
+          first genetic map of any organism.
+        </p>
+        <p className="text-sm text-violet-800">
+          <strong>Important caveat:</strong> RF saturates at <strong>50%</strong>. When two genes are very far apart,
+          multiple crossovers between them randomize allele combinations — making them <em>look</em> like they
+          assort independently, even though they are on the same chromosome. This means the apparent RF
+          underestimates the true genetic distance for loci more than ~30 cM apart. Mapping functions
+          (like Haldane's) correct for this.
+        </p>
       </div>
 
       <QuestionPanel
@@ -623,7 +803,7 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
           <ChromosomeDiagram genes={threeGenes} chrom1={tester.chromosome1} chrom2={tester.chromosome2} label="Tester" />
         </div>
         <button onClick={handleCross}
-          className="rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
+          className="rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-800 transition-all">
           Cross!
         </button>
       </div>
@@ -969,7 +1149,7 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
           <span className="text-sm text-stone-500">tester (all recessive)</span>
         </div>
         <button onClick={handleCross}
-          className="rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-600 transition-all">
+          className="rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg active:from-cyan-800 transition-all">
           Cross! (2000 offspring)
         </button>
       </div>
@@ -1053,9 +1233,25 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
                 <p>This means one crossover <strong>inhibits</strong> a second crossover nearby. This is a real biological phenomenon — the physical mechanics of chromosome crossing over make nearby double events less likely.</p>
               </div>
               <button onClick={onComplete}
-                className="w-full rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 py-3 text-sm font-bold text-white shadow-md">
+                className="w-full rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 py-3 text-sm font-bold text-white shadow-md">
                 Complete Module
               </button>
+
+              {/* 1.7 — PopGen tease */}
+              <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-3">
+                <p className="text-sm font-semibold text-violet-900">What comes next: Linkage Disequilibrium</p>
+                <p className="text-sm text-violet-800">
+                  You've learned that linked genes travel together on chromosomes. In populations, this
+                  non-random association of alleles at different loci is called <strong>linkage disequilibrium</strong> (LD).
+                  Over generations, recombination breaks down LD — but selection, drift, and population structure
+                  can maintain it. LD is the foundation of genome-wide association studies (GWAS) and genomic
+                  selection in plant breeding.
+                </p>
+                <a href="/breeding-game/popgen.html"
+                  className="block rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg">
+                  Explore drift and selection in the Population Genetics module &rarr;
+                </a>
+              </div>
             </div>
           )}
         </div>
