@@ -18,3 +18,5 @@ export {
 export type { PhenotypeColors } from './colors';
 export { AlleleTrajectoryVisualizer } from './AlleleTrajectoryVisualizer';
 export type { AlleleTrajectoryVisualizerProps } from './AlleleTrajectoryVisualizer';
+export { CrossoverVisualizer } from './CrossoverVisualizer';
+export type { CrossoverVisualizerProps } from './CrossoverVisualizer';

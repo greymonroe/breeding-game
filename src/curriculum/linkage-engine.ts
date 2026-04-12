@@ -128,6 +128,71 @@ export function isHomozygousRecessive(org: LinkedOrganism, geneId: string): bool
   return !isDominant(org.chromosome1[geneId]) && !isDominant(org.chromosome2[geneId]);
 }
 
+// ── Gamete trace (for CrossoverVisualizer) ────────────────────────────
+
+export interface GeneConfig {
+  name: string;
+  allele1: string;   // allele on homolog 1
+  allele2: string;   // allele on homolog 2
+  position: number;  // linear position along the chromosome (for drawing)
+}
+
+export interface GameteTrace {
+  gamete: Record<string, string>;   // gene name → allele in the resulting gamete
+  crossovers: boolean[];            // which intervals had a crossover
+  /** Which of the 4 chromatids (0–3) became the gamete.
+   *  0,1 = sister chromatids of homolog 1; 2,3 = sister chromatids of homolog 2.
+   *  For simplicity we model one crossover product per meiosis (the gamete). */
+  sourceChromatid: 0 | 1 | 2 | 3;
+}
+
+/**
+ * Generate a single gamete AND the crossover trace so a visualizer can
+ * show what happened during meiosis. Uses the same crossover logic as
+ * the internal `makeGamete` used by `linkedCross`.
+ *
+ * `genes` must be in chromosome order; `recombFreqs[i]` = RF between
+ * genes[i] and genes[i+1].
+ */
+export function makeGameteWithTrace(
+  genes: GeneConfig[],
+  recombFreqs: number[],
+  rng: () => number = Math.random,
+): GameteTrace {
+  // Pick starting homolog
+  const useHomolog1 = rng() < 0.5;
+
+  // Determine crossover events for each interval
+  const crossovers: boolean[] = [];
+  for (let i = 0; i < recombFreqs.length; i++) {
+    crossovers.push(rng() < recombFreqs[i]);
+  }
+
+  // Build gamete alleles: track which homolog we're reading from
+  const gamete: Record<string, string> = {};
+  let onHomolog1 = useHomolog1;
+  for (let i = 0; i < genes.length; i++) {
+    if (i > 0 && crossovers[i - 1]) {
+      onHomolog1 = !onHomolog1;
+    }
+    gamete[genes[i].name] = onHomolog1 ? genes[i].allele1 : genes[i].allele2;
+  }
+
+  // Determine which chromatid index this corresponds to.
+  // 0,1 = homolog 1 sisters; 2,3 = homolog 2 sisters.
+  // If no crossover occurred: 0 or 2 (first sister of whichever homolog).
+  // If any crossover occurred: 1 or 3 (the recombinant sister).
+  const anyCrossover = crossovers.some(c => c);
+  let sourceChromatid: 0 | 1 | 2 | 3;
+  if (useHomolog1) {
+    sourceChromatid = anyCrossover ? 1 : 0;
+  } else {
+    sourceChromatid = anyCrossover ? 3 : 2;
+  }
+
+  return { gamete, crossovers, sourceChromatid };
+}
+
 // ── Gamete generation with recombination ───────────────────────────────
 
 /**
