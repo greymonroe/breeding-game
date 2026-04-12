@@ -607,22 +607,35 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
 
 function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
-  const [answer, setAnswer] = useState('');
-  const [correct, setCorrect] = useState<boolean | null>(null);
+  const [cmInput, setCmInput] = useState('');
+  const [cmCorrect, setCmCorrect] = useState<boolean | null>(null);
   const [mapInput, setMapInput] = useState(50); // slider for gene position
 
-  // Known RF = 17% = 17 cM
   const targetCM = 17;
+
+  // Fresh testcross: C/c Sh/sh × c/c sh/sh, 500 kernels, RF = 17%
+  const parent = useMemo(() => makeLinkedOrganism(
+    { color: 'C', shape: 'Sh' },
+    { color: 'c', shape: 'sh' },
+    'het',
+  ), []);
+  const tester = useMemo(() => makeLinkedOrganism(
+    { color: 'c', shape: 'sh' },
+    { color: 'c', shape: 'sh' },
+    'tester',
+  ), []);
+
+  const genes = [KERNEL_COLOR, KERNEL_SHAPE];
+  const recombFreqs = [0.17];
+
+  const [crossResult, setCrossResult] = useState<LinkedCrossResult | null>(null);
+
+  // Sampled RF for dual-tolerance validation
+  const sampledRF = crossResult ? crossResult.recombinationFrequency * 100 : 0;
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-stone-600">
-        You've calculated that aleurone color and kernel shape have a recombination frequency of about <strong>17%</strong>
-        <span className="text-stone-400"> (simplified for this module; the actual C–sh1 map distance on maize chromosome 9 is ~29 cM)</span>.
-        In genetics, <strong>1% RF = 1 centiMorgan (cM)</strong> of map distance.
-      </p>
-
-      {/* 1.4 — Sturtevant's insight + 50% ceiling */}
+      {/* Sturtevant's insight callout — stays at the top */}
       <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-2">
         <p className="text-sm font-semibold text-violet-900">Sturtevant's insight (1913)</p>
         <p className="text-sm text-violet-800">
@@ -640,94 +653,120 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
         </p>
       </div>
 
-      <QuestionPanel
-        question="If RF = 17%, what is the map distance between C and Sh?"
-        correct={correct}
-        feedback={correct === true
-          ? "Correct! 17% RF = 17 cM. Now let's visualize this on a chromosome map."
-          : correct === false
-          ? "Remember: 1% RF = 1 centiMorgan. The conversion is direct."
-          : undefined}
-      >
-        <div className="flex gap-2 flex-wrap">
-          {['8.5 cM', '17 cM', '34 cM', '1.7 cM'].map(opt => (
-            <button key={opt} onClick={() => {
-              setAnswer(opt);
-              const isCorrect = opt === '17 cM';
-              setCorrect(isCorrect);
-              if (isCorrect) setStep(1);
-            }}
-              className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
-                answer === opt
-                  ? correct ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
-                  : 'border-stone-200 bg-white hover:border-stone-300'
-              }`}>
-              {opt}
-            </button>
-          ))}
-        </div>
-      </QuestionPanel>
+      <p className="text-sm text-stone-600">
+        Perform a testcross of <strong>C/c Sh/sh × c/c sh/sh</strong> (500 kernels). From the offspring counts,
+        calculate the recombination frequency and convert it to a <strong>map distance in centiMorgans</strong>.
+        <span className="text-stone-400"> (Simplified for this module; the actual C–sh1 map distance on maize chromosome 9 is ~29 cM.)</span>
+      </p>
 
-      {step >= 1 && (
+      <LinkageCrossWorkbench
+        parentA={parent} parentB={tester} genes={genes} recombFreqs={recombFreqs}
+        onCross={setCrossResult} crossResult={crossResult}
+        sampleSize={500} label="Testcross: C Sh / c sh  ×  c sh / c sh"
+      />
+
+      {crossResult && (
         <div className="space-y-4">
-          <p className="text-sm text-stone-600">
-            Place the <strong>Sh</strong> locus on the chromosome map. The C locus is fixed at position 0.
-            Drag the slider to position Sh at the correct map distance.
-          </p>
-          <div className="relative">
-            {/* Chromosome map SVG */}
-            <svg width="100%" height="80" viewBox="0 0 400 80">
-              {/* Chromosome bar */}
-              <rect x="30" y="25" width="340" height="10" rx="5" fill="#7cb5d4" />
-              {/* Scale markers */}
-              {[0, 10, 20, 30, 40, 50].map(cm => {
-                const x = 30 + (cm / 50) * 340;
-                return (
-                  <g key={cm}>
-                    <line x1={x} y1="20" x2={x} y2="40" stroke="#4a8ab0" strokeWidth={1} />
-                    <text x={x} y="55" textAnchor="middle" className="text-[9px] fill-stone-400">{cm} cM</text>
-                  </g>
-                );
-              })}
-              {/* C locus (fixed at 0) */}
-              <circle cx="30" cy="30" r="6" fill="#5a2a6b" />
-              <text x="30" y="72" textAnchor="middle" className="text-[8px] font-bold fill-cyan-900">C</text>
-              {/* Sh locus (draggable) */}
-              <circle cx={30 + (mapInput / 50) * 340} cy="30" r="6" fill="#b8860b" />
-              <text x={30 + (mapInput / 50) * 340} y="72" textAnchor="middle" className="text-[8px] font-bold fill-amber-700">Sh</text>
-            </svg>
-            <input
-              type="range" min="0" max="50" step="1" value={mapInput}
-              onChange={e => setMapInput(parseInt(e.target.value))}
-              className="w-full"
-            />
-            <div className="text-center text-sm text-stone-600 font-semibold">
-              Current position: {mapInput} cM
-            </div>
+          <div className="rounded-lg bg-cyan-50 border border-cyan-200 p-3 text-sm text-cyan-800 space-y-1">
+            <p><strong>Recombinant classes</strong> are the less-frequent phenotypes — allele combos not present in either parent chromosome.</p>
+            <p className="font-mono text-xs">
+              Total offspring: <strong>{crossResult.total}</strong>
+            </p>
           </div>
-          <button
-            onClick={() => {
-              if (Math.abs(mapInput - targetCM) <= 2) {
-                setStep(2);
-                setTimeout(onComplete, 1500);
-              } else {
-                setStep(-1); // show error briefly
-                setTimeout(() => setStep(1), 1500);
-              }
-            }}
-            className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
+
+          <QuestionPanel
+            question="Count the recombinant offspring. Compute RF = (recombinants / total) × 100 and enter the map distance in cM (remember: 1% RF = 1 cM):"
+            correct={cmCorrect}
+            feedback={cmCorrect === true
+              ? "You just did what the first geneticists did for every linked-gene pair in maize, wheat, pea, and tomato."
+              : cmCorrect === false
+              ? `Not quite. Identify the two less-common (recombinant) classes, add their counts, then RF% = (recombinants / ${crossResult.total}) × 100. Since 1% RF = 1 cM, the RF in percent IS the map distance in cM.`
+              : undefined}
           >
-            Place Gene
-          </button>
-          {step === -1 && (
-            <div className="text-sm text-red-600 font-semibold">Not quite — remember, 17% RF = 17 cM from the C locus.</div>
-          )}
-          {step === 2 && (
-            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
-              <strong>You built your first genetic map!</strong> In this module C and Sh are 17 cM apart on
-              maize chromosome 9 (simplified from the actual C–sh1 distance of ~29 cM).
-              This technique — converting recombination frequencies to map distances — is the foundation of
-              all genetic mapping.
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={cmInput}
+                onChange={e => setCmInput(e.target.value)}
+                placeholder="cM"
+                className="rounded-lg border-2 border-stone-200 px-3 py-2 text-sm w-24 focus:border-cyan-400 focus:outline-none"
+              />
+              <span className="text-sm text-stone-500">cM</span>
+              <button
+                onClick={() => {
+                  const val = parseFloat(cmInput);
+                  // Dual tolerance: accept ±2 of sampled RF OR ±2 of textbook 17 cM
+                  const isCorrect =
+                    Math.abs(val - Math.round(sampledRF)) <= 2 ||
+                    Math.abs(val - targetCM) <= 2;
+                  setCmCorrect(isCorrect);
+                  if (isCorrect) setStep(1);
+                }}
+                className="rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 px-4 py-2 text-xs font-bold text-white shadow-md hover:shadow-lg active:from-cyan-800 transition-all"
+              >
+                Check
+              </button>
+            </div>
+          </QuestionPanel>
+
+          {/* Chromosome map visualization — reinforcement below the puzzle */}
+          {step >= 1 && (
+            <div className="space-y-4">
+              <p className="text-sm text-stone-600">
+                Now visualize your result. Place the <strong>Sh</strong> locus on the chromosome map.
+                The C locus is fixed at position 0.
+              </p>
+              <div className="relative">
+                <svg width="100%" height="80" viewBox="0 0 400 80">
+                  <rect x="30" y="25" width="340" height="10" rx="5" fill="#7cb5d4" />
+                  {[0, 10, 20, 30, 40, 50].map(cm => {
+                    const x = 30 + (cm / 50) * 340;
+                    return (
+                      <g key={cm}>
+                        <line x1={x} y1="20" x2={x} y2="40" stroke="#4a8ab0" strokeWidth={1} />
+                        <text x={x} y="55" textAnchor="middle" className="text-[9px] fill-stone-400">{cm} cM</text>
+                      </g>
+                    );
+                  })}
+                  <circle cx="30" cy="30" r="6" fill="#5a2a6b" />
+                  <text x="30" y="72" textAnchor="middle" className="text-[8px] font-bold fill-cyan-900">C</text>
+                  <circle cx={30 + (mapInput / 50) * 340} cy="30" r="6" fill="#b8860b" />
+                  <text x={30 + (mapInput / 50) * 340} y="72" textAnchor="middle" className="text-[8px] font-bold fill-amber-700">Sh</text>
+                </svg>
+                <input
+                  type="range" min="0" max="50" step="1" value={mapInput}
+                  onChange={e => setMapInput(parseInt(e.target.value))}
+                  className="w-full"
+                />
+                <div className="text-center text-sm text-stone-600 font-semibold">
+                  Current position: {mapInput} cM
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (Math.abs(mapInput - targetCM) <= 2) {
+                    setStep(2);
+                    setTimeout(onComplete, 1500);
+                  } else {
+                    setStep(-1);
+                    setTimeout(() => setStep(1), 1500);
+                  }
+                }}
+                className="rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 px-4 py-2 text-xs font-bold text-white shadow-md hover:shadow-lg active:from-cyan-800 transition-all"
+              >
+                Place Gene
+              </button>
+              {step === -1 && (
+                <div className="text-sm text-red-600 font-semibold">Not quite — remember, 1% RF = 1 cM. Place Sh at about 17 cM from C.</div>
+              )}
+              {step === 2 && (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
+                  <strong>You built your first genetic map!</strong> In this module C and Sh are 17 cM apart on
+                  maize chromosome 9 (simplified from the actual C–sh1 distance of ~29 cM).
+                  This technique — converting recombination frequencies to map distances — is the foundation of
+                  all genetic mapping.
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -849,14 +888,26 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
           </div>
 
           <QuestionPanel
-            question="The two LEAST frequent classes are double crossovers. Compare each rare class to the parental class it MOST resembles (the nearest parental) — the single gene that differs is the middle gene. Which gene is it?"
+            question="Look at the 8 offspring classes. Two classes are much more frequent — these are the parental classes. Two are extremely rare. Your job: figure out which of the three genes (C, Wx, Sh) is physically in the middle of the chromosome."
             correct={correct}
             feedback={correct === true
-              ? "Right! The double crossover class differs from the parental class at only the MIDDLE gene. The gene that flipped must be between the other two on the chromosome."
+              ? "Correct! In the rarest class, only Sh flipped relative to parental. The only way for one gene to flip while neighbors stay the same is if it lies between the other two. Order: C — Sh — Wx."
               : correct === false
-              ? "Look at the rarest two classes and compare each allele (+/-) to the most common (parental) classes. Which gene flipped?"
+              ? (answer === 'Aleurone color (C)'
+                ? "Not quite. For C to be in the middle, a double crossover would flip C while leaving Wx and Sh unchanged. Look at the rarest class — is it C that differs from parental?"
+                : answer === 'Endosperm (Wx)'
+                ? "Not quite. For Wx to be in the middle, a double crossover would flip Wx. Check the rarest class."
+                : "Look at the rarest two classes and compare each allele (+/-) to the most common (parental) classes. Which gene flipped?")
               : undefined}
           >
+            {/* Collapsible hint */}
+            <details className="mb-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+              <summary className="text-xs font-semibold text-stone-500 cursor-pointer select-none">Hint (click to reveal)</summary>
+              <p className="text-xs text-stone-600 mt-1">
+                Think about how many crossovers would be required to produce the rarest classes. If a class
+                requires two independent crossovers to form, those crossovers must flank which gene?
+              </p>
+            </details>
             <div className="flex gap-2 flex-wrap">
               {['Aleurone color (C)', 'Endosperm (Wx)', 'Kernel shape (Sh)'].map(opt => (
                 <button key={opt} onClick={() => {
