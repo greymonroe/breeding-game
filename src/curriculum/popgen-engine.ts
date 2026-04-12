@@ -47,7 +47,7 @@ function binomial(n: number, p: number): number {
  * because the counts are a multinomial draw, not a deterministic rounding of
  * N·p², N·2pq, N·q².
  */
-function sampleZygotes(n: number, p: number): { AA: number; Aa: number; aa: number } {
+export function sampleZygotes(n: number, p: number): { AA: number; Aa: number; aa: number } {
   const q = 1 - p;
   const pAA = p * p;
   const pAa = 2 * p * q;
