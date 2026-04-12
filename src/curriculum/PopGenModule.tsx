@@ -127,6 +127,9 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
   const [predCorrect, setPredCorrect] = useState<boolean | null>(null);
   const [exitAnswer, setExitAnswer] = useState('');
   const [exitCorrect, setExitCorrect] = useState<boolean | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   const handlePrediction = (ans: string) => {
     setPrediction(ans);
@@ -141,7 +144,7 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
     setExitAnswer(ans);
     const isCorrect = ans === 'null_hypothesis';
     setExitCorrect(isCorrect);
-    if (isCorrect) setTimeout(onComplete, 1500);
+    if (isCorrect) setForwardEverCorrect(true);
   };
 
   return (
@@ -266,8 +269,44 @@ function Exp0_HardyWeinberg1908({ onComplete }: { onComplete: () => void }) {
             </div>
           </QuestionPanel>
 
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <QuestionPanel
+              question="If you observe a Mimulus population where p(M) drifted from 0.5 to 0.62 over 10 generations at N=200, is this consistent with HWE + drift alone, or does it require invoking selection?"
+              correct={backCorrect}
+              feedback={backCorrect === true
+                ? 'Correct. At N=200, per-generation variance is p(1\u2212p)/(2N) = 0.25/400 = 0.000625. Over 10 independent generations, cumulative variance \u2248 10 \u00D7 0.000625 = 0.00625, so SD \u2248 0.079. A shift of 0.12 is ~1.5 SD \u2014 easily within drift range. No need to invoke selection.'
+                : backCorrect === false
+                ? 'Think about the expected standard deviation of drift over 10 generations. Per-generation variance = p(1\u2212p)/(2N). Over t generations, cumulative variance \u2248 t \u00D7 p(1\u2212p)/(2N). Compute the SD and compare to the observed shift of 0.12.'
+                : undefined}
+            >
+              <div className="flex flex-col gap-2">
+                {[
+                  { key: 'a', label: 'Drift alone at N=200 could easily produce this \u2014 the expected SD over 10 gens is substantial' },
+                  { key: 'b', label: 'This requires selection \u2014 drift cannot move frequencies this much' },
+                  { key: 'c', label: 'HWE means frequencies never change, so something is wrong' },
+                  { key: 'd', label: 'Cannot tell without knowing the selection coefficient' },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => {
+                    setBackAnswer(opt.key);
+                    const isCorrect = opt.key === 'a';
+                    setBackCorrect(isCorrect);
+                    if (isCorrect) setTimeout(onComplete, 1500);
+                  }}
+                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                      backAnswer === opt.key
+                        ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                        : 'border-stone-200 bg-white hover:border-stone-300'
+                    }`}>
+                    ({opt.key}) {opt.label}
+                  </button>
+                ))}
+              </div>
+            </QuestionPanel>
+          )}
+
           {/* What's next tease */}
-          {exitCorrect && (
+          {backCorrect && (
             <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700">
               <strong className="text-stone-800">What's next after PopGen?</strong> The next level up from here
               is <strong>quantitative genetics</strong> — when many loci each contribute a small effect, the
@@ -300,6 +339,9 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
   const [pInput, setPInput] = useState('');
   const [qInput, setQInput] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backInput, setBackInput] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   const handleCheck = () => {
     const pVal = parseFloat(pInput);
@@ -308,7 +350,7 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
     const qOk = Math.abs(qVal - trueQ) < 0.03;
     const isCorrect = pOk && qOk;
     setCorrect(isCorrect);
-    if (isCorrect) setTimeout(onComplete, 1500);
+    if (isCorrect) setForwardEverCorrect(true);
   };
 
   return (
@@ -367,6 +409,37 @@ function Exp1_AlleleFrequencies({ onComplete }: { onComplete: () => void }) {
           </button>
         </div>
       </QuestionPanel>
+
+      {/* Backward problem */}
+      {forwardEverCorrect && (
+        <QuestionPanel
+          question="A population has p\u0302(M) = 0.12 for the anthocyanin allele. If you sampled N = 100 Mimulus plants and sequenced all 200 alleles, approximately how many M alleles would you expect to see?"
+          correct={backCorrect}
+          feedback={backCorrect === true
+            ? 'Correct! Expected count = 2N \u00D7 p = 200 \u00D7 0.12 = 24 M alleles.'
+            : backCorrect === false
+            ? 'Remember: the expected count of M alleles = 2N \u00D7 p. With N = 100 diploid plants, there are 200 alleles total.'
+            : undefined}
+        >
+          <div className="flex gap-3 items-end flex-wrap">
+            <div>
+              <label className="block text-xs text-stone-500 mb-1">Expected M allele count</label>
+              <input type="number" step="1" min="0" max="200" value={backInput}
+                onChange={e => setBackInput(e.target.value)}
+                className="w-24 rounded-lg border-2 border-stone-200 px-2 py-1.5 text-sm focus:border-violet-400 outline-none" />
+            </div>
+            <button onClick={() => {
+              const val = parseInt(backInput, 10);
+              const isCorrect = !Number.isNaN(val) && Math.abs(val - 24) <= 3;
+              setBackCorrect(isCorrect);
+              if (isCorrect) setTimeout(onComplete, 1500);
+            }}
+              className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg">
+              Check
+            </button>
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
@@ -392,6 +465,11 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
   const [selData, setSelData] = useState<{ obs: { AA: number; Aa: number; aa: number }; hwe: ReturnType<typeof testHWE> } | null>(null);
   const [selAnswer, setSelAnswer] = useState('');
   const [selCorrect, setSelCorrect] = useState<boolean | null>(null);
+
+  // Backward problem
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   // Noise literacy panel state (kept from Phase 1)
   const [showNoise, setShowNoise] = useState(false);
@@ -471,7 +549,7 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
     // We need to do a manual chi-square against original HWE expectations.
     const isCorrect = ans === 'no';
     setSelCorrect(isCorrect);
-    if (isCorrect) setTimeout(onComplete, 1500);
+    if (isCorrect) setForwardEverCorrect(true);
   };
 
   // Manual chi-square of selection sample against original HWE (p=0.6)
@@ -795,6 +873,42 @@ function Exp2_HardyWeinberg({ onComplete }: { onComplete: () => void }) {
           the next five experiments breaks exactly one of them.
         </div>
       )}
+
+      {/* Backward problem */}
+      {forwardEverCorrect && (
+        <QuestionPanel
+          question="You sample 500 Mimulus plants and observe {MM: 50, Mm: 100, mm: 350}. Compute p\u0302(M) and decide: is this population in HWE?"
+          correct={backCorrect}
+          feedback={backCorrect === true
+            ? 'Correct! p\u0302 = (2\u00D750 + 100)/(2\u00D7500) = 200/1000 = 0.20. Expected under HWE: MM = 0.04\u00D7500 = 20, Mm = 0.32\u00D7500 = 160, mm = 0.64\u00D7500 = 320. X\u00B2 = (50\u221220)\u00B2/20 + (100\u2212160)\u00B2/160 + (350\u2212320)\u00B2/320 = 45 + 22.5 + 2.8 = 70.3, vastly exceeding 3.84. The heterozygote deficit (100 observed vs 160 expected) is the signature of inbreeding.'
+            : backCorrect === false
+            ? 'First compute p\u0302: count M alleles = 2\u00D7MM + Mm, total alleles = 2\u00D7500. Then compute HWE expected counts and X\u00B2. Compare to 3.84.'
+            : undefined}
+        >
+          <div className="flex flex-col gap-2">
+            {[
+              { key: 'a', label: 'p\u0302 = 0.20, X\u00B2 \u2248 70, strongly reject HWE \u2014 deficit of heterozygotes suggests inbreeding' },
+              { key: 'b', label: 'p\u0302 = 0.20, in HWE \u2014 observed matches expected' },
+              { key: 'c', label: 'p\u0302 = 0.40, X\u00B2 \u2248 0, in HWE' },
+              { key: 'd', label: 'Cannot tell without more data' },
+            ].map(opt => (
+              <button key={opt.key} onClick={() => {
+                setBackAnswer(opt.key);
+                const isCorrect = opt.key === 'a';
+                setBackCorrect(isCorrect);
+                if (isCorrect) setTimeout(onComplete, 1500);
+              }}
+                className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                  backAnswer === opt.key
+                    ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                    : 'border-stone-200 bg-white hover:border-stone-300'
+                }`}>
+                ({opt.key}) {opt.label}
+              </button>
+            ))}
+          </div>
+        </QuestionPanel>
+      )}
     </div>
   );
 }
@@ -813,6 +927,11 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
   const [fixMPred, setFixMPred] = useState('');
   const [fixMPredCorrect, setFixMPredCorrect] = useState<boolean | null>(null);
   const [predictionLocked, setPredictionLocked] = useState(false);
+
+  // Backward problem
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   // Simulation key to force re-render of AlleleTrajectoryVisualizer
   const [simKey, setSimKey] = useState(0);
@@ -959,7 +1078,7 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
                       setAnswer(opt);
                       const isCorrect = opt.includes('Smaller');
                       setCorrect(isCorrect);
-                      if (isCorrect) setTimeout(onComplete, 1500);
+                      if (isCorrect) setForwardEverCorrect(true);
                     }}
                       className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                         answer === opt
@@ -983,6 +1102,42 @@ function Exp3_GeneticDrift({ onComplete }: { onComplete: () => void }) {
                 Wright showed that the variance of p per generation is p(1 {'\u2212'} p) / (2N) — the smaller
                 the population, the faster drift operates.
               </div>
+
+              {/* Backward problem */}
+              {forwardEverCorrect && (
+                <QuestionPanel
+                  question="Three island Mimulus populations (all N=20, p\u2080=0.5): one fixed M at gen 15, one fixed m at gen 22, one hasn't fixed after 50 generations. What can you conclude?"
+                  correct={backCorrect}
+                  feedback={backCorrect === true
+                    ? 'Correct. At N=20, drift is strong and stochastic. Some lineages fix quickly, some slowly, some not at all within the observation window. No single trajectory tells you anything about the forces acting \u2014 you need many replicates to distinguish drift from selection.'
+                    : backCorrect === false
+                    ? 'Remember: drift is random. At N=20 with p\u2080=0.5, fixation time is highly variable. Any individual trajectory is just one draw from a wide distribution.'
+                    : undefined}
+                >
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { key: 'a', label: 'The population that fixed M must have had selection favoring M' },
+                      { key: 'b', label: 'These are all normal outcomes of drift at N=20 \u2014 no single trajectory is informative about forces' },
+                      { key: 'c', label: 'The unfixed population must be larger than the others' },
+                      { key: 'd', label: 'Something is wrong \u2014 they should all fix at the same time' },
+                    ].map(opt => (
+                      <button key={opt.key} onClick={() => {
+                        setBackAnswer(opt.key);
+                        const isCorrect = opt.key === 'b';
+                        setBackCorrect(isCorrect);
+                        if (isCorrect) setTimeout(onComplete, 1500);
+                      }}
+                        className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                          backAnswer === opt.key
+                            ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                            : 'border-stone-200 bg-white hover:border-stone-300'
+                        }`}>
+                        ({opt.key}) {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </QuestionPanel>
+              )}
             </>
           )}
         </>
@@ -1003,6 +1158,11 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
   const [predDeltaP, setPredDeltaP] = useState('');
   const [predCorrect, setPredCorrect] = useState<boolean | null>(null);
   const [predLocked, setPredLocked] = useState(false);
+
+  // Backward problem
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   const gens = 100;
 
@@ -1126,7 +1286,7 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
                   setAnswer(opt);
                   const isCorrect = opt.includes('Stronger');
                   setCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
+                  if (isCorrect) setForwardEverCorrect(true);
                 }}
                   className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                     answer === opt
@@ -1148,6 +1308,42 @@ function Exp4_NaturalSelection({ onComplete }: { onComplete: () => void }) {
             the frequency of the favorable allele. <strong>J. B. S. Haldane</strong> independently derived
             the same selection recursions in his 1932 book <em>The Causes of Evolution</em>.
           </div>
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <QuestionPanel
+              question="You observe the Amaranthus resistance allele R rising from p = 0.01 to p = 0.15 over 30 generations. If R is dominant and selection is against susceptible homozygotes (ss), is this consistent with s \u2248 0.1?"
+              correct={backCorrect}
+              feedback={backCorrect === true
+                ? 'Correct. With s=0.1 and p\u2080=0.01, \u0394p \u2248 s\u00B7p\u00B7q\u00B2 \u2248 0.1\u00D70.01\u00D71 = 0.001 per gen initially, accelerating as p rises (because more ss homozygotes are exposed to selection). Over 30 generations, the recursion predicts p reaching roughly 0.10\u20130.20 \u2014 consistent with the observed 0.15.'
+                : backCorrect === false
+                ? 'Think about the selection recursion: at low p, \u0394p \u2248 s\u00B7p\u00B7q\u00B2. With s=0.1, p\u2080=0.01, the initial \u0394p is small but accelerates. Over 30 generations, does p reach the observed range?'
+                : undefined}
+            >
+              <div className="flex flex-col gap-2">
+                {[
+                  { key: 'a', label: 'Yes \u2014 with s=0.1 and p\u2080=0.01, the recursion predicts p reaching ~0.10\u20130.20 by generation 30' },
+                  { key: 'b', label: 'No \u2014 s=0.1 is too weak; you\'d need s > 0.5' },
+                  { key: 'c', label: 'No \u2014 selection cannot increase frequency this much in 30 generations' },
+                  { key: 'd', label: 'Cannot tell \u2014 we need to know the population size' },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => {
+                    setBackAnswer(opt.key);
+                    const isCorrect = opt.key === 'a';
+                    setBackCorrect(isCorrect);
+                    if (isCorrect) setTimeout(onComplete, 1500);
+                  }}
+                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                      backAnswer === opt.key
+                        ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                        : 'border-stone-200 bg-white hover:border-stone-300'
+                    }`}>
+                    ({opt.key}) {opt.label}
+                  </button>
+                ))}
+              </div>
+            </QuestionPanel>
+          )}
         </>
       )}
     </div>
@@ -1167,6 +1363,11 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
   const [predAnswer, setPredAnswer] = useState('');
   const [predCorrect, setPredCorrect] = useState<boolean | null>(null);
   const [predLocked, setPredLocked] = useState(false);
+
+  // Backward problem
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   const gens = 80;
 
@@ -1264,7 +1465,7 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
                   setAnswer(opt);
                   const isCorrect = opt.includes('converge');
                   setCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
+                  if (isCorrect) setForwardEverCorrect(true);
                 }}
                   className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                     answer === opt
@@ -1286,6 +1487,42 @@ function Exp5_Migration({ onComplete }: { onComplete: () => void }) {
             conservation genetics still uses Wright's model to decide when two populations are functionally
             connected.
           </div>
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <QuestionPanel
+              question="Two Mimulus populations start at p\u2081=0.0 and p\u2082=1.0. After 30 generations of symmetric migration at m=0.03, you observe p\u2081=0.42 and p\u2082=0.58. Is this consistent with migration alone?"
+              correct={backCorrect}
+              feedback={backCorrect === true
+                ? 'Correct. The symmetric two-island model predicts p\u2081(t) = 0.5 \u2212 0.5\u00B7(1\u22122m)\u1D57. With m=0.03: (0.94)\u00B3\u2070 \u2248 0.154, so p\u2081(30) \u2248 0.5 \u2212 0.077 = 0.42. The observed values match the closed-form prediction for migration alone.'
+                : backCorrect === false
+                ? 'Use the formula p\u2081(t) = 0.5 \u2212 0.5\u00B7(1\u22122m)\u1D57. Plug in m=0.03, t=30. Does the predicted p\u2081(30) match 0.42?'
+                : undefined}
+            >
+              <div className="flex flex-col gap-2">
+                {[
+                  { key: 'a', label: 'Yes \u2014 the symmetric model predicts exponential approach to 0.5, and at gen 30 they should be approximately 0.42/0.58' },
+                  { key: 'b', label: 'No \u2014 they should have converged to 0.5 by now' },
+                  { key: 'c', label: 'No \u2014 migration swaps frequencies, so p\u2081 should be near 1.0' },
+                  { key: 'd', label: 'No \u2014 these values suggest selection is also acting' },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => {
+                    setBackAnswer(opt.key);
+                    const isCorrect = opt.key === 'a';
+                    setBackCorrect(isCorrect);
+                    if (isCorrect) setTimeout(onComplete, 1500);
+                  }}
+                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                      backAnswer === opt.key
+                        ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                        : 'border-stone-200 bg-white hover:border-stone-300'
+                    }`}>
+                    ({opt.key}) {opt.label}
+                  </button>
+                ))}
+              </div>
+            </QuestionPanel>
+          )}
         </>
       )}
     </div>
@@ -1305,6 +1542,11 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
   const [predAnswer, setPredAnswer] = useState('');
   const [predCorrect, setPredCorrect] = useState<boolean | null>(null);
   const [predLocked, setPredLocked] = useState(false);
+
+  // Backward problem
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backInput, setBackInput] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   const gens = 500;
   const expectedEq = Math.sqrt(mu / s);
@@ -1427,7 +1669,7 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
                   setAnswer(opt);
                   const isCorrect = opt.includes('reintroduces');
                   setCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
+                  if (isCorrect) setForwardEverCorrect(true);
                 }}
                   className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                     answer === opt
@@ -1452,6 +1694,37 @@ function Exp6_MutationSelectionBalance({ onComplete }: { onComplete: () => void 
             above would correspond to approximately 1 in 5000 alleles being mutant — exactly the order of
             magnitude seen in real sequencing surveys.
           </div>
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <QuestionPanel
+              question="You observe a recessive deleterious Arabidopsis chlorophyll mutant allele at q\u0302 = 0.02 in a large population. If selection against chl/chl homozygotes is s = 0.5, what is the forward mutation rate \u03BC? (Use q\u0302 \u2248 \u221A(\u03BC/s), so \u03BC = s\u00B7q\u0302\u00B2)"
+              correct={backCorrect}
+              feedback={backCorrect === true
+                ? 'Correct! \u03BC = s\u00B7q\u0302\u00B2 = 0.5 \u00D7 (0.02)\u00B2 = 0.5 \u00D7 0.0004 = 0.0002 = 2\u00D710\u207B\u2074. This is within the typical range of per-locus mutation rates in plants.'
+                : backCorrect === false
+                ? 'Rearrange the formula: q\u0302 \u2248 \u221A(\u03BC/s), so \u03BC = s\u00B7q\u0302\u00B2. Plug in s = 0.5 and q\u0302 = 0.02.'
+                : undefined}
+            >
+              <div className="flex gap-3 items-end flex-wrap">
+                <div>
+                  <label className="block text-xs text-stone-500 mb-1">{'\u03BC'} (mutation rate)</label>
+                  <input type="number" step="0.0001" min="0" max="0.01" value={backInput}
+                    onChange={e => setBackInput(e.target.value)}
+                    className="w-32 rounded-lg border-2 border-stone-200 px-2 py-1.5 text-sm focus:border-violet-400 outline-none" />
+                </div>
+                <button onClick={() => {
+                  const val = parseFloat(backInput);
+                  const isCorrect = !Number.isNaN(val) && Math.abs(val - 0.0002) <= 0.0001;
+                  setBackCorrect(isCorrect);
+                  if (isCorrect) setTimeout(onComplete, 1500);
+                }}
+                  className="rounded-xl bg-gradient-to-b from-violet-700 to-violet-800 px-5 py-2 text-sm font-bold text-white shadow-md hover:shadow-lg">
+                  Check
+                </button>
+              </div>
+            </QuestionPanel>
+          )}
         </>
       )}
     </div>
@@ -1465,6 +1738,11 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
   const [founderFreqs, setFounderFreqs] = useState<number[] | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+
+  // Backward problem
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
 
   const sourceP = 0.5;
   const nTrials = 20;
@@ -1591,7 +1869,7 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
                   setAnswer(opt);
                   const isCorrect = opt.startsWith('Spread roughly doubles');
                   setCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
+                  if (isCorrect) setForwardEverCorrect(true);
                 }}
                   className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                     answer === opt
@@ -1603,6 +1881,42 @@ function Exp7_FounderEffect({ onComplete }: { onComplete: () => void }) {
               ))}
             </div>
           </QuestionPanel>
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <QuestionPanel
+              question="A founded Bidens population has p&#x0302; = 0.85 for an allele that was p = 0.5 on the mainland. What founding group size N is most consistent with this deviation?"
+              correct={backCorrect}
+              feedback={backCorrect === true
+                ? 'Correct. The deviation is (0.85 \u2212 0.5)\u00B2 = 0.1225. The expected sampling variance is p(1\u2212p)/(2N) = 0.25/(2N). Setting these equal: N \u2248 0.25/0.245 \u2248 1. A founding pair (N \u2248 2 diploid plants, 4 alleles) is the right order of magnitude \u2014 only an extremely small founding group could produce this large a deviation from the source.'
+                : backCorrect === false
+                ? 'Use the sampling variance formula: Var(p\u0302) = p(1\u2212p)/(2N). The observed deviation is |0.85 \u2212 0.5| = 0.35. What N makes (0.35)\u00B2 \u2248 0.25/(2N)?'
+                : undefined}
+            >
+              <div className="flex flex-col gap-2">
+                {[
+                  { key: 'a', label: 'N \u2248 2 (a founding pair) \u2014 the deviation of 0.35 is ~1 SD when N is very small' },
+                  { key: 'b', label: 'N \u2248 50 \u2014 moderate founder group' },
+                  { key: 'c', label: 'N \u2248 500 \u2014 large founder group' },
+                  { key: 'd', label: 'Cannot estimate N from this information' },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => {
+                    setBackAnswer(opt.key);
+                    const isCorrect = opt.key === 'a';
+                    setBackCorrect(isCorrect);
+                    if (isCorrect) setTimeout(onComplete, 1500);
+                  }}
+                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                      backAnswer === opt.key
+                        ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                        : 'border-stone-200 bg-white hover:border-stone-300'
+                    }`}>
+                    ({opt.key}) {opt.label}
+                  </button>
+                ))}
+              </div>
+            </QuestionPanel>
+          )}
         </>
       )}
     </div>
