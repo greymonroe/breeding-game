@@ -397,7 +397,7 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
             question={`RF% = (recombinants / total) × 100. Calculate the recombination frequency (round to nearest whole number):`}
             correct={rfCorrect}
             feedback={rfCorrect === true
-              ? `Correct! The recombination frequency is ~${Math.round(actualRF)}%. This tells us these genes are about ${Math.round(actualRF)} map units (centiMorgans) apart on the chromosome.`
+              ? `Correct! The recombination frequency in your sample is ~${actualRF.toFixed(1)}%, consistent with the canonical C–Sh distance of 17 cM. This tells us these genes are about 17 map units (centiMorgans) apart on the chromosome.`
               : rfCorrect === false
               ? `Not quite. RF% = (${crossResult.recombinantCount} / ${crossResult.total}) × 100 = ${actualRF.toFixed(1)}%. Round to the nearest whole number.`
               : undefined}
