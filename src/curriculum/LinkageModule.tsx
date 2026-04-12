@@ -20,7 +20,7 @@
  *  7. Interference & Coincidence — double crossover analysis
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   linkedCross, chiSquare, classifyThreePoint, threePointAnalysis,
   makeLinkedOrganism, getLinkedPhenotypeLabel,
@@ -198,6 +198,16 @@ function Exp0_CreightonMcClintock({ onComplete }: { onComplete: () => void }) {
   const [predictionLocked, setPredictionLocked] = useState(false);
   const [exitAnswer, setExitAnswer] = useState<string | null>(null);
   const [exitCorrect, setExitCorrect] = useState<boolean | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   const handlePrediction = (key: string) => {
     if (predictionLocked) return;
@@ -328,7 +338,7 @@ function Exp0_CreightonMcClintock({ onComplete }: { onComplete: () => void }) {
                 setExitAnswer(opt.key);
                 const isCorrect = opt.key === 'rf_physical';
                 setExitCorrect(isCorrect);
-                if (isCorrect) onComplete();
+                if (isCorrect) setForwardEverCorrect(true);
               }}
                 disabled={exitCorrect === true}
                 className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
@@ -353,6 +363,49 @@ function Exp0_CreightonMcClintock({ onComplete }: { onComplete: () => void }) {
           </p>
         </div>
       )}
+
+      {/* Backward problem */}
+      {forwardEverCorrect && (
+        <>
+          <hr className="border-stone-200" />
+          <QuestionPanel
+            question="A colleague claims they found recombinant kernels that do NOT have recombinant chromosomes. If true, what would this mean for the chromosome theory?"
+            correct={backCorrect}
+            feedback={backCorrect === true
+              ? "Correct! Gene conversion is a real phenomenon where genetic information transfers between homologs without reciprocal exchange. It produces recombinant allele combinations without the physical chromosome rearrangement Creighton and McClintock used as their marker. The chromosome theory isn't wrong — it just has a nuance that wasn't visible in 1931."
+              : backCorrect === false
+              ? "Think about whether there are mechanisms other than reciprocal crossover that could produce new allele combinations. The chromosome theory is well-established — but is physical exchange the ONLY way to recombine alleles?"
+              : undefined}
+          >
+            <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+              Working backward
+            </div>
+            <div className="flex flex-col gap-2">
+              {[
+                { key: 'a', label: 'Crossing-over is not always a physical exchange — some recombination is non-reciprocal or gene conversion' },
+                { key: 'b', label: 'The chromosome theory is wrong' },
+                { key: 'c', label: "Creighton and McClintock's experiment was flawed" },
+                { key: 'd', label: 'Maize chromosomes behave differently from other organisms' },
+              ].map(opt => (
+                <button key={opt.key} onClick={() => {
+                  setBackAnswer(opt.key);
+                  const isCorrect = opt.key === 'a';
+                  setBackCorrect(isCorrect);
+                  if (isCorrect) setBackCompleted(true);
+                }}
+                  disabled={backCompleted}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                    backAnswer === opt.key
+                      ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                  ({opt.key}) {opt.label}
+                </button>
+              ))}
+            </div>
+          </QuestionPanel>
+        </>
+      )}
     </div>
   );
 }
@@ -374,6 +427,16 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
   const [crossResult, setCrossResult] = useState<LinkedCrossResult | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   const genes = [KERNEL_COLOR, KERNEL_SHAPE];
   const recombFreqs = [0.17]; // 17 cM between C and Sh (pedagogical value)
@@ -500,11 +563,56 @@ function Exp1_LinkedGenes({ onComplete }: { onComplete: () => void }) {
                 </p>
               </div>
 
-              <button onClick={() => setTimeout(onComplete, 300)}
-                className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
-                Continue to next experiment
-              </button>
+              {!forwardEverCorrect && (
+                <button onClick={() => setForwardEverCorrect(true)}
+                  className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
+                  Continue
+                </button>
+              )}
             </div>
+          )}
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <>
+              <hr className="border-stone-200" />
+              <QuestionPanel
+                question="You observe an 8:1:1:8 testcross result for two genes. What can you conclude?"
+                correct={backCorrect}
+                feedback={backCorrect === true
+                  ? "Correct! An 8:1:1:8 ratio means the parental classes vastly outnumber the recombinants. This high parental:recombinant ratio indicates tight linkage — the two genes are close together on the same chromosome, with a recombination frequency of about 1/(8+1) ≈ 11%."
+                  : backCorrect === false
+                  ? "Look at the ratio: 8 parental : 1 recombinant : 1 recombinant : 8 parental. The parental classes dominate. What does a very low recombinant fraction tell you about the genes' physical relationship?"
+                  : undefined}
+              >
+                <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                  Working backward
+                </div>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { key: 'a', label: 'The genes are close together on the same chromosome' },
+                    { key: 'b', label: 'The genes are far apart on the same chromosome' },
+                    { key: 'c', label: 'The genes are on different chromosomes' },
+                    { key: 'd', label: 'One gene is epistatic to the other' },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => {
+                      setBackAnswer(opt.key);
+                      const isCorrect = opt.key === 'a';
+                      setBackCorrect(isCorrect);
+                      if (isCorrect) setBackCompleted(true);
+                    }}
+                      disabled={backCompleted}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                        backAnswer === opt.key
+                          ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                      ({opt.key}) {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </QuestionPanel>
+            </>
           )}
         </>
       )}
@@ -538,6 +646,16 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   return (
     <div className="space-y-6">
@@ -582,7 +700,7 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
                 setAnswer(opt);
                 const isCorrect = opt.includes('cis vs trans');
                 setCorrect(isCorrect);
-                if (isCorrect) setTimeout(onComplete, 1500);
+                if (isCorrect) setForwardEverCorrect(true);
               }}
                 className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                   answer === opt
@@ -594,6 +712,49 @@ function Exp2_CouplingRepulsion({ onComplete }: { onComplete: () => void }) {
             ))}
           </div>
         </QuestionPanel>
+      )}
+
+      {/* Backward problem */}
+      {forwardEverCorrect && (
+        <>
+          <hr className="border-stone-200" />
+          <QuestionPanel
+            question="A testcross gives mostly Purple Shrunken and Yellow Plump kernels, with a few Purple Plump and Yellow Shrunken. What is the parental chromosome arrangement?"
+            correct={backCorrect}
+            feedback={backCorrect === true
+              ? "Correct! The most common offspring classes are the parental types. Purple Shrunken (C sh) and Yellow Plump (c Sh) dominate, meaning the parent's chromosomes carried C with sh on one homolog and c with Sh on the other — that's repulsion (trans)."
+              : backCorrect === false
+              ? "The parental classes are the most frequent offspring. If Purple Shrunken and Yellow Plump dominate, what allele combinations must be on each parental chromosome?"
+              : undefined}
+          >
+            <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+              Working backward
+            </div>
+            <div className="flex flex-col gap-2">
+              {[
+                { key: 'a', label: 'Repulsion: C sh / c Sh' },
+                { key: 'b', label: 'Coupling: C Sh / c sh' },
+                { key: 'c', label: 'Cannot determine from phenotype data' },
+                { key: 'd', label: 'The genes are unlinked' },
+              ].map(opt => (
+                <button key={opt.key} onClick={() => {
+                  setBackAnswer(opt.key);
+                  const isCorrect = opt.key === 'a';
+                  setBackCorrect(isCorrect);
+                  if (isCorrect) setBackCompleted(true);
+                }}
+                  disabled={backCompleted}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                    backAnswer === opt.key
+                      ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-stone-300'
+                  } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                  ({opt.key}) {opt.label}
+                </button>
+              ))}
+            </div>
+          </QuestionPanel>
+        </>
       )}
     </div>
   );
@@ -619,6 +780,16 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
   const [rfCorrect, setRfCorrect] = useState<boolean | null>(null);
   // 1.5 — Noise literacy: replicate RF dots
   const [replicateRFs, setReplicateRFs] = useState<number[]>([]);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   const actualRF = crossResult ? (crossResult.recombinationFrequency * 100) : 0;
 
@@ -756,13 +927,58 @@ function Exp3_RecombFrequency({ onComplete }: { onComplete: () => void }) {
                     Each dot is one testcross with n=500. The shaded band shows 17% +/- 2 standard errors (~13.6-20.4%).
                     Sampling variation means any single experiment won't give exactly 17% — but the dots cluster around the true value.
                   </p>
-                  <button onClick={() => setTimeout(onComplete, 300)}
-                    className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
-                    Continue to next experiment
-                  </button>
+                  {!forwardEverCorrect && (
+                    <button onClick={() => setForwardEverCorrect(true)}
+                      className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
+                      Continue
+                    </button>
+                  )}
                 </div>
               )}
             </div>
+          )}
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <>
+              <hr className="border-stone-200" />
+              <QuestionPanel
+                question="Given an RF of 10% for two linked genes in coupling, predict the approximate testcross proportions per 100 offspring."
+                correct={backCorrect}
+                feedback={backCorrect === true
+                  ? "Correct! With RF = 10%, 90% of gametes are parental and 10% are recombinant. Each parental class gets ~45 and each recombinant class gets ~5 out of 100. This is the direct backward application of the RF formula you just learned."
+                  : backCorrect === false
+                  ? "Think step by step: RF = 10% means 10% recombinant gametes and 90% parental. Split each group equally between the two classes in that category."
+                  : undefined}
+              >
+                <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                  Working backward
+                </div>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { key: 'a', label: '45 : 5 : 5 : 45 (parental : recomb : recomb : parental)' },
+                    { key: 'b', label: '40 : 10 : 10 : 40' },
+                    { key: 'c', label: '25 : 25 : 25 : 25' },
+                    { key: 'd', label: '48 : 2 : 2 : 48' },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => {
+                      setBackAnswer(opt.key);
+                      const isCorrect = opt.key === 'a';
+                      setBackCorrect(isCorrect);
+                      if (isCorrect) setBackCompleted(true);
+                    }}
+                      disabled={backCompleted}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                        backAnswer === opt.key
+                          ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                      ({opt.key}) {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </QuestionPanel>
+            </>
           )}
         </div>
       )}
@@ -775,6 +991,16 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
   const [cmInput, setCmInput] = useState('');
   const [cmCorrect, setCmCorrect] = useState<boolean | null>(null);
   const [mapInput, setMapInput] = useState(50); // slider for gene position
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   const targetCM = 17;
 
@@ -911,7 +1137,6 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
                 onClick={() => {
                   if (Math.abs(mapInput - targetCM) <= 2) {
                     setStep(2);
-                    setTimeout(onComplete, 1500);
                   } else {
                     setStep(-1);
                     setTimeout(() => setStep(1), 1500);
@@ -925,12 +1150,63 @@ function Exp4_MapDistance({ onComplete }: { onComplete: () => void }) {
                 <div className="text-sm text-red-600 font-semibold">Not quite — remember, 1% RF = 1 cM. Place Sh at about 17 cM from C.</div>
               )}
               {step === 2 && (
-                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
-                  <strong>You built your first genetic map!</strong> In this module C and Sh are 17 cM apart on
-                  maize chromosome 9 (simplified from the actual C–sh1 distance of ~29 cM).
-                  This technique — converting recombination frequencies to map distances — is the foundation of
-                  all genetic mapping.
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
+                    <strong>You built your first genetic map!</strong> In this module C and Sh are 17 cM apart on
+                    maize chromosome 9 (simplified from the actual C–sh1 distance of ~29 cM).
+                    This technique — converting recombination frequencies to map distances — is the foundation of
+                    all genetic mapping.
+                  </div>
+                  {!forwardEverCorrect && (
+                    <button onClick={() => setForwardEverCorrect(true)}
+                      className="rounded-lg border-2 border-cyan-400 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-700 hover:bg-cyan-100">
+                      Continue
+                    </button>
+                  )}
                 </div>
+              )}
+
+              {/* Backward problem */}
+              {forwardEverCorrect && (
+                <>
+                  <hr className="border-stone-200" />
+                  <QuestionPanel
+                    question="Two genes show an observed RF of 45% in a large testcross. Are they 45 cM apart?"
+                    correct={backCorrect}
+                    feedback={backCorrect === true
+                      ? "Correct! RF saturates at 50% because multiple crossovers between distant loci randomize allele combinations. An observed RF of 45% means the genes are far apart, but the true genetic distance could be much more than 45 cM. Mapping functions like Haldane's correct for this: −50 ln(1 − 2×0.45) = ~107 cM. This is why three-point crosses and additive mapping are needed for distant loci."
+                      : backCorrect === false
+                      ? "Think about what happens when two genes are very far apart on the same chromosome. Can RF ever exceed 50%? What does that imply about the relationship between RF and true distance for large distances?"
+                      : undefined}
+                  >
+                    <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                      Working backward
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { key: 'a', label: 'Not necessarily — RF saturates near 50%, so 45% means far apart but doesn\'t pin down exact cM' },
+                        { key: 'b', label: 'Yes, 45% = 45 cM exactly' },
+                        { key: 'c', label: 'No, 45% means the genes are on different chromosomes' },
+                        { key: 'd', label: 'Yes, but only if there\'s no interference' },
+                      ].map(opt => (
+                        <button key={opt.key} onClick={() => {
+                          setBackAnswer(opt.key);
+                          const isCorrect = opt.key === 'a';
+                          setBackCorrect(isCorrect);
+                          if (isCorrect) setBackCompleted(true);
+                        }}
+                          disabled={backCompleted}
+                          className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                            backAnswer === opt.key
+                              ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                              : 'border-stone-200 bg-white hover:border-stone-300'
+                          } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                          ({opt.key}) {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </QuestionPanel>
+                </>
               )}
             </div>
           )}
@@ -968,6 +1244,16 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
   const [correct, setCorrect] = useState<boolean | null>(null);
   const [orderAnswer, setOrderAnswer] = useState('');
   const [orderCorrect, setOrderCorrect] = useState<boolean | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   // Recomb freqs in TRUE order: C–Sh, Sh–Wx
   const recombFreqs = [0.08, 0.10];
@@ -1115,7 +1401,7 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
                     setOrderAnswer(opt);
                     const isCorrect = opt === 'C — Sh — Wx';
                     setOrderCorrect(isCorrect);
-                    if (isCorrect) setTimeout(onComplete, 1500);
+                    if (isCorrect) setForwardEverCorrect(true);
                   }}
                     className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                       orderAnswer === opt
@@ -1127,6 +1413,49 @@ function Exp5_ThreePointCross({ onComplete }: { onComplete: () => void }) {
                 ))}
               </div>
             </QuestionPanel>
+          )}
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <>
+              <hr className="border-stone-200" />
+              <QuestionPanel
+                question="In an 8-class three-point cross, the rarest class shows a flip at the FIRST gene listed (C). What does this tell you about the gene order?"
+                correct={backCorrect}
+                feedback={backCorrect === true
+                  ? "Correct! The rarest classes in a three-point cross are always the double crossovers, and a double crossover flips only the MIDDLE gene. If C is the gene that flipped, then C must actually be the middle gene — the listed order doesn't match the chromosomal order. This is exactly the logic you used to discover that Sh was in the middle when we listed C, Wx, Sh."
+                  : backCorrect === false
+                  ? "Remember: in a three-point cross, the rarest classes are double crossovers, and a double crossover flips the gene in the MIDDLE of the chromosome. If the rarest class shows C flipped, what must C's position be?"
+                  : undefined}
+              >
+                <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                  Working backward
+                </div>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { key: 'a', label: "C is actually the middle gene — the listed order doesn't match chromosomal order" },
+                    { key: 'b', label: 'C is on a different chromosome' },
+                    { key: 'c', label: 'C has a higher mutation rate' },
+                    { key: 'd', label: 'The cross was done incorrectly' },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => {
+                      setBackAnswer(opt.key);
+                      const isCorrect = opt.key === 'a';
+                      setBackCorrect(isCorrect);
+                      if (isCorrect) setBackCompleted(true);
+                    }}
+                      disabled={backCompleted}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                        backAnswer === opt.key
+                          ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                      ({opt.key}) {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </QuestionPanel>
+            </>
           )}
         </div>
       )}
@@ -1140,6 +1469,16 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
   const [chiResult, setChiResult] = useState<{ statistic: number; df: number; pValue: number } | null>(null);
   const [answer, setAnswer] = useState('');
   const [correct, setCorrect] = useState<boolean | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   // Run a fresh testcross with the same parameters as Exp 3 (C Sh / c sh
   // heterozygote × tester, 17 cM linkage, n=400). We freeze the result once,
@@ -1281,7 +1620,7 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
                   setAnswer(opt);
                   const isCorrect = opt.includes('reject');
                   setCorrect(isCorrect);
-                  if (isCorrect) setTimeout(onComplete, 1500);
+                  if (isCorrect) setForwardEverCorrect(true);
                 }}
                   className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all ${
                     answer === opt
@@ -1293,6 +1632,49 @@ function Exp6_ChiSquare({ onComplete }: { onComplete: () => void }) {
               ))}
             </div>
           </QuestionPanel>
+
+          {/* Backward problem */}
+          {forwardEverCorrect && (
+            <>
+              <hr className="border-stone-200" />
+              <QuestionPanel
+                question="You compute χ² = 1.2 with df = 3 for a dihybrid testcross. What do you conclude?"
+                correct={backCorrect}
+                feedback={backCorrect === true
+                  ? "Correct! With χ² = 1.2 and df = 3, the critical value at p = 0.05 is 7.815. Since 1.2 < 7.815, you fail to reject the null hypothesis — the data are consistent with a 1:1:1:1 ratio, meaning the genes appear to assort independently. This is the opposite of what you found in this experiment, where linkage produced a huge chi-square."
+                  : backCorrect === false
+                  ? "Compare χ² = 1.2 to the critical value of 7.815 (df = 3, α = 0.05). Is 1.2 greater or less than 7.815? What does that mean for the null hypothesis?"
+                  : undefined}
+              >
+                <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                  Working backward
+                </div>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { key: 'a', label: 'Fail to reject 1:1:1:1 — the data are consistent with independent assortment' },
+                    { key: 'b', label: 'Reject — the genes are linked' },
+                    { key: 'c', label: 'The test is invalid with only 3 degrees of freedom' },
+                    { key: 'd', label: 'Need more data to decide' },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => {
+                      setBackAnswer(opt.key);
+                      const isCorrect = opt.key === 'a';
+                      setBackCorrect(isCorrect);
+                      if (isCorrect) setBackCompleted(true);
+                    }}
+                      disabled={backCompleted}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                        backAnswer === opt.key
+                          ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                      ({opt.key}) {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </QuestionPanel>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -1324,6 +1706,16 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
   // Remember the student's entered values at the moment they clicked Check,
   // so the feedback panel can print them alongside the measured values.
   const [submitted, setSubmitted] = useState<{ c: number; i: number } | null>(null);
+  const [forwardEverCorrect, setForwardEverCorrect] = useState(false);
+  const [backAnswer, setBackAnswer] = useState('');
+  const [backCorrect, setBackCorrect] = useState<boolean | null>(null);
+  const [backCompleted, setBackCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!backCompleted) return;
+    const t = setTimeout(onComplete, 1500);
+    return () => clearTimeout(t);
+  }, [backCompleted, onComplete]);
 
   const recombFreqs = [0.08, 0.10]; // C–Sh, Sh–Wx
   const usedCoincidence = 0.5; // strong positive interference
@@ -1448,26 +1840,73 @@ function Exp7_Interference({ onComplete }: { onComplete: () => void }) {
                 <p>Measured from your cross: c = {actualCoincidence.toFixed(2)}, I = {actualInterference.toFixed(2)} <span className="text-emerald-600">✓ within tolerance</span></p>
                 <p>This means one crossover <strong>inhibits</strong> a second crossover nearby. This is a real biological phenomenon — the physical mechanics of chromosome crossing over make nearby double events less likely.</p>
               </div>
-              <button onClick={onComplete}
-                className="w-full rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 py-3 text-sm font-bold text-white shadow-md">
-                Complete Module
-              </button>
+              {!forwardEverCorrect && (
+                <button onClick={() => setForwardEverCorrect(true)}
+                  className="w-full rounded-xl bg-gradient-to-b from-cyan-700 to-cyan-800 py-3 text-sm font-bold text-white shadow-md">
+                  Continue
+                </button>
+              )}
+
+              {/* Backward problem */}
+              {forwardEverCorrect && (
+                <>
+                  <hr className="border-stone-200" />
+                  <QuestionPanel
+                    question="A three-point cross yields an observed double-crossover frequency HIGHER than expected (coincidence > 1). What is the interpretation?"
+                    correct={backCorrect}
+                    feedback={backCorrect === true
+                      ? "Correct! When coincidence > 1, one crossover makes a nearby second crossover MORE likely, not less. This is called negative interference. It's rare in most eukaryotes but has been documented — for example in some fungal systems and at very short genetic intervals. It's the opposite of the positive interference you just measured in this experiment, where coincidence was well below 1."
+                      : backCorrect === false
+                      ? "Coincidence = observed DCO / expected DCO. If coincidence > 1, there are MORE double crossovers than expected. What does that imply about the effect of one crossover on the probability of a second nearby?"
+                      : undefined}
+                  >
+                    <div className="text-xs font-semibold tracking-wider text-stone-500 uppercase mb-1 font-hand">
+                      Working backward
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { key: 'a', label: 'Negative interference — one crossover makes a nearby second MORE likely' },
+                        { key: 'b', label: 'Positive interference — crossovers suppress each other' },
+                        { key: 'c', label: 'The data must be wrong' },
+                        { key: 'd', label: 'The genes are on different chromosomes' },
+                      ].map(opt => (
+                        <button key={opt.key} onClick={() => {
+                          setBackAnswer(opt.key);
+                          const isCorrect = opt.key === 'a';
+                          setBackCorrect(isCorrect);
+                          if (isCorrect) setBackCompleted(true);
+                        }}
+                          disabled={backCompleted}
+                          className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-left ${
+                            backAnswer === opt.key
+                              ? backCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'
+                              : 'border-stone-200 bg-white hover:border-stone-300'
+                          } ${backCompleted ? 'opacity-70 cursor-default' : ''}`}>
+                          ({opt.key}) {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </QuestionPanel>
+                </>
+              )}
 
               {/* 1.7 — PopGen tease */}
-              <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-3">
-                <p className="text-sm font-semibold text-violet-900">What comes next: Linkage Disequilibrium</p>
-                <p className="text-sm text-violet-800">
-                  You've learned that linked genes travel together on chromosomes. In populations, this
-                  non-random association of alleles at different loci is called <strong>linkage disequilibrium</strong> (LD).
-                  Over generations, recombination breaks down LD — but selection, drift, and population structure
-                  can maintain it. LD is the foundation of genome-wide association studies (GWAS) and genomic
-                  selection in plant breeding.
-                </p>
-                <a href="/breeding-game/popgen.html"
-                  className="block rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg">
-                  Explore drift and selection in the Population Genetics module &rarr;
-                </a>
-              </div>
+              {backCompleted && (
+                <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-violet-900">What comes next: Linkage Disequilibrium</p>
+                  <p className="text-sm text-violet-800">
+                    You've learned that linked genes travel together on chromosomes. In populations, this
+                    non-random association of alleles at different loci is called <strong>linkage disequilibrium</strong> (LD).
+                    Over generations, recombination breaks down LD — but selection, drift, and population structure
+                    can maintain it. LD is the foundation of genome-wide association studies (GWAS) and genomic
+                    selection in plant breeding.
+                  </p>
+                  <a href="/breeding-game/popgen.html"
+                    className="block rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 px-5 py-3 text-center text-sm font-bold text-white shadow-md hover:shadow-lg">
+                    Explore drift and selection in the Population Genetics module &rarr;
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </div>
