@@ -47,8 +47,11 @@ export interface PracticeOption {
 
 export interface PracticeProblem {
   id: string;
-  type: PracticeProblemType;
-  concept: PracticeConcept;
+  /** Problem type key. Accepts any string so PopGen (and future modules)
+   *  can use their own type keys without needing a union with Mendelian's. */
+  type: string;
+  /** Concept key. Accepts any string for multi-module generality. */
+  concept: string;
   difficulty: 1 | 2 | 3;
   prompt: string;
   /** Optional scaffolding hint shown under the prompt before the student

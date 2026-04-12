@@ -1,10 +1,14 @@
 /**
- * Spaced-repetition persistence + scheduling for Mendelian Practice Mode.
+ * Spaced-repetition persistence + scheduling for Practice Mode.
  *
- * Tracks per-concept mastery in `localStorage` under the key
- * `mendelian-practice-v1`. All scheduling logic is implemented as PURE
- * functions over an immutable `PracticeState`; the only side effects are
- * in `loadState` and `saveState`.
+ * Generalized to support multiple modules (Mendelian, PopGen, etc.) via
+ * configurable `storageKey` and `conceptKeys` parameters. All functions
+ * default to Mendelian values when called without those parameters, so
+ * existing Mendelian callers continue to work unchanged.
+ *
+ * Tracks per-concept mastery in `localStorage`. All scheduling logic is
+ * implemented as PURE functions over an immutable `PracticeState`; the
+ * only side effects are in `loadState` and `saveState`.
  *
  * Design notes:
  *  - "SM-2-lite" ease levels 0..3 map to intervals {0min, 15min, 1d, 4d}.
@@ -16,7 +20,7 @@
  *  - Concept selection weights three factors additively:
  *      due weight: 1 if now >= nextDue (70% of the final weight)
  *      weak weight: extra for concepts with accuracy < 0.9 (any recent miss
- *        should resurface \u2014 F-034 loosened this from < 0.7, which let
+ *        should resurface — F-034 loosened this from < 0.7, which let
  *        a 9/10 session at acc=0.9 silently skip the upweight and broke the
  *        "you'll see more of those next time" promise on the scorecard)
  *      new weight: moderate for never-seen concepts
@@ -27,7 +31,6 @@
  *    switch on `schemaVersion`.
  */
 
-import type { PracticeConcept } from './problems';
 import { ALL_CONCEPTS } from './problems';
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -40,9 +43,12 @@ export interface ConceptStats {
   easeLevel: 0 | 1 | 2 | 3;
 }
 
+/** Generic practice state that works for any module. The `concepts` field
+ *  is a `Record<string, ConceptStats>` so it can hold Mendelian, PopGen,
+ *  or any future module's concept keys. */
 export interface PracticeState {
   schemaVersion: 1;
-  concepts: Record<PracticeConcept, ConceptStats>;
+  concepts: Record<string, ConceptStats>;
   streak: {
     current: number;
     best: number;
@@ -79,9 +85,13 @@ export function defaultConceptStats(): ConceptStats {
   };
 }
 
-export function defaultState(): PracticeState {
-  const concepts = {} as Record<PracticeConcept, ConceptStats>;
-  for (const c of ALL_CONCEPTS) concepts[c] = defaultConceptStats();
+/** Build a fresh default state. When `conceptKeys` is provided the state
+ *  is keyed by those strings (for PopGen or any future module). When
+ *  omitted the Mendelian `ALL_CONCEPTS` are used for backward-compat. */
+export function defaultState(conceptKeys?: readonly string[]): PracticeState {
+  const keys: readonly string[] = conceptKeys ?? ALL_CONCEPTS;
+  const concepts: Record<string, ConceptStats> = {};
+  for (const c of keys) concepts[c] = defaultConceptStats();
   return {
     schemaVersion: SCHEMA_VERSION,
     concepts,
@@ -93,24 +103,31 @@ export function defaultState(): PracticeState {
 }
 
 /** Read practice state from localStorage. Returns a fresh default on
- *  missing, malformed, or schema-mismatched storage. Never throws. */
-export function loadState(): PracticeState {
-  if (typeof localStorage === 'undefined') return defaultState();
+ *  missing, malformed, or schema-mismatched storage. Never throws.
+ *
+ *  @param storageKey   localStorage key. Defaults to `mendelian-practice-v1`.
+ *  @param conceptKeys  Concept strings to seed. Defaults to Mendelian ALL_CONCEPTS. */
+export function loadState(
+  storageKey: string = STORAGE_KEY,
+  conceptKeys?: readonly string[],
+): PracticeState {
+  const keys: readonly string[] = conceptKeys ?? ALL_CONCEPTS;
+  if (typeof localStorage === 'undefined') return defaultState(keys);
   let raw: string | null = null;
   try {
-    raw = localStorage.getItem(STORAGE_KEY);
+    raw = localStorage.getItem(storageKey);
   } catch {
-    return defaultState();
+    return defaultState(keys);
   }
-  if (!raw) return defaultState();
+  if (!raw) return defaultState(keys);
 
   try {
     const parsed = JSON.parse(raw) as Partial<PracticeState>;
-    if (!parsed || parsed.schemaVersion !== SCHEMA_VERSION) return defaultState();
+    if (!parsed || parsed.schemaVersion !== SCHEMA_VERSION) return defaultState(keys);
 
     // Reconstruct, filling in any missing concepts (e.g. if a new concept
     // was added in a later ship but before a migration).
-    const base = defaultState();
+    const base = defaultState(keys);
     const merged: PracticeState = {
       schemaVersion: SCHEMA_VERSION,
       concepts: { ...base.concepts },
@@ -124,8 +141,8 @@ export function loadState(): PracticeState {
       totalCorrect: parsed.totalCorrect ?? 0,
     };
     if (parsed.concepts) {
-      for (const c of ALL_CONCEPTS) {
-        const stored = parsed.concepts[c];
+      for (const c of keys) {
+        const stored = (parsed.concepts as Record<string, ConceptStats | undefined>)[c];
         if (stored && typeof stored === 'object') {
           merged.concepts[c] = {
             attempts: stored.attempts ?? 0,
@@ -139,18 +156,20 @@ export function loadState(): PracticeState {
     }
     return merged;
   } catch {
-    return defaultState();
+    return defaultState(keys);
   }
 }
 
 /** Persist practice state. Survives a quota error without crashing the
- *  session \u2014 the student simply loses the persistence for that write. */
-export function saveState(state: PracticeState): void {
+ *  session — the student simply loses the persistence for that write.
+ *
+ *  @param storageKey  localStorage key. Defaults to `mendelian-practice-v1`. */
+export function saveState(state: PracticeState, storageKey: string = STORAGE_KEY): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(storageKey, JSON.stringify(state));
   } catch (err) {
-    // QuotaExceededError or security error \u2014 log once and continue.
+    // QuotaExceededError or security error — log once and continue.
     // eslint-disable-next-line no-console
     console.warn('[practice] failed to persist state:', err);
   }
@@ -167,14 +186,16 @@ function clampEase(value: unknown): 0 | 1 | 2 | 3 {
  *  updated stats. Correct -> ease up one; wrong -> ease down one (floor 0).
  *  Next due time recomputed from the new ease.
  *
+ *  Accepts `string` for the concept key so it works for any module.
  *  Takes an explicit `now` for testability. Defaults to `Date.now()`. */
 export function recordAnswer(
   state: PracticeState,
-  concept: PracticeConcept,
+  concept: string,
   correct: boolean,
   now: number = Date.now(),
 ): PracticeState {
   const prev = state.concepts[concept];
+  if (!prev) return state; // safety: unknown concept key
   const nextEase: 0 | 1 | 2 | 3 = correct
     ? (Math.min(3, prev.easeLevel + 1) as 0 | 1 | 2 | 3)
     : (Math.max(0, prev.easeLevel - 1) as 0 | 1 | 2 | 3);
@@ -220,12 +241,12 @@ export function recordSessionEnd(
 
   let current: number;
   if (last === today) {
-    // Already counted a session today \u2014 don't double-increment.
+    // Already counted a session today — don't double-increment.
     current = state.streak.current;
   } else if (last === yesterday) {
     current = state.streak.current + 1;
   } else {
-    // No prior session, or gap of 2+ days \u2014 restart streak at 1.
+    // No prior session, or gap of 2+ days — restart streak at 1.
     current = 1;
   }
 
@@ -234,7 +255,7 @@ export function recordSessionEnd(
   // Totals for attempted/correct are already incremented per-answer via
   // recordAnswer, so we only bump session count here to avoid
   // double-counting. (If a caller wants to skip per-answer persistence and
-  // just call recordSessionEnd, the per-answer totals would be zero \u2014
+  // just call recordSessionEnd, the per-answer totals would be zero —
   // that's a caller bug, not a state bug.)
   return {
     ...state,
@@ -246,27 +267,32 @@ export function recordSessionEnd(
 // ── Scheduling / selection ──────────────────────────────────────────────
 
 interface ConceptWeight {
-  concept: PracticeConcept;
+  concept: string;
   weight: number;
 }
 
 /** Pick the next concept to drill, given the current state and an RNG.
  *  Deterministic for a seeded RNG (no Date.now inside).
  *
+ *  @param allConcepts  The concept keys to choose from. Defaults to Mendelian ALL_CONCEPTS.
+ *
  *  Weighting:
  *    - base floor 0.1 for every concept (never starve a mastered concept)
  *    - +1.0 if the concept is due or overdue (nextDue <= now)
  *    - +0.7 if the concept is new (attempts === 0)
- *    - +0.5 if accuracy < 0.9 (weak spot \u2014 any recent miss; F-034)
- *    - +0.3 if accuracy < 0.5 (on top of the above \u2014 really weak)
+ *    - +0.5 if accuracy < 0.9 (weak spot — any recent miss; F-034)
+ *    - +0.3 if accuracy < 0.5 (on top of the above — really weak)
  */
 export function selectNextConcept(
   state: PracticeState,
   rng: () => number,
   now: number = Date.now(),
-): PracticeConcept {
-  const weights: ConceptWeight[] = ALL_CONCEPTS.map(c => {
+  allConcepts?: readonly string[],
+): string {
+  const concepts: readonly string[] = allConcepts ?? ALL_CONCEPTS;
+  const weights: ConceptWeight[] = concepts.map(c => {
     const s = state.concepts[c];
+    if (!s) return { concept: c, weight: 0.1 }; // safety
     let w = 0.1;
     if (s.nextDue <= now) w += 1.0;
     if (s.attempts === 0) {
@@ -276,7 +302,7 @@ export function selectNextConcept(
       // Threshold 0.9 (was 0.7 pre-F-034): a 9/10 session is exactly the
       // case where the student saw one miss and we promised on the
       // scorecard they'd see more of that concept. 0.9 is strictly greater
-      // than any accuracy a student with \u22651 miss on their current
+      // than any accuracy a student with >=1 miss on their current
       // attempts can achieve, so the upweight fires whenever they missed
       // anything recently.
       if (acc < 0.9) w += 0.5;
@@ -291,7 +317,7 @@ export function selectNextConcept(
     roll -= w.weight;
     if (roll <= 0) return w.concept;
   }
-  // Floating-point backstop \u2014 should be unreachable.
+  // Floating-point backstop — should be unreachable.
   return weights[weights.length - 1].concept;
 }
 
@@ -313,7 +339,7 @@ export function getStreakDisplay(
 
 /** YYYY-MM-DD in the viewer's local time. Used for streak day comparisons.
  *  Using local time (not UTC) means "yesterday" actually means "the
- *  previous calendar day for this student", which is what they\u2019d expect.
+ *  previous calendar day for this student", which is what they'd expect.
  */
 export function localDateString(ms: number): string {
   const d = new Date(ms);

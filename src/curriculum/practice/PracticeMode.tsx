@@ -1,5 +1,5 @@
 /**
- * Practice Mode — Duolingo-flavored rapid practice for the Mendelian module.
+ * Practice Mode — Duolingo-flavored rapid practice, generalized for any module.
  *
  * A single session is 10 problems, interleaved across concepts via the
  * spaced-repetition selector. Problems render with immediate feedback and
@@ -10,19 +10,34 @@
  *
  * All persistence happens through `spaced-repetition.ts`; no other module
  * reads or writes localStorage.
+ *
+ * Module-specific behavior is injected via props:
+ *  - `generateProblemForConcept` — problem factory
+ *  - `allConcepts` — concept key list
+ *  - `conceptLabels` — display labels for concepts
+ *  - `storageKey` — localStorage key for persistence
+ *  - `themeColor` — 'emerald' (Mendelian default) or 'violet' (PopGen)
+ *
+ * When called with no props, all values default to the Mendelian module
+ * for full backward-compatibility.
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type {
   PracticeProblem,
-  PracticeConcept,
   PracticeOption,
 } from './problems';
+import type { PracticeConcept } from './problems';
 import {
-  generateProblemForConcept,
-  CONCEPT_LABELS,
-  ALL_CONCEPTS,
+  generateProblemForConcept as mendelianGenerateProblemForConceptTyped,
+  CONCEPT_LABELS as MENDELIAN_CONCEPT_LABELS,
+  ALL_CONCEPTS as MENDELIAN_ALL_CONCEPTS,
 } from './problems';
+
+/** Wrapper that widens PracticeConcept -> string for the default prop. */
+function mendelianGenerateProblemForConcept(concept: string, rng: () => number): PracticeProblem {
+  return mendelianGenerateProblemForConceptTyped(concept as PracticeConcept, rng);
+}
 import {
   loadState,
   saveState,
@@ -30,6 +45,7 @@ import {
   recordSessionEnd,
   selectNextConcept,
   getStreakDisplay,
+  STORAGE_KEY as MENDELIAN_STORAGE_KEY,
   type PracticeState,
 } from './spaced-repetition';
 
@@ -43,10 +59,80 @@ interface SessionResult {
   correct: boolean;
 }
 
+// ── Theme color utilities ──────────────────────────────────────────────
+
+export type ThemeColor = 'emerald' | 'violet';
+
+/** Returns Tailwind class strings for the given theme color. */
+function themeClasses(color: ThemeColor) {
+  if (color === 'violet') {
+    return {
+      btnGradient: 'from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800',
+      barGradient: 'from-violet-400 to-violet-500',
+      scoreBg: 'bg-violet-50',
+      scoreBorder: 'border-violet-200',
+      scoreText: 'text-violet-800',
+      scoreSubtext: 'text-violet-700',
+      feedbackCorrectBg: 'bg-violet-50',
+      feedbackCorrectBorder: 'border-violet-200',
+      feedbackCorrectText: 'text-violet-800',
+      optionSelectedBorder: 'border-violet-400',
+      optionSelectedBg: 'bg-violet-50',
+      optionCorrectBorder: 'border-violet-400',
+      optionCorrectBg: 'bg-violet-50',
+      optionCorrectText: 'text-violet-900',
+      markCorrectBg: 'bg-violet-500',
+      celebrationGradient: 'radial-gradient(circle at 30% 30%, #c4b5fd, #7c3aed)',
+    };
+  }
+  // emerald (default / Mendelian)
+  return {
+    btnGradient: 'from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800',
+    barGradient: 'from-emerald-400 to-emerald-500',
+    scoreBg: 'bg-emerald-50',
+    scoreBorder: 'border-emerald-200',
+    scoreText: 'text-emerald-800',
+    scoreSubtext: 'text-emerald-700',
+    feedbackCorrectBg: 'bg-emerald-50',
+    feedbackCorrectBorder: 'border-emerald-200',
+    feedbackCorrectText: 'text-emerald-800',
+    optionSelectedBorder: 'border-emerald-400',
+    optionSelectedBg: 'bg-emerald-50',
+    optionCorrectBorder: 'border-emerald-400',
+    optionCorrectBg: 'bg-emerald-50',
+    optionCorrectText: 'text-emerald-900',
+    markCorrectBg: 'bg-emerald-500',
+    celebrationGradient: 'radial-gradient(circle at 30% 30%, #6ee7b7, #059669)',
+  };
+}
+
+// ── Props ──────────────────────────────────────────────────────────────
+
+export interface PracticeModeProps {
+  /** Problem factory: given a concept key and RNG, return a PracticeProblem. */
+  generateProblemForConcept?: (concept: string, rng: () => number) => PracticeProblem;
+  /** All concept keys for this module. */
+  allConcepts?: readonly string[];
+  /** Human-readable labels for each concept key. */
+  conceptLabels?: Record<string, string>;
+  /** localStorage key for persistence. */
+  storageKey?: string;
+  /** Theme color for CTA buttons and accent. */
+  themeColor?: ThemeColor;
+}
+
 // ── Root component ──────────────────────────────────────────────────────
 
-export function PracticeMode() {
-  const [state, setState] = useState<PracticeState>(() => loadState());
+export function PracticeMode({
+  generateProblemForConcept: genProblem = mendelianGenerateProblemForConcept,
+  allConcepts = MENDELIAN_ALL_CONCEPTS,
+  conceptLabels = MENDELIAN_CONCEPT_LABELS,
+  storageKey = MENDELIAN_STORAGE_KEY,
+  themeColor = 'emerald',
+}: PracticeModeProps = {}) {
+  const theme = useMemo(() => themeClasses(themeColor), [themeColor]);
+
+  const [state, setState] = useState<PracticeState>(() => loadState(storageKey, allConcepts));
   const [view, setView] = useState<View>('landing');
   const [sessionResults, setSessionResults] = useState<SessionResult[]>([]);
   const [currentProblem, setCurrentProblem] = useState<PracticeProblem | null>(null);
@@ -66,10 +152,10 @@ export function PracticeMode() {
     setSessionResults([]);
     setSelectedIdx(null);
     // Pick first concept + problem from the current state.
-    const next = selectNextConcept(state, Math.random);
-    setCurrentProblem(generateProblemForConcept(next, Math.random));
+    const next = selectNextConcept(state, Math.random, Date.now(), allConcepts);
+    setCurrentProblem(genProblem(next, Math.random));
     setView('session');
-  }, [state]);
+  }, [state, allConcepts, genProblem]);
 
   const advance = useCallback(() => {
     if (!currentProblem || selectedIdx === null) return;
@@ -86,12 +172,12 @@ export function PracticeMode() {
     // Update spaced-repetition state and persist (mid-session reload safety).
     const updated = recordAnswer(state, currentProblem.concept, correct);
     setState(updated);
-    saveState(updated);
+    saveState(updated, storageKey);
 
     if (newResults.length >= SESSION_LENGTH) {
       const finalState = recordSessionEnd(updated, newResults.length);
       setState(finalState);
-      saveState(finalState);
+      saveState(finalState, storageKey);
       setSessionResults(newResults);
       setCurrentProblem(null);
       setSelectedIdx(null);
@@ -100,11 +186,11 @@ export function PracticeMode() {
     }
 
     // Next problem
-    const nextConcept = selectNextConcept(updated, Math.random);
+    const nextConcept = selectNextConcept(updated, Math.random, Date.now(), allConcepts);
     setSessionResults(newResults);
     setSelectedIdx(null);
-    setCurrentProblem(generateProblemForConcept(nextConcept, Math.random));
-  }, [currentProblem, selectedIdx, sessionResults, state]);
+    setCurrentProblem(genProblem(nextConcept, Math.random));
+  }, [currentProblem, selectedIdx, sessionResults, state, storageKey, allConcepts, genProblem]);
 
   const backToLanding = useCallback(() => {
     setView('landing');
@@ -143,7 +229,15 @@ export function PracticeMode() {
   // ── Render dispatch ────────────────────────────────────────────────
 
   if (view === 'landing') {
-    return <LandingCard state={state} onStart={startSession} />;
+    return (
+      <LandingCard
+        state={state}
+        onStart={startSession}
+        allConcepts={allConcepts}
+        conceptLabels={conceptLabels}
+        theme={theme}
+      />
+    );
   }
   if (view === 'session' && currentProblem) {
     return (
@@ -154,6 +248,8 @@ export function PracticeMode() {
         setSelectedIdx={setSelectedIdx}
         onAdvance={advance}
         progress={{ index: sessionResults.length + 1, total: SESSION_LENGTH }}
+        conceptLabels={conceptLabels}
+        theme={theme}
       />
     );
   }
@@ -165,6 +261,8 @@ export function PracticeMode() {
         reducedMotion={reducedMotion}
         onPracticeAgain={startSession}
         onBack={backToLanding}
+        conceptLabels={conceptLabels}
+        theme={theme}
       />
     );
   }
@@ -176,9 +274,15 @@ export function PracticeMode() {
 function LandingCard({
   state,
   onStart,
+  allConcepts,
+  conceptLabels,
+  theme,
 }: {
   state: PracticeState;
   onStart: () => void;
+  allConcepts: readonly string[];
+  conceptLabels: Record<string, string>;
+  theme: ReturnType<typeof themeClasses>;
 }) {
   const streak = getStreakDisplay(state);
 
@@ -214,7 +318,7 @@ function LandingCard({
         <button
           type="button"
           onClick={onStart}
-          className="w-full rounded-xl px-5 py-3 font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md transition-all"
+          className={`w-full rounded-xl px-5 py-3 font-semibold text-white bg-gradient-to-r ${theme.btnGradient} shadow-md transition-all`}
         >
           Start a 10-question session
         </button>
@@ -225,15 +329,16 @@ function LandingCard({
           Concept mastery
         </h3>
         <div className="space-y-3">
-          {ALL_CONCEPTS.map(c => {
+          {allConcepts.map(c => {
             const s = state.concepts[c];
+            if (!s) return null;
             const acc = s.attempts === 0 ? 0 : s.correct / s.attempts;
             const pct = Math.round(acc * 100);
             return (
               <div key={c} className="space-y-1">
                 <div className="flex items-baseline justify-between text-xs">
                   <span className="font-semibold text-stone-700">
-                    {CONCEPT_LABELS[c]}
+                    {conceptLabels[c] ?? c}
                   </span>
                   <span className="text-stone-500">
                     {s.attempts === 0
@@ -243,7 +348,7 @@ function LandingCard({
                 </div>
                 <div className="h-2 rounded-full bg-stone-200 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all"
+                    className={`h-full bg-gradient-to-r ${theme.barGradient} transition-all`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -295,6 +400,8 @@ function SessionCard({
   setSelectedIdx,
   onAdvance,
   progress,
+  conceptLabels,
+  theme,
 }: {
   state: PracticeState;
   problem: PracticeProblem;
@@ -302,6 +409,8 @@ function SessionCard({
   setSelectedIdx: (i: number) => void;
   onAdvance: () => void;
   progress: { index: number; total: number };
+  conceptLabels: Record<string, string>;
+  theme: ReturnType<typeof themeClasses>;
 }) {
   const answered = selectedIdx !== null;
   const selectedOption =
@@ -317,13 +426,13 @@ function SessionCard({
             Question {progress.index} of {progress.total}
           </span>
           <span className="text-xs text-stone-500">
-            {CONCEPT_LABELS[problem.concept]}
+            {conceptLabels[problem.concept] ?? problem.concept}
           </span>
         </div>
         <StreakPill streak={streak} />
       </div>
 
-      <ProgressBar current={progress.index} total={progress.total} />
+      <ProgressBar current={progress.index} total={progress.total} theme={theme} />
 
       <div>
         <p className="text-base text-stone-800 leading-relaxed">
@@ -349,6 +458,7 @@ function SessionCard({
             selected={selectedIdx === i}
             answered={answered}
             onClick={() => !answered && setSelectedIdx(i)}
+            theme={theme}
           />
         ))}
       </div>
@@ -358,6 +468,7 @@ function SessionCard({
           correct={isCorrect}
           feedback={selectedOption.feedback ?? problem.explanation}
           explanation={problem.explanation}
+          theme={theme}
         />
       )}
 
@@ -368,7 +479,7 @@ function SessionCard({
           disabled={!answered}
           className={`rounded-xl px-5 py-2.5 font-semibold text-sm transition-all ${
             answered
-              ? 'text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md'
+              ? `text-white bg-gradient-to-r ${theme.btnGradient} shadow-md`
               : 'text-stone-400 bg-stone-100 cursor-not-allowed'
           }`}
         >
@@ -385,30 +496,32 @@ function OptionButton({
   selected,
   answered,
   onClick,
+  theme,
 }: {
   opt: PracticeOption;
   index: number;
   selected: boolean;
   answered: boolean;
   onClick: () => void;
+  theme: ReturnType<typeof themeClasses>;
 }) {
-  // After answering: show emerald for the correct option, red for the
-  // student's wrong pick, neutral for the rest. Before answering:
-  // neutral with hover.
+  // After answering: show themed correct color for the correct option,
+  // red for the student's wrong pick, neutral for the rest. Before
+  // answering: neutral with hover.
   const showCorrect = answered && opt.isCorrect;
   const showWrong = answered && selected && !opt.isCorrect;
 
   const cls = showCorrect
-    ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
+    ? `${theme.optionCorrectBorder} ${theme.optionCorrectBg} ${theme.optionCorrectText}`
     : showWrong
     ? 'border-red-300 bg-red-50 text-red-800'
     : selected
-    ? 'border-emerald-400 bg-emerald-50 text-stone-800'
+    ? `${theme.optionSelectedBorder} ${theme.optionSelectedBg} text-stone-800`
     : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-800';
 
   const mark = showCorrect ? '\u2713' : showWrong ? '\u2717' : `${index + 1}`;
   const markCls = showCorrect
-    ? 'bg-emerald-500 text-white'
+    ? `${theme.markCorrectBg} text-white`
     : showWrong
     ? 'bg-red-400 text-white'
     : 'bg-stone-100 text-stone-500';
@@ -439,10 +552,12 @@ function FeedbackBlock({
   correct,
   feedback,
   explanation,
+  theme,
 }: {
   correct: boolean;
   feedback: string;
   explanation: string;
+  theme: ReturnType<typeof themeClasses>;
 }) {
   const showExplanation = feedback !== explanation;
   return (
@@ -450,14 +565,14 @@ function FeedbackBlock({
       <div
         className={`rounded-xl border px-4 py-3 text-sm flex items-start gap-3 ${
           correct
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            ? `${theme.feedbackCorrectBg} ${theme.feedbackCorrectBorder} ${theme.feedbackCorrectText}`
             : 'bg-red-50 border-red-200 text-red-700'
         }`}
         role="status"
       >
         <span
           className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
-            correct ? 'bg-emerald-500 text-white' : 'bg-red-400 text-white'
+            correct ? `${theme.markCorrectBg} text-white` : 'bg-red-400 text-white'
           }`}
           aria-hidden
         >
@@ -480,12 +595,20 @@ function FeedbackBlock({
   );
 }
 
-function ProgressBar({ current, total }: { current: number; total: number }) {
+function ProgressBar({
+  current,
+  total,
+  theme,
+}: {
+  current: number;
+  total: number;
+  theme: ReturnType<typeof themeClasses>;
+}) {
   const pct = Math.round(((current - 1) / total) * 100);
   return (
     <div className="h-1.5 rounded-full bg-stone-200 overflow-hidden">
       <div
-        className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all"
+        className={`h-full bg-gradient-to-r ${theme.barGradient} transition-all`}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -500,19 +623,23 @@ function Scorecard({
   reducedMotion,
   onPracticeAgain,
   onBack,
+  conceptLabels,
+  theme,
 }: {
   state: PracticeState;
   results: SessionResult[];
   reducedMotion: boolean;
   onPracticeAgain: () => void;
   onBack: () => void;
+  conceptLabels: Record<string, string>;
+  theme: ReturnType<typeof themeClasses>;
 }) {
   const correctCount = results.filter(r => r.correct).length;
   const perfect = correctCount === results.length && results.length > 0;
 
   // Per-concept breakdown for just the concepts that appeared this session.
   const byConcept = useMemo(() => {
-    const map = new Map<PracticeConcept, { attempts: number; correct: number }>();
+    const map = new Map<string, { attempts: number; correct: number }>();
     for (const r of results) {
       const k = r.problem.concept;
       const cur = map.get(k) ?? { attempts: 0, correct: 0 };
@@ -526,7 +653,7 @@ function Scorecard({
   // Weakest concept by accuracy (ties broken by attempts desc).
   const weakest = useMemo(() => {
     let worst: {
-      concept: PracticeConcept;
+      concept: string;
       acc: number;
       attempts: number;
     } | null = null;
@@ -543,7 +670,7 @@ function Scorecard({
 
   return (
     <div className="relative rounded-2xl border border-stone-200 shadow-sm bg-white p-6 space-y-5 overflow-hidden">
-      {perfect && !reducedMotion && <Celebration />}
+      {perfect && !reducedMotion && <Celebration celebrationGradient={theme.celebrationGradient} />}
       <div className="flex items-start justify-between gap-3 flex-wrap relative">
         <div>
           <h2 className="text-2xl text-stone-800 font-hand">
@@ -558,11 +685,11 @@ function Scorecard({
         <StreakPill streak={streak} />
       </div>
 
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center relative">
-        <div className="text-5xl font-bold text-emerald-800 font-hand">
+      <div className={`rounded-xl border ${theme.scoreBorder} ${theme.scoreBg} p-5 text-center relative`}>
+        <div className={`text-5xl font-bold ${theme.scoreText} font-hand`}>
           {correctCount} / {results.length}
         </div>
-        <div className="text-xs uppercase tracking-wide text-emerald-700 mt-1">
+        <div className={`text-xs uppercase tracking-wide ${theme.scoreSubtext} mt-1`}>
           correct answers
         </div>
       </div>
@@ -580,7 +707,7 @@ function Scorecard({
                 className="flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs"
               >
                 <span className="font-semibold text-stone-700">
-                  {CONCEPT_LABELS[c]}
+                  {conceptLabels[c] ?? c}
                 </span>
                 <span className="text-stone-600">
                   {s.correct} / {s.attempts} ({pct}%)
@@ -594,7 +721,7 @@ function Scorecard({
       {weakest && (
         <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800">
           <span className="font-semibold">Weakest this session: </span>
-          {CONCEPT_LABELS[weakest.concept]}. You&rsquo;ll see more of those next
+          {conceptLabels[weakest.concept] ?? weakest.concept}. You&rsquo;ll see more of those next
           time.
         </div>
       )}
@@ -603,7 +730,7 @@ function Scorecard({
         <button
           type="button"
           onClick={onPracticeAgain}
-          className="flex-1 min-w-[160px] rounded-xl px-5 py-2.5 font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md transition-all"
+          className={`flex-1 min-w-[160px] rounded-xl px-5 py-2.5 font-semibold text-white bg-gradient-to-r ${theme.btnGradient} shadow-md transition-all`}
         >
           Practice again
         </button>
@@ -621,13 +748,14 @@ function Scorecard({
 
 // ── Celebration (CSS-only, pointer-events-none, reduced-motion safe) ───
 
-function Celebration() {
+function Celebration({ celebrationGradient }: { celebrationGradient: string }) {
   // Eight scattering particles; fully non-interactive so the Next button
   // click is never blocked.
   const particles = Array.from({ length: 8 });
+  const css = CELEBRATION_CSS.replace('__GRADIENT__', celebrationGradient);
   return (
     <>
-      <style>{CELEBRATION_CSS}</style>
+      <style>{css}</style>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 flex items-center justify-center"
@@ -650,7 +778,7 @@ const CELEBRATION_CSS = `
   width: 10px;
   height: 10px;
   border-radius: 9999px;
-  background: radial-gradient(circle at 30% 30%, #6ee7b7, #059669);
+  background: __GRADIENT__;
   opacity: 0;
   animation: practice-celebrate 1400ms ease-out forwards;
   transform-origin: center;
