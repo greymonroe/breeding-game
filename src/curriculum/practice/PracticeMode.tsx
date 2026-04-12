@@ -61,10 +61,30 @@ interface SessionResult {
 
 // ── Theme color utilities ──────────────────────────────────────────────
 
-export type ThemeColor = 'emerald' | 'violet';
+export type ThemeColor = 'emerald' | 'violet' | 'cyan';
 
 /** Returns Tailwind class strings for the given theme color. */
 function themeClasses(color: ThemeColor) {
+  if (color === 'cyan') {
+    return {
+      btnGradient: 'from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800',
+      barGradient: 'from-cyan-400 to-cyan-500',
+      scoreBg: 'bg-cyan-50',
+      scoreBorder: 'border-cyan-200',
+      scoreText: 'text-cyan-800',
+      scoreSubtext: 'text-cyan-700',
+      feedbackCorrectBg: 'bg-cyan-50',
+      feedbackCorrectBorder: 'border-cyan-200',
+      feedbackCorrectText: 'text-cyan-800',
+      optionSelectedBorder: 'border-cyan-400',
+      optionSelectedBg: 'bg-cyan-50',
+      optionCorrectBorder: 'border-cyan-400',
+      optionCorrectBg: 'bg-cyan-50',
+      optionCorrectText: 'text-cyan-900',
+      markCorrectBg: 'bg-cyan-500',
+      celebrationGradient: 'radial-gradient(circle at 30% 30%, #67e8f9, #0891b2)',
+    };
+  }
   if (color === 'violet') {
     return {
       btnGradient: 'from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800',
@@ -392,6 +412,8 @@ function StreakPill({
       : `${streak.current} day streak \u2014 practice today to extend it`;
   const colorClasses = themeColor === 'violet'
     ? 'border-violet-200 bg-violet-50 text-violet-800'
+    : themeColor === 'cyan'
+    ? 'border-cyan-200 bg-cyan-50 text-cyan-800'
     : 'border-emerald-200 bg-emerald-50 text-emerald-800';
   return (
     <div className={`rounded-full border ${colorClasses} px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5`}>

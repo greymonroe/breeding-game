@@ -25,3 +25,14 @@ export {
   POPGEN_CONCEPT_LABELS,
   POPGEN_CONCEPT_TO_TYPE,
 } from './popgen-problems';
+export type {
+  LinkageProblemType,
+  LinkageConcept,
+} from './linkage-problems';
+export {
+  linkageGenerateProblemForConcept,
+  linkageGenerateRandomProblem,
+  LINKAGE_ALL_CONCEPTS,
+  LINKAGE_CONCEPT_LABELS,
+  LINKAGE_CONCEPT_TO_TYPE,
+} from './linkage-problems';
