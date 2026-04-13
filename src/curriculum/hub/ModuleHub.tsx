@@ -35,6 +35,15 @@ const MODULES = [
     href: '/breeding-game/molbio.html',
     icon: 'dna' as const,
   },
+  {
+    title: 'Gene Structure & Regulation',
+    description: 'Explore gene anatomy, splicing, promoters, transcription factors, and the ABC model of flower development.',
+    difficulty: 'Advanced',
+    color: 'indigo',
+    experiments: 8,
+    href: '/breeding-game/genereg.html',
+    icon: 'gene' as const,
+  },
 ];
 
 const COMING_SOON = [
@@ -97,6 +106,23 @@ function PopulationSvg({ className }: { className?: string }) {
   );
 }
 
+function GeneSvg({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Horizontal gene bar with colored segments (exons, introns, regulatory) */}
+      <rect x="4" y="20" width="40" height="8" rx="2" fill="currentColor" opacity="0.1" stroke="currentColor" strokeWidth="1.5" />
+      {/* Exon blocks */}
+      <rect x="6" y="18" width="8" height="12" rx="2" fill="currentColor" opacity="0.7" />
+      <rect x="20" y="18" width="8" height="12" rx="2" fill="currentColor" opacity="0.7" />
+      <rect x="34" y="18" width="8" height="12" rx="2" fill="currentColor" opacity="0.7" />
+      {/* Arrow indicating direction */}
+      <path d="M10 36L24 36L22 33M24 36L22 39" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Promoter arrow */}
+      <path d="M6 14L6 10L14 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+    </svg>
+  );
+}
+
 function LockSvg({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -111,6 +137,7 @@ const ICON_MAP = {
   chromosome: ChromosomeSvg,
   population: PopulationSvg,
   dna: DnaSvg,
+  gene: GeneSvg,
 };
 
 const COLOR_MAP: Record<string, { gradient: string; border: string; bg: string; text: string; btnFrom: string; btnTo: string }> = {
@@ -145,6 +172,14 @@ const COLOR_MAP: Record<string, { gradient: string; border: string; bg: string; 
     text: 'text-amber-700',
     btnFrom: 'from-amber-500',
     btnTo: 'to-amber-600',
+  },
+  indigo: {
+    gradient: 'from-indigo-400 to-indigo-500',
+    border: 'border-indigo-200',
+    bg: 'bg-indigo-50',
+    text: 'text-indigo-700',
+    btnFrom: 'from-indigo-500',
+    btnTo: 'to-indigo-600',
   },
 };
 

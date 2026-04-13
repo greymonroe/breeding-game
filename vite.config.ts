@@ -15,6 +15,7 @@ export default defineConfig({
         linkage: resolve(__dirname, 'linkage.html'),
         modules: resolve(__dirname, 'modules.html'),
         molbio: resolve(__dirname, 'molbio.html'),
+        genereg: resolve(__dirname, 'genereg.html'),
       },
     },
   },
