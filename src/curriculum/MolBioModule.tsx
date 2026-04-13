@@ -235,6 +235,15 @@ function Exp0_TransformingPrinciple({ onComplete }: { onComplete: () => void }) 
                   Submit
                 </button>
               )}
+              {submitted1 && answer1 !== 'c' && (
+                <button
+                  type="button"
+                  onClick={() => { setSubmitted1(false); setAnswer1(null); }}
+                  className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300"
+                >
+                  Try Again
+                </button>
+              )}
             </div>
           </QuestionPanel>
 
@@ -274,6 +283,15 @@ function Exp0_TransformingPrinciple({ onComplete }: { onComplete: () => void }) 
                     className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800"
                   >
                     Submit
+                  </button>
+                )}
+                {submitted2 && answer2 !== 'a' && (
+                  <button
+                    type="button"
+                    onClick={() => { setSubmitted2(false); setAnswer2(null); }}
+                    className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300"
+                  >
+                    Try Again
                   </button>
                 )}
               </div>
@@ -798,6 +816,16 @@ function Exp3_GeneticCode({ onComplete }: { onComplete: () => void }) {
             </div>
           )}
 
+          {codonSubmitted && !codonCorrect && (
+            <button
+              type="button"
+              onClick={() => { setCodonSubmitted(false); setStudentAAs(Array(codons.length).fill(null)); }}
+              className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300"
+            >
+              Try Again
+            </button>
+          )}
+
           {codonSubmitted && codonCorrect && step === 1 && (
             <button
               type="button"
@@ -860,6 +888,15 @@ function Exp3_GeneticCode({ onComplete }: { onComplete: () => void }) {
                   Submit
                 </button>
               )}
+              {rfSubmitted && rfAnswer !== 'b' && (
+                <button
+                  type="button"
+                  onClick={() => { setRfSubmitted(false); setRfAnswer(null); }}
+                  className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300"
+                >
+                  Try Again
+                </button>
+              )}
             </div>
           </QuestionPanel>
         </div>
@@ -868,209 +905,335 @@ function Exp3_GeneticCode({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// ── Experiment 4: Translation — Building a Protein ────────────────────
+// ── Experiment 4: Translation — tRNA Ribosome Game ───────────────────
 
-// A real fragment from Rubisco large subunit (rbcL) - first 30 bp after start codon
-// This is a simplified educational sequence based on rbcL
-const EXP4_CODING_DNA = 'ATGAGCCAAGCTGCTTCTAATGCCAAATGG'; // 30 bp = 10 codons
-const EXP4_TEMPLATE_DNA = reverseComplement(EXP4_CODING_DNA);
+// A real fragment from Rubisco large subunit (rbcL) - first 30 bp + stop codon
+const EXP4_CODING_DNA = 'ATGAGCCAAGCTGCTTCTAATGCCAAATGGTAA'; // 33 bp = 10 codons + stop
+const EXP4_MRNA = codingToMrna(EXP4_CODING_DNA);
+
+/** Compute the anticodon for an mRNA codon (complement with U instead of T, reversed) */
+function anticodon(codon: string): string {
+  const comp: Record<string, string> = { A: 'U', U: 'A', G: 'C', C: 'G' };
+  return codon.split('').reverse().map(b => comp[b] ?? b).join('');
+}
+
+/** Generate a pool of tRNA cards: 1 correct + N distractors */
+function buildTrnaPool(correctCodon: string, poolSize: number): Array<{ anticodon: string; aa: string; isCorrect: boolean }> {
+  const correctAnti = anticodon(correctCodon);
+  const correctAA = CODON_TABLE[correctCodon] ?? '?';
+  const pool: Array<{ anticodon: string; aa: string; isCorrect: boolean }> = [
+    { anticodon: correctAnti, aa: correctAA, isCorrect: true },
+  ];
+
+  // Build distractors from all codons that don't match this one
+  const allCodons = Object.keys(CODON_TABLE);
+  const distractorCodons = allCodons.filter(c => c !== correctCodon && CODON_TABLE[c] !== '*');
+  // Shuffle and pick
+  const shuffled = [...distractorCodons].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < Math.min(poolSize - 1, shuffled.length); i++) {
+    const c = shuffled[i];
+    pool.push({ anticodon: anticodon(c), aa: CODON_TABLE[c] ?? '?', isCorrect: false });
+  }
+  // Shuffle the pool so correct isn't always first
+  return pool.sort(() => Math.random() - 0.5);
+}
 
 function Exp4_Translation({ onComplete }: { onComplete: () => void }) {
-  const [step, setStep] = useState(0);
-  // Step 0: identify template strand
-  // Step 1: transcribe to mRNA
-  // Step 2: break into codons
-  // Step 3: translate to protein
-  // Step 4: write final sequence
   const completedRef = useRef(false);
 
-  // Step 0: template strand identification
-  const [templateAnswer, setTemplateAnswer] = useState<string | null>(null);
-  const [templateSubmitted, setTemplateSubmitted] = useState(false);
+  // Parse the mRNA into codons
+  const allCodons = useMemo(() => {
+    const result: string[] = [];
+    for (let i = 0; i < EXP4_MRNA.length; i += 3) {
+      if (i + 3 <= EXP4_MRNA.length) result.push(EXP4_MRNA.slice(i, i + 3));
+    }
+    return result;
+  }, []);
 
-  // Step 1: mRNA (auto-computed for verification)
-  const correctMrna = codingToMrna(EXP4_CODING_DNA);
+  // Find where the stop codon is (if any)
+  const stopIndex = useMemo(() => allCodons.findIndex(c => CODON_TABLE[c] === '*'), [allCodons]);
+  // Codons to translate (up to but not including stop)
+  const translateCodons = useMemo(
+    () => stopIndex >= 0 ? allCodons.slice(0, stopIndex) : allCodons,
+    [allCodons, stopIndex],
+  );
 
-  // Step 3: protein
-  const expectedProtein = translateToProtein(EXP4_CODING_DNA);
-  const expectedProteinStr = expectedProtein.map(aa => AA_THREE_LETTER[aa] ?? aa).join('-');
+  const [currentCodonIdx, setCurrentCodonIdx] = useState(0);
+  const [proteinChain, setProteinChain] = useState<string[]>([]);
+  const [trnaPool, setTrnaPool] = useState<Array<{ anticodon: string; aa: string; isCorrect: boolean }>>([]);
+  const [wrongPick, setWrongPick] = useState<string | null>(null);
+  const [correctFlash, setCorrectFlash] = useState(false);
+  const [gameComplete, setGameComplete] = useState(false);
+  const [atStopCodon, setAtStopCodon] = useState(false);
 
-  // Step 4: final answer
-  const [proteinAnswer, setProteinAnswer] = useState('');
-  const [proteinSubmitted, setProteinSubmitted] = useState(false);
-  const expectedSingleLetter = expectedProtein.join('');
-  const proteinCorrect = proteinSubmitted && proteinAnswer.toUpperCase().replace(/[^A-Z]/g, '') === expectedSingleLetter;
+  // Initialize pool for current codon
+  useEffect(() => {
+    if (currentCodonIdx < translateCodons.length) {
+      setTrnaPool(buildTrnaPool(translateCodons[currentCodonIdx], 7));
+      setWrongPick(null);
+    } else if (stopIndex >= 0 && currentCodonIdx === translateCodons.length) {
+      // We've reached the stop codon
+      setAtStopCodon(true);
+    }
+  }, [currentCodonIdx, translateCodons, stopIndex]);
+
+  const handleTrnaClick = useCallback((trna: { anticodon: string; aa: string; isCorrect: boolean }) => {
+    if (gameComplete || atStopCodon) return;
+    if (!trna.isCorrect) {
+      setWrongPick(trna.anticodon);
+      return;
+    }
+    // Correct pick
+    setWrongPick(null);
+    setCorrectFlash(true);
+    setProteinChain(prev => [...prev, trna.aa]);
+    setTimeout(() => {
+      setCorrectFlash(false);
+      setCurrentCodonIdx(prev => prev + 1);
+    }, 500);
+  }, [gameComplete, atStopCodon]);
+
+  const handleRelease = useCallback(() => {
+    setAtStopCodon(false);
+    setGameComplete(true);
+  }, []);
 
   useEffect(() => {
-    if (proteinCorrect && !completedRef.current) {
+    if (gameComplete && !completedRef.current) {
       completedRef.current = true;
-      const timer = setTimeout(onComplete, 600);
+      const timer = setTimeout(onComplete, 1200);
       return () => clearTimeout(timer);
     }
-  }, [proteinCorrect, onComplete]);
+  }, [gameComplete, onComplete]);
+
+  // Current codon for display
+  const displayCodonIdx = atStopCodon ? translateCodons.length : currentCodonIdx;
+  const currentCodon = atStopCodon
+    ? (stopIndex >= 0 ? allCodons[stopIndex] : '')
+    : (currentCodonIdx < translateCodons.length ? translateCodons[currentCodonIdx] : '');
 
   return (
     <div className="space-y-6">
       <div className="text-sm text-stone-600 space-y-2">
         <p>
-          Now put it all together: go from a DNA coding sequence to a protein. This sequence is based on
-          a fragment of <strong>rbcL</strong>, the gene encoding the large subunit of <strong>Rubisco</strong> (ribulose-1,5-bisphosphate
-          carboxylase/oxygenase) — the most abundant protein on Earth, responsible for fixing CO&#x2082; in
-          photosynthesis.
+          You are the <strong>ribosome</strong>. Your job: read the mRNA codons one at a time and select
+          the correct <strong>tRNA</strong> — the one whose <strong>anticodon</strong> is complementary to the
+          current codon. Each tRNA carries a specific amino acid that gets added to the growing protein chain.
+        </p>
+        <p>
+          This mRNA is from <strong>rbcL</strong>, encoding the large subunit of <strong>Rubisco</strong> — the
+          most abundant protein on Earth, responsible for fixing CO&#x2082; in photosynthesis.
         </p>
       </div>
 
-      {/* Show the DNA */}
-      <div className="bg-white rounded-xl border border-stone-200 p-5 space-y-4">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-stone-500">Gene fragment (rbcL):</p>
-          <div className="bg-stone-50 rounded-lg p-3 text-xs font-mono space-y-1">
-            <div>5&apos;-{EXP4_CODING_DNA}-3&apos; &nbsp;<span className="text-stone-400">(Strand 1)</span></div>
-            <div>3&apos;-{EXP4_TEMPLATE_DNA.split('').reverse().join('')}-5&apos; &nbsp;<span className="text-stone-400">(Strand 2)</span></div>
-          </div>
-        </div>
-
-        {/* Step 0: Which is the template? */}
-        <QuestionPanel
-          question="Step 1: Which strand does RNA polymerase use as the template? (Hint: the mRNA must start with AUG, which corresponds to ATG on the coding strand.)"
-          correct={templateSubmitted ? templateAnswer === 'b' : null}
-          feedback={
-            templateSubmitted
-              ? templateAnswer === 'b'
-                ? 'Correct! Strand 2 is the template. RNA polymerase reads it 3\'→5\' to produce mRNA that matches Strand 1 (with U instead of T).'
-                : 'The template strand is the one that RNA polymerase reads. The mRNA will match the coding strand (Strand 1) with U replacing T. So the template is the OTHER strand.'
-              : undefined
-          }
-        >
-          <div className="space-y-2">
-            <OptionButton
-              label="(a) Strand 1 is the template"
-              selected={templateAnswer === 'a'}
-              correct={templateSubmitted ? (templateAnswer === 'a' ? false : null) : null}
-              onClick={() => { if (!templateSubmitted) setTemplateAnswer('a'); }}
-              disabled={templateSubmitted}
-            />
-            <OptionButton
-              label="(b) Strand 2 is the template"
-              selected={templateAnswer === 'b'}
-              correct={templateSubmitted ? (templateAnswer === 'b' ? true : null) : null}
-              onClick={() => { if (!templateSubmitted) setTemplateAnswer('b'); }}
-              disabled={templateSubmitted}
-            />
-            {templateAnswer && !templateSubmitted && (
-              <button
-                type="button"
-                onClick={() => { setTemplateSubmitted(true); if (templateAnswer === 'b') setStep(1); }}
-                className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800"
+      {/* Growing protein chain */}
+      <div className="bg-white rounded-xl border border-stone-200 p-4">
+        <p className="text-xs font-semibold text-stone-500 mb-2">Protein Chain ({proteinChain.length} amino acids)</p>
+        <div className="flex flex-wrap gap-1 min-h-[2.5rem]">
+          {proteinChain.length === 0 && (
+            <span className="text-xs text-stone-400 italic">Select tRNAs below to build the protein...</span>
+          )}
+          {proteinChain.map((aa, i) => {
+            const prop = AA_PROPERTIES[aa] ?? 'special';
+            const color = AA_PROPERTY_COLORS[prop];
+            const isNew = i === proteinChain.length - 1 && correctFlash;
+            return (
+              <div
+                key={i}
+                className={`w-9 h-9 rounded-full text-xs font-bold text-white flex items-center justify-center transition-all ${
+                  isNew ? 'scale-125 ring-2 ring-emerald-400' : ''
+                }`}
+                style={{ backgroundColor: color }}
+                title={`${AA_THREE_LETTER[aa]} — ${AA_PROPERTY_LABELS[prop]}`}
               >
-                Submit
-              </button>
-            )}
-          </div>
-        </QuestionPanel>
-
-        {/* Step 1: Show the mRNA */}
-        {step >= 1 && (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-stone-700">Step 2: The mRNA (transcribed from the template):</p>
-            <div className="bg-amber-50 rounded-lg p-3 font-mono text-sm overflow-x-auto">
-              5&apos;-{correctMrna}-3&apos;
+                {AA_THREE_LETTER[aa] ?? aa}
+              </div>
+            );
+          })}
+          {gameComplete && (
+            <div className="flex items-center ml-2">
+              <span className="text-sm font-bold text-emerald-600">Release!</span>
             </div>
-            <button type="button" onClick={() => setStep(2)} className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800">
-              Break into Codons
-            </button>
-          </div>
-        )}
+          )}
+        </div>
+      </div>
 
-        {/* Step 2: Show codons */}
-        {step >= 2 && (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-stone-700">Step 3: Reading in triplets (codons):</p>
-            <div className="flex flex-wrap gap-2 font-mono text-sm">
-              {(() => {
-                const codons: string[] = [];
-                for (let i = 0; i < correctMrna.length; i += 3) {
-                  codons.push(correctMrna.slice(i, i + 3));
-                }
-                return codons.map((codon, i) => {
-                  const aa = CODON_TABLE[codon];
-                  const label = aa === '*' ? 'Stop' : (AA_THREE_LETTER[aa ?? ''] ?? '?');
-                  return (
-                    <div key={i} className="text-center">
-                      <div className="bg-stone-100 rounded px-2 py-1 font-bold">{codon}</div>
-                      <div className={`text-xs mt-0.5 ${aa === '*' ? 'text-red-600' : aa === 'M' && i === 0 ? 'text-emerald-600' : 'text-stone-500'}`}>
-                        {label}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-            <button type="button" onClick={() => setStep(3)} className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800">
-              Translate to Protein
-            </button>
+      {/* mRNA strand with ribosome window */}
+      <div className="bg-white rounded-xl border border-stone-200 p-4">
+        <p className="text-xs font-semibold text-stone-500 mb-2">mRNA (5&apos; &#x2192; 3&apos;)</p>
+        <div className="flex gap-0.5 flex-wrap items-center">
+          {allCodons.map((codon, ci) => {
+            const isActive = ci === displayCodonIdx && !gameComplete;
+            const isPast = ci < displayCodonIdx;
+            const isStop = CODON_TABLE[codon] === '*';
+            return (
+              <div
+                key={ci}
+                className={`flex gap-px rounded px-0.5 py-1 transition-all ${
+                  isActive
+                    ? 'ring-2 ring-amber-500 bg-amber-50 scale-110'
+                    : isPast
+                    ? 'opacity-40'
+                    : ''
+                }`}
+              >
+                {codon.split('').map((base, bi) => (
+                  <span
+                    key={bi}
+                    className={`w-6 h-7 rounded text-xs font-bold text-white flex items-center justify-center ${
+                      isStop && isActive ? 'ring-1 ring-red-400' : ''
+                    }`}
+                    style={{ backgroundColor: BASE_COLORS[base] ?? '#9ca3af' }}
+                  >
+                    {base}
+                  </span>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+        {currentCodon && !gameComplete && (
+          <div className="mt-2 text-sm font-mono text-stone-700">
+            Current codon: <strong className="text-amber-700">{currentCodon}</strong>
+            {atStopCodon && <span className="text-red-600 font-semibold ml-2">(Stop codon!)</span>}
           </div>
-        )}
-
-        {/* Step 3: Show protein */}
-        {step >= 3 && (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-stone-700">Step 4: The protein (amino acid sequence):</p>
-            <div className="bg-emerald-50 rounded-lg p-3 font-mono text-sm">
-              {expectedProteinStr}
-            </div>
-            <p className="text-sm text-stone-600">
-              This {expectedProtein.length}-amino-acid fragment is the very beginning of the Rubisco large subunit.
-              The full protein is 475 amino acids long.
-            </p>
-          </div>
-        )}
-
-        {/* Final verification */}
-        {step >= 3 && (
-          <QuestionPanel
-            question={`Write the protein sequence using single-letter amino acid codes (${expectedProtein.length} letters):`}
-            correct={proteinSubmitted ? proteinCorrect : null}
-            feedback={
-              proteinSubmitted
-                ? proteinCorrect
-                  ? `Correct! The protein sequence is ${expectedSingleLetter}.`
-                  : `Check the codon table. The correct sequence is ${expectedSingleLetter}.`
-                : undefined
-            }
-          >
-            <div className="flex gap-2 items-center">
-              <input
-                type="text"
-                value={proteinAnswer}
-                onChange={e => setProteinAnswer(e.target.value.toUpperCase())}
-                disabled={proteinCorrect}
-                className="border border-stone-300 rounded-lg px-3 py-2 text-sm font-mono w-48 focus:outline-none focus:border-amber-400"
-                placeholder={`${expectedProtein.length} letter codes...`}
-                maxLength={expectedProtein.length + 5}
-              />
-              {proteinAnswer.length >= expectedProtein.length && !proteinSubmitted && (
-                <button
-                  type="button"
-                  onClick={() => setProteinSubmitted(true)}
-                  className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800"
-                >
-                  Submit
-                </button>
-              )}
-              {proteinSubmitted && !proteinCorrect && (
-                <button
-                  type="button"
-                  onClick={() => { setProteinSubmitted(false); setProteinAnswer(''); }}
-                  className="bg-stone-200 text-stone-700 font-bold px-3 py-2 rounded-lg text-xs hover:bg-stone-300"
-                >
-                  Retry
-                </button>
-              )}
-            </div>
-          </QuestionPanel>
         )}
       </div>
+
+      {/* tRNA pool or stop/release */}
+      {!gameComplete && !atStopCodon && currentCodonIdx < translateCodons.length && (
+        <div className="bg-stone-50 rounded-xl border border-stone-200 p-4 space-y-3">
+          <p className="text-xs font-semibold text-stone-500">
+            Select the tRNA with the matching anticodon for codon <strong className="text-amber-700">{currentCodon}</strong>
+          </p>
+
+          {wrongPick && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+              Anticodon <strong className="font-mono">{wrongPick}</strong> does not match codon <strong className="font-mono">{currentCodon}</strong>.
+              Remember: A pairs with U, G pairs with C. The anticodon reads 3&apos;&#x2192;5&apos; against the codon 5&apos;&#x2192;3&apos;. Try again!
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
+            {trnaPool.map((trna, i) => {
+              const aaLabel = trna.aa === '*' ? 'Stop' : (AA_THREE_LETTER[trna.aa] ?? trna.aa);
+              const aaProp = AA_PROPERTIES[trna.aa] ?? 'special';
+              const aaColor = AA_PROPERTY_COLORS[aaProp];
+              const isWrongFlash = wrongPick === trna.anticodon;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleTrnaClick(trna)}
+                  className={`flex flex-col items-center rounded-xl border-2 p-2 transition-all hover:scale-105 hover:shadow-md ${
+                    isWrongFlash
+                      ? 'border-red-300 bg-red-50'
+                      : 'border-stone-200 bg-white hover:border-amber-400'
+                  }`}
+                >
+                  {/* Amino acid */}
+                  <div
+                    className="w-8 h-8 rounded-full text-xs font-bold text-white flex items-center justify-center mb-1"
+                    style={{ backgroundColor: aaColor }}
+                  >
+                    {aaLabel}
+                  </div>
+                  {/* tRNA body */}
+                  <svg width="40" height="32" viewBox="0 0 40 32" className="mb-1">
+                    {/* Stem */}
+                    <line x1="20" y1="0" x2="20" y2="8" stroke="#78716c" strokeWidth="2" />
+                    {/* T-shape body */}
+                    <rect x="8" y="8" width="24" height="4" rx="2" fill="#d6d3d1" />
+                    <rect x="18" y="8" width="4" height="16" rx="1" fill="#d6d3d1" />
+                    {/* Anticodon loop */}
+                    <ellipse cx="20" cy="28" rx="10" ry="4" fill="none" stroke="#78716c" strokeWidth="1.5" />
+                  </svg>
+                  {/* Anticodon */}
+                  <div className="flex gap-px">
+                    {trna.anticodon.split('').map((base, bi) => (
+                      <span
+                        key={bi}
+                        className="w-4 h-5 rounded-sm text-[10px] font-bold text-white flex items-center justify-center"
+                        style={{ backgroundColor: BASE_COLORS[base] ?? '#9ca3af' }}
+                      >
+                        {base}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Stop codon reached — release button */}
+      {atStopCodon && !gameComplete && (
+        <div className="bg-red-50 rounded-xl border border-red-200 p-5 text-center space-y-3">
+          <p className="text-lg font-bold text-red-700">Stop Codon Reached! ({currentCodon})</p>
+          <p className="text-sm text-red-600">
+            No tRNA recognizes a stop codon. Instead, a <strong>release factor</strong> enters the ribosome
+            and triggers release of the completed protein.
+          </p>
+          <button
+            type="button"
+            onClick={handleRelease}
+            className="bg-amber-700 text-white font-bold px-8 py-3 rounded-xl text-lg hover:bg-amber-800 transition-all hover:scale-105"
+          >
+            Release Protein!
+          </button>
+        </div>
+      )}
+
+      {/* Completion */}
+      {gameComplete && (
+        <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-5 space-y-4">
+          <p className="text-lg font-bold text-emerald-800">Protein Complete!</p>
+          <div className="space-y-2">
+            <p className="text-sm text-stone-700 font-semibold">Your protein ({proteinChain.length} amino acids):</p>
+            <div className="flex flex-wrap gap-1">
+              {proteinChain.map((aa, i) => {
+                const prop = AA_PROPERTIES[aa] ?? 'special';
+                const color = AA_PROPERTY_COLORS[prop];
+                return (
+                  <div
+                    key={i}
+                    className="w-10 h-10 rounded-full text-xs font-bold text-white flex items-center justify-center"
+                    style={{ backgroundColor: color }}
+                    title={`Position ${i + 1}: ${AA_THREE_LETTER[aa]} — ${AA_PROPERTY_LABELS[prop]}`}
+                  >
+                    {AA_THREE_LETTER[aa] ?? aa}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs font-mono text-stone-500">
+              Single-letter: {proteinChain.join('')}
+            </p>
+          </div>
+          <div className="bg-white rounded-lg border border-emerald-100 p-4 text-sm text-stone-700 space-y-2">
+            <p>
+              You just built the first <strong>{proteinChain.length} amino acids</strong> of <strong>Rubisco</strong> — the
+              protein that fixes every molecule of CO&#x2082; in photosynthesis. The full protein is
+              <strong> 475 amino acids</strong> long. Imagine doing this 475 times!
+            </p>
+            <p>
+              In a real cell, the ribosome translates roughly <strong>15-20 amino acids per second</strong>.
+              So a full Rubisco large subunit takes about 25 seconds to translate.
+            </p>
+          </div>
+
+          {/* Property legend */}
+          <div className="flex flex-wrap gap-3 text-xs">
+            {(['hydrophobic', 'polar', 'positive', 'negative', 'special'] as const).map(prop => (
+              <div key={prop} className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: AA_PROPERTY_COLORS[prop] }} />
+                <span className="text-stone-600">{AA_PROPERTY_LABELS[prop]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1298,6 +1461,9 @@ function Exp5_Mutations({ onComplete }: { onComplete: () => void }) {
               {q1Answer && !q1Submitted && (
                 <button type="button" onClick={() => setQ1Submitted(true)} className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800">Submit</button>
               )}
+              {q1Submitted && q1Answer !== 'c' && (
+                <button type="button" onClick={() => { setQ1Submitted(false); setQ1Answer(null); }} className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300">Try Again</button>
+              )}
             </div>
           </QuestionPanel>
 
@@ -1330,6 +1496,9 @@ function Exp5_Mutations({ onComplete }: { onComplete: () => void }) {
                 ))}
                 {q2Answer && !q2Submitted && (
                   <button type="button" onClick={() => setQ2Submitted(true)} className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800">Submit</button>
+                )}
+                {q2Submitted && q2Answer !== 'b' && (
+                  <button type="button" onClick={() => { setQ2Submitted(false); setQ2Answer(null); }} className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300">Try Again</button>
                 )}
               </div>
             </QuestionPanel>
@@ -1461,6 +1630,9 @@ function Exp6_ProteinStructure({ onComplete }: { onComplete: () => void }) {
               {q1Answer && !q1Submitted && (
                 <button type="button" onClick={() => setQ1Submitted(true)} className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800">Submit</button>
               )}
+              {q1Submitted && q1Answer !== 'a' && (
+                <button type="button" onClick={() => { setQ1Submitted(false); setQ1Answer(null); }} className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300">Try Again</button>
+              )}
             </div>
           </QuestionPanel>
 
@@ -1493,6 +1665,9 @@ function Exp6_ProteinStructure({ onComplete }: { onComplete: () => void }) {
                 ))}
                 {q2Answer && !q2Submitted && (
                   <button type="button" onClick={() => setQ2Submitted(true)} className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800">Submit</button>
+                )}
+                {q2Submitted && q2Answer !== 'b' && (
+                  <button type="button" onClick={() => { setQ2Submitted(false); setQ2Answer(null); }} className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300">Try Again</button>
                 )}
               </div>
             </QuestionPanel>
@@ -1613,6 +1788,9 @@ function Exp7_Synthesis({ onComplete }: { onComplete: () => void }) {
           {answer && !submitted && (
             <button type="button" onClick={() => setSubmitted(true)} className="bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-amber-800">Submit</button>
           )}
+          {submitted && answer !== 'c' && (
+            <button type="button" onClick={() => { setSubmitted(false); setAnswer(null); }} className="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-lg text-sm hover:bg-stone-300">Try Again</button>
+          )}
         </div>
       </QuestionPanel>
 
@@ -1660,7 +1838,7 @@ const EXPERIMENTS = [
   {
     id: 'molbio-4',
     title: 'Translation',
-    subtitle: 'Building a protein from rbcL',
+    subtitle: 'tRNA ribosome game',
     Component: Exp4_Translation,
   },
   {
