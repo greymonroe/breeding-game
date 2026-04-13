@@ -26,10 +26,18 @@ const MODULES = [
     href: '/breeding-game/popgen.html',
     icon: 'population' as const,
   },
+  {
+    title: 'Molecular Biology',
+    description: 'Explore DNA, transcription, translation, mutations, and protein structure.',
+    difficulty: 'Intermediate',
+    color: 'amber',
+    experiments: 8,
+    href: '/breeding-game/molbio.html',
+    icon: 'dna' as const,
+  },
 ];
 
 const COMING_SOON = [
-  { title: 'Molecular Biology' },
   { title: 'Quantitative Genetics' },
 ];
 
@@ -54,6 +62,22 @@ function ChromosomeSvg({ className }: { className?: string }) {
       <circle cx="26" cy="24" r="2.5" fill="currentColor" />
       <circle cx="36" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
       <path d="M20 20V14M20 28V34" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" />
+    </svg>
+  );
+}
+
+function DnaSvg({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Double helix strands */}
+      <path d="M16 6C16 6 32 14 32 24C32 34 16 42 16 42" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      <path d="M32 6C32 6 16 14 16 24C16 34 32 42 32 42" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      {/* Base pair rungs */}
+      <line x1="19" y1="12" x2="29" y2="12" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="17" y1="18" x2="31" y2="18" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="17" y1="24" x2="31" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="17" y1="30" x2="31" y2="30" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      <line x1="19" y1="36" x2="29" y2="36" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
     </svg>
   );
 }
@@ -86,6 +110,7 @@ const ICON_MAP = {
   plant: PlantSvg,
   chromosome: ChromosomeSvg,
   population: PopulationSvg,
+  dna: DnaSvg,
 };
 
 const COLOR_MAP: Record<string, { gradient: string; border: string; bg: string; text: string; btnFrom: string; btnTo: string }> = {
@@ -112,6 +137,14 @@ const COLOR_MAP: Record<string, { gradient: string; border: string; bg: string; 
     text: 'text-violet-700',
     btnFrom: 'from-violet-500',
     btnTo: 'to-violet-600',
+  },
+  amber: {
+    gradient: 'from-amber-400 to-amber-500',
+    border: 'border-amber-200',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    btnFrom: 'from-amber-500',
+    btnTo: 'to-amber-600',
   },
 };
 
@@ -196,7 +229,7 @@ export default function ModuleHub() {
 
       {/* Module cards */}
       <section className="max-w-5xl mx-auto px-4 -mt-4 sm:-mt-6 relative z-[1]">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {MODULES.map((m) => (
             <ModuleCard key={m.title} module={m} />
           ))}

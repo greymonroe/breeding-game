@@ -22,7 +22,7 @@ export interface ModuleDefinition {
   id: string;
   title: string;
   subtitle: string;
-  color: 'emerald' | 'cyan' | 'violet';
+  color: 'emerald' | 'cyan' | 'violet' | 'amber';
   backLink?: { href: string; label: string };
   experiments: ExperimentDefinition[];
   /**
@@ -93,6 +93,14 @@ const THEME = {
     done: 'bg-violet-50 text-violet-700 hover:bg-violet-100',
     button: 'bg-violet-700',
     complete: 'bg-violet-100 text-violet-700',
+  },
+  amber: {
+    gradient: 'from-amber-800 to-amber-700',
+    light: 'text-amber-200',
+    active: 'bg-amber-100 border-2 border-amber-400 font-bold text-amber-800',
+    done: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+    button: 'bg-amber-700',
+    complete: 'bg-amber-100 text-amber-700',
   },
 } as const;
 

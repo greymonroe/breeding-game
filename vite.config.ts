@@ -14,6 +14,7 @@ export default defineConfig({
         popgen: resolve(__dirname, 'popgen.html'),
         linkage: resolve(__dirname, 'linkage.html'),
         modules: resolve(__dirname, 'modules.html'),
+        molbio: resolve(__dirname, 'molbio.html'),
       },
     },
   },
